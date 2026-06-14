@@ -138,3 +138,36 @@ BREAKING CHANGE: response field `data` renamed to `payload`
 
 - [Conventional Commits Specification v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
 - [Angular Commit Guidelines](https://github.com/angular/angular/blob/master/CONTRIBUTING.md#commit)
+
+## macOS 复制到剪贴板
+
+在 macOS 系统下生成 commit message 后，使用 `pbcopy` 将其复制到系统剪贴板，便于直接粘贴到 git GUI 或终端。
+
+**检测系统：**
+
+```bash
+[[ "$(uname)" == "Darwin" ]] && echo "macOS"
+```
+
+**单行消息：**
+
+```bash
+echo -n "feat(parser): add array parsing support" | pbcopy
+```
+
+**多行消息（含 body / footer）：**
+
+```bash
+pbcopy <<'EOF'
+fix: prevent request race condition
+
+Introduce request ID to track concurrent requests.
+Reject duplicate requests with same ID.
+
+Refs: #123
+EOF
+```
+
+**Agent 工作流建议：**
+
+生成 commit message 后，若检测到 `uname` 输出为 `Darwin`，自动通过 `pbcopy` 复制结果，并在回复中提示「已复制到剪贴板」。非 macOS 系统跳过此步骤。
