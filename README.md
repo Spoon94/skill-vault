@@ -105,7 +105,10 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 | 技能 | 描述 |
 |------|------|
-| [conventional-commits](./conventional-commits) | 规范 Git 提交消息格式，便于自动化生成版本号和变更日志 |
+| [conventional-commits](./conventional-commits) | 规范 Git 提交消息格式，便于自动化生成版本号和变更日志；macOS 下可自动 `pbcopy` 到剪贴板 |
+| [gh](./gh) | GitHub CLI（`gh`）调用模式：结构化输出、分页、仓库定位、搜索 vs 列表、`gh api` 兜底 |
+| [tmux](./tmux) | 以脚本方式驱动 tmux：后台会话、`send-keys`、`capture-pane`，自动化 REPL/SSH/调试器 |
+| [semble](./semble) | 用 `semble search` 替代 grep+read 做语义代码检索，省 ~98% token |
 | [mcp2cli](./mcp2cli) | 把任意 MCP 服务器、OpenAPI 规范或 GraphQL 端点变成 CLI，无需代码生成 |
 | [worktrunk](./worktrunk) | Worktrunk（`wt` CLI）使用指南：git worktree 管理、hooks 和配置 |
 
