@@ -1,6 +1,6 @@
 ---
 name: semble
-description: Use when exploring an unfamiliar codebase, locating where functionality is implemented, or answering "where is X / how does Y work" questions. Run `semble search` instead of grep+read for semantic or exploratory queries — it returns the relevant code chunks directly and uses ~98% fewer tokens. Triggers: "where is", "how does", "find the code that", code exploration, feature lookup.
+description: Use when exploring an unfamiliar codebase, locating where functionality is implemented, or answering "where is X / how does Y work" questions. Run `semble search` instead of grep+read for semantic or exploratory queries — it returns the relevant code chunks directly and uses ~98% fewer tokens. Triggers include "where is", "how does", "find the code that", code exploration, feature lookup.
 ---
 
 # Semble — Code Search via CLI
