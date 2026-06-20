@@ -111,6 +111,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [semble](./semble) | 用 `semble search` 替代 grep+read 做语义代码检索，省 ~98% token |
 | [mcp2cli](./mcp2cli) | 把任意 MCP 服务器、OpenAPI 规范或 GraphQL 端点变成 CLI，无需代码生成 |
 | [worktrunk](./worktrunk) | Worktrunk（`wt` CLI）使用指南：git worktree 管理、hooks 和配置 |
+| [engram-mem](./engram-mem) | 基于本地 engram CLI(SQLite + FTS5)的跨会话持久记忆,工作与生活通用,支持决策、偏好、计划等记忆的存取与检索 |
 
 ## 安装方式
 
