@@ -196,16 +196,35 @@ engram search "wife allergy food" --limit 10      # 确认是生活记忆后再 
 
 engram 以本地 SQLite 为权威源,通过 git 同步。完整命令见 `references/engram-cli.md`。
 
-**务必用 `engram sync --all`**:默认 `engram sync` 只导出当前项目,会漏掉
-`--scope personal` 的生活记忆(已实测验证);`--all` 才会把所有项目 + personal 记忆一起导出。
+**两条铁律:**
+1. **`engram sync` 把 chunk 写到「当前目录/.engram」**(源码里是相对路径 `.engram`,无法用 flag 改)。
+   所以**必须在 `~/.engram` 里跑**;在别处跑会把 chunk 写进那个目录的 `.engram/`(如
+   `~/Code/某项目/.engram/`),既不进数据目录也没进 git 仓——记忆看似同步了实际丢了。
+   (这是实测踩过的坑。)
+2. **`engram sync` 要带 `--all`**:默认只导出当前项目,会漏 `--scope personal` 的生活记忆;
+   `--all` 才导出全部(含 personal)。
+
+为彻底免踩 cwd 坑,**同步统一走 skill 自带脚本** `scripts/engram-sync.sh`(它内部用子 shell
+固定到 `~/.engram`,既保证 chunk 落对地方,又不改你当前目录):
 
 ```bash
-cd ~/.engram && git init && git remote add origin <私有仓>     # 每台机一次性
-engram sync --all && git -C ~/.engram add . && git -C ~/.engram commit -m "sync" && git -C ~/.engram push
-# 另一台:git -C ~/.engram pull && engram sync --import
+# 路径相对本 skill 目录;<skill> = 本 SKILL.md 所在目录
+<skill>/scripts/engram-sync.sh push      # engram sync --all → git add/commit/push(默认)
+<skill>/scripts/engram-sync.sh pull      # git pull → engram sync --import
+<skill>/scripts/engram-sync.sh status    # engram 同步状态 + git 状态
+```
+
+首次每台机一次性初始化 git 远端(脚本不做这步,避免误操作):
+
+```bash
+( cd ~/.engram && git init && git remote add origin <私有仓> )   # 用私有仓!
 ```
 
 务必用**私有**仓(记忆含敏感上下文)。检索文本已是英文,同步后各机表现一致;继续用同样的常用译词即可对齐。
+
+> 注:`engram sync --status` 里的 `Remote chunks` 指的是 engram 自建 cloud 服务(未配置即为 0),
+> 与"git 已推送成功"无关——本方案的云端走 git→GitHub,不是 engram cloud。
+> 脚本可用 `ENGRAM_HOME` 覆盖数据目录(默认 `~/.engram`)。
 
 ## 为什么这样设计(便于变通,而非死记)
 

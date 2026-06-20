@@ -110,23 +110,29 @@ engram export [file]                     # 默认 engram-export.json
 ---
 
 ## sync
-跨设备同步:本地 SQLite 为权威源,按项目导出压缩 chunk 到 `~/.engram/.engram/`,经 git 流转。
+跨设备同步:本地 SQLite 为权威源,导出压缩 chunk,经 git 流转。
+
+**⚠️ chunk 写到「当前目录/.engram」**:源码里 syncDir 是相对路径 `.engram`(无 flag 可改),
+所以 `engram sync` 在哪个目录跑就写到哪个目录的 `.engram/`。**必须在 `~/.engram` 里跑**,
+否则 chunk 落到别处(如 `~/Code/某项目/.engram/`),不进 git 仓 → 记忆丢失(实测踩过)。
 
 ```
-engram sync                              # 导出新记忆为 chunk(默认当前项目)
-engram sync --all                        # 所有项目
+engram sync                              # 导出当前项目的新记忆为 chunk(默认)
+engram sync --all                        # 导出所有项目 + personal(同步务必用这个)
 engram sync --import                     # 在另一台机器导入新 chunk
 engram sync --status                     # 查看同步状态
-engram sync --cloud --project PROJECT    # 云复制(需显式 --project,可选)
+engram sync --cloud --project PROJECT    # engram 自建云复制(需显式 --project,本方案不用)
 ```
 
-git 闭环(配合 sync):
+git 闭环(全部用子 shell 固定 cwd,免踩坑):
 
 ```bash
-cd ~/.engram && git init && git remote add origin <私有仓>   # 一次性
-engram sync --all && git -C ~/.engram add . && git -C ~/.engram commit -m "sync" && git -C ~/.engram push
-# 另一台:git -C ~/.engram pull && engram sync --import
+( cd ~/.engram && git init && git remote add origin <私有仓> )   # 一次性
+( cd ~/.engram && engram sync --all && git add .engram/ && git commit -m "sync engram memories" && git push )
+# 另一台:( cd ~/.engram && git pull && engram sync --import )
 ```
+
+> `engram sync --status` 的 `Remote chunks: 0` 指 engram 自建 cloud(未配置即 0),与 git 推送成功无关。
 
 ---
 
