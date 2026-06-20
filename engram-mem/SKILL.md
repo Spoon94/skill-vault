@@ -163,17 +163,25 @@ engram save "Fix login timeout via JWT retry and backoff" "$CONTENT" --type bugf
 
 ## 检索记忆(recall)
 
+检索是**关键词精确匹配、无语义兜底**,所以"召回靠多试、别过早过滤、别过早放弃"。
+实测教训:一条明明存在的记忆,因第一次查询词不对 + 误加了 scope 过滤,前三次全返回 0,
+第四次换词才命中——差点被误判成"没存过"。据此定下面的规则。
+
 1. **把查询译成英文**(用与保存时一致的常用词);用户给英文则直接用。
-2. **检索**:
+2. **第一次搜:宽,不要加 `--scope` 过滤。** scope(project/personal)很难猜准,猜错会把
+   命中的记忆直接滤掉。先搜全量,拿到结果再按需收窄。
+3. **多轮换词,至少试 2-3 个角度再下"不存在"结论**。换词思路:
+   - 用户的**原词直译** + 明显**近义词**(分类→classify / categorize / lists / organize)
+   - 可能出现在记忆里的**具体名词/专名**(库名、API、项目名、功能名,如 "star lists"、"GraphQL")
+   - 放宽到**单个核心词**(如只搜 "star"、"stars")
+4. **可读地呈现**;用户用中文时把 `[原文]` 中文一并展示。
+5. 仅在确实需要收窄时才加过滤:`--type` / `--project` / `--scope` / `--limit`。
 
 ```bash
-engram search "login timeout JWT" --limit 10
-# 生活类记忆加 --scope personal;也可 --type / --project 过滤
-engram search "wife allergy food" --scope personal
+engram search "github star lists" --limit 10      # 第一次:宽,不加 scope
+engram search "star categorize organize" --limit 10   # 没中就换词再试
+engram search "wife allergy food" --limit 10      # 确认是生活记忆后再 --scope personal 收窄
 ```
-
-3. 没命中先**换关键词重试**再下"不存在"结论(无语义兜底,换说法常能搜出,如 "auth timeout"、"token expiry")。
-4. **可读地呈现**;用户用中文时把 `[原文]` 中文一并展示。
 
 ## 翻译原则
 
