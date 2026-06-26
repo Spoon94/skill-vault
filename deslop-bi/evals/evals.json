@@ -1,0 +1,29 @@
+{
+  "skill_name": "deslop-bi",
+  "evals": [
+    {
+      "id": 0,
+      "name": "chinese-marketing-copy",
+      "prompt": "帮我去除这段产品介绍的 AI 味道，让它读起来像真人写的：\n\n作为新一代 AI 编程助手，CodeFlow 致力于打造开发者最坚实的后盾——通过深度赋能开发流程，全方位助力工程师持续提升效率。它不仅仅是一个工具，更是一种思维方式的革新。在不断演变的技术格局中，CodeFlow 正在重塑代码编写、调试和部署的方式，为团队带来前所未有的生产力飞跃。\n\n**核心优势：**\n- 🚀 **极速响应：** 毫秒级智能补全，让灵感不再被打断\n- 💡 **深度理解：** 全面洞察代码上下文，精准把握开发者意图\n- ✅ **无缝集成：** 支持主流 IDE，一键接入现有工作流\n\n展望未来，我们将持续深耕，期待与每一位开发者共同书写代码世界的新篇章。",
+      "expected_output": "中文输出，去掉机械动词(打造/赋能/助力/深耕)、破折号、装饰 emoji、内联标题列表、三段式套话、宣告式结尾。保留产品名 CodeFlow 和核心功能描述。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 1,
+      "name": "english-essay-slop",
+      "prompt": "Can you humanize this for me? It sounds way too much like ChatGPT wrote it:\n\nGreat question! Let me dive into the fascinating world of remote work. Remote work stands as a testament to the transformative potential of digital technology, marking a pivotal moment in the ever-evolving landscape of modern employment. It's not just a workplace shift — it's a profound reimagining of how we collaborate, communicate, and create.\n\nThe benefits are clear: enhanced flexibility, improved work-life balance, and increased productivity. Companies are leveraging cutting-edge tools to foster collaboration across geographies, while employees are navigating the intricate tapestry of asynchronous workflows. Industry experts believe this trend will continue to shape the future of work in significant ways.\n\nHowever, despite these challenges — including isolation, communication gaps, and the blurring of work-life boundaries — the remote work revolution shows no signs of slowing down. In conclusion, the future of work is bright, and remote work is here to stay. Hope this helps!",
+      "expected_output": "English output. Remove em dashes, sycophantic opener, AI vocab (delve/tapestry/landscape/pivotal/testament), 'It's not just X, it's Y', rule of three (collaborate/communicate/create), 'In conclusion', 'Hope this helps'. Output should keep the topic (remote work) and main claims.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "mixed-tech-blog",
+      "prompt": "我写了一篇关于 Kubernetes 的技术博客开头，请帮我去掉 AI 味，保持中英混合的技术语境：\n\n在当今云原生（Cloud Native）的浪潮中，Kubernetes 作为容器编排（Container Orchestration）的事实标准，正在不断重塑现代基础设施的格局。本文将深入探讨 K8s 的核心架构——通过剖析其控制平面（Control Plane）和工作节点（Worker Node）的精妙设计，帮助读者全面理解这一开创性技术的内在逻辑。\n\n让我们一起来看看 Kubernetes 的核心组件：\n- **API Server（API 服务器）:** 整个集群的统一入口\n- **etcd（分布式键值存储）:** 集群状态的真实之源\n- **Scheduler（调度器）:** 智能分配工作负载\n- **Controller Manager（控制器管理器）:** 维持集群的期望状态\n\n值得注意的是，Kubernetes 不仅仅是一个容器编排工具，更是一种 cloud-native 应用开发的全新范式。",
+      "expected_output": "中英混合输出，保留技术术语 Kubernetes/K8s/API Server/etcd 等。去掉:在当今/浪潮中/重塑/格局/深入探讨/破折号/让我们一起看看/值得注意的是/不仅仅是X更是Y/精妙/开创性/全新范式。括号注释过密的(英文术语+中文翻译)应精简。",
+      "files": [],
+      "assertions": []
+    }
+  ]
+}
