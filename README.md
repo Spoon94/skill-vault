@@ -112,6 +112,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [mcp2cli](./mcp2cli) | 把任意 MCP 服务器、OpenAPI 规范或 GraphQL 端点变成 CLI，无需代码生成 |
 | [worktrunk](./worktrunk) | Worktrunk（`wt` CLI）使用指南：git worktree 管理、hooks 和配置 |
 | [engram-mem](./engram-mem) | 基于本地 engram CLI(SQLite + FTS5)的跨会话持久记忆,工作与生活通用,支持决策、偏好、计划等记忆的存取与检索 |
+| [deslop-bi](./deslop-bi) | 双语去 AI 味：识别并修复中英文文本中的 AI 生成痕迹——浮夸修辞、套路结构、机器翻译腔、"深入探讨/打造/赋能"等中文 AI 高频词 |
 
 ## 安装方式
 
