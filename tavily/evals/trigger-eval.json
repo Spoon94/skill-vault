@@ -1,0 +1,166 @@
+[
+  {
+    "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+    "should_trigger": true
+  },
+  {
+    "query": "我的老板让我研究一下竞品定价策略，对比一下 Notion vs Linear vs ClickUp 的团队版月费，要带引用来源",
+    "should_trigger": true
+  },
+  {
+    "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+    "should_trigger": true
+  },
+  {
+    "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts — don't dump raw HTML into context, filter for the relevant paragraphs only",
+    "should_trigger": true
+  },
+  {
+    "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+    "should_trigger": true
+  },
+  {
+    "query": "what's on the front page of hacker news today? just titles and urls, skip the boilerplate",
+    "should_trigger": true
+  },
+  {
+    "query": "research the EU AI Act implementation timeline — I need a cited report with sources, take your time and use the pro model",
+    "should_trigger": true
+  },
+  {
+    "query": "discover all URLs under https://example.com/blog/ — I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+    "should_trigger": true
+  },
+  {
+    "query": "搜一下 Python 3.13 的发布日期，给我三条结果就够了，要带相关度评分",
+    "should_trigger": true
+  },
+  {
+    "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app — try advanced depth, I need the rendered text not the raw HTML",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我查一下 2026 年中国新能源汽车补贴政策有什么最新变化，要最近一个月的新闻，给我 5 条带来源",
+    "should_trigger": true
+  },
+  {
+    "query": "爬一下这个文档站点 https://docs.example.com/zh/ ，把每个页面存成 markdown 文件放到 ./docs/ 目录下，深度 2 层就行",
+    "should_trigger": true
+  },
+  {
+    "query": "这个网址的内容帮我提取出来 https://zh.wikipedia.org/wiki/人工智能 ，只要正文部分，不要导航栏和侧边栏那些乱七八糟的",
+    "should_trigger": true
+  },
+  {
+    "query": "深度研究一下中美 AI 芯片出口管制的演变历程，给我一份带引用来源的分析报告，对比 2022 到 2026 年的政策变化",
+    "should_trigger": true
+  },
+  {
+    "query": "找一下 example.com 网站上所有关于 API 鉴权的页面 URL，我记不清具体路径了，先列出来再决定看哪个",
+    "should_trigger": true
+  },
+  {
+    "query": "搜一下最近的 Rust 1.85 版本更新了啥，过滤一下只保留和异步相关的内容，别把整个 release notes 全塞进来，挑重要的几段就行",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我 search 一下 React 19 新出了哪些 hooks，给我 5 条结果就行，要带 url 和 score",
+    "should_trigger": true
+  },
+  {
+    "query": "research 一下 LangChain 和 LlamaIndex 哪个更适合做 RAG，要带引用的对比报告，用 pro model 跑",
+    "should_trigger": true
+  },
+  {
+    "query": "fetch 这个 URL 的内容出来 https://docs.python.org/3/whatsnew/3.13.html ，我只要跟 performance 相关的章节，过滤一下",
+    "should_trigger": true
+  },
+  {
+    "query": "crawl 一下 https://docs.example.com/api/ 把所有 endpoint 页面 save 成 markdown，max-depth 设 2，limit 50",
+    "should_trigger": true
+  },
+  {
+    "query": "搜一下上周的 AI 新闻，topic 设成 news，给我最新的 8 条带来源",
+    "should_trigger": true
+  },
+  {
+    "query": "只在 arxiv.org 搜 multimodal transformer 相关论文，时间限定上个月，max-results 给 10",
+    "should_trigger": true
+  },
+  {
+    "query": "查一下 NVIDIA Q4 2025 财报，从结果里 filter 出 revenue 和 EPS 的数字就行，别整页塞 context",
+    "should_trigger": true
+  },
+  {
+    "query": "map 一下 https://docs.example.com 这个站点，列出所有跟 authentication 相关的 URL，用 instructions 过滤",
+    "should_trigger": true
+  },
+  {
+    "query": "read the file at ./src/index.ts and explain what the main function does — I'm trying to debug a crash",
+    "should_trigger": false
+  },
+  {
+    "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+    "should_trigger": false
+  },
+  {
+    "query": "refactor this React component to use hooks instead of class component — the file is at ./components/UserProfile.tsx",
+    "should_trigger": false
+  },
+  {
+    "query": "write a Python script using the tavily-python SDK to search the web and save results to a CSV file — I want to run this on a cron job daily",
+    "should_trigger": false
+  },
+  {
+    "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+    "should_trigger": false
+  },
+  {
+    "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ — show me the curl command",
+    "should_trigger": false
+  },
+  {
+    "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+    "should_trigger": false
+  },
+  {
+    "query": "set up a cron job on my Mac to run backup.sh every day at 3am — write the crontab entry",
+    "should_trigger": false
+  },
+  {
+    "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+    "should_trigger": false
+  },
+  {
+    "query": "install the tavily-cli package via homebrew and configure TAVILY_API_KEY in my .bashrc — show me the exact commands",
+    "should_trigger": false
+  },
+  {
+    "query": "读一下 ./src/main.py 这个文件，看看主函数在做什么，我想搞清楚为什么它会崩溃",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我把这个 Python 函数改造成异步的，文件在 ./utils/fetcher.py 第 45 行那个 fetch_data 函数",
+    "should_trigger": false
+  },
+  {
+    "query": "git log 看一下最近 5 次提交改了啥，然后帮我给当前的 staged 改动写个规范的 commit message",
+    "should_trigger": false
+  },
+  {
+    "query": "用 tavily-python SDK 写一个搜索脚本，每天凌晨 3 点定时跑，把结果存到 PostgreSQL 数据库的 search_results 表里",
+    "should_trigger": false
+  },
+  {
+    "query": "git status 看下当前 working tree 状态，然后 stage 所有改动的 .py 文件，再帮我写个 commit message",
+    "should_trigger": false
+  },
+  {
+    "query": "在 PostgreSQL 里写个 query，找过去 30 天活跃用户，按注册时间倒序，给我 SQL 语句",
+    "should_trigger": false
+  },
+  {
+    "query": "用 tavily-python SDK 在我的 FastAPI 应用里集成一个 /search endpoint，要支持 async，结果存到 Redis 缓存",
+    "should_trigger": false
+  }
+]
