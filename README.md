@@ -105,7 +105,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 | 技能 | 描述 |
 |------|------|
-| [conventional-commits](./conventional-commits) | 规范 Git 提交消息格式，便于自动化生成版本号和变更日志；macOS 下可自动 `pbcopy` 到剪贴板 |
+| [git-commit](./git-commit) | 规范 Git 提交消息格式，便于自动化生成版本号和变更日志；macOS 下可自动 `pbcopy` 到剪贴板 |
 | [gh](./gh) | GitHub CLI（`gh`）调用模式：结构化输出、分页、仓库定位、搜索 vs 列表、`gh api` 兜底 |
 | [tmux](./tmux) | 以脚本方式驱动 tmux：后台会话、`send-keys`、`capture-pane`，自动化 REPL/SSH/调试器 |
 | [semble](./semble) | 用 `semble search` 替代 grep+read 做语义代码检索，省 ~98% token |
@@ -143,7 +143,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 - 新增 skill：请放在对应分类目录下，并在本 README 表格中追加一行
 - 修复/改进现有 skill：建议先在 Issue 中讨论后再提 PR
-- 提交规范：遵循 [Conventional Commits](./conventional-commits)
+- 提交规范：遵循 [Conventional Commits](./git-commit)
 
 ## License
 
