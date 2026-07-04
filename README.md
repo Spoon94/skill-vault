@@ -113,6 +113,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [worktrunk](./worktrunk) | Worktrunk（`wt` CLI）使用指南：git worktree 管理、hooks 和配置 |
 | [engram-mem](./engram-mem) | 基于本地 engram CLI(SQLite + FTS5)的跨会话持久记忆,工作与生活通用,支持决策、偏好、计划等记忆的存取与检索 |
 | [deslop-bi](./deslop-bi) | 双语去 AI 味：识别并修复中英文文本中的 AI 生成痕迹——浮夸修辞、套路结构、机器翻译腔、"深入探讨/打造/赋能"等中文 AI 高频词 |
+| [tavily](./tavily) | 通过 Tavily CLI 做网页搜索、内容提取、站点爬取、URL 发现和带引用的深度研究，支持 context-isolated 模式过滤原始结果 |
 
 ## 安装方式
 
