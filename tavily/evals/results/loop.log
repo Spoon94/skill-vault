@@ -1,0 +1,3051 @@
+Split: 26 train, 15 test (holdout=0.4)
+
+============================================================
+Iteration 1/5
+Description: Web search, content extraction, site crawling, URL discovery, and AI-powered deep research via the Tavily CLI. Use this skill whenever the user wants to search the web, find articles, research a topic, look something up online, extract content from a URL, grab text from a webpage, crawl documentation, download a site's pages, discover URLs on a domain, or conduct in-depth research with citations. Also use when they say "fetch this page", "pull the content from", "get the page at https://", "find me articles about", "search and filter", "find the important parts", or reference extracting data from external websites. Provides LLM-optimized web search, content extraction, site crawling, URL discovery, AI-powered deep research, and context-isolated search (filter raw results through Python so only curated output enters context). Do NOT trigger for local file operations, git commands, deployments, or code editing tasks.
+============================================================
+Train: 37/78 correct, precision=100% recall=9% accuracy=47% (149.7s)
+  [FAIL] rate=0/3 expected=True: 帮我 search 一下 React 19 新出了哪些 hooks，给我 5 条结果就行，要带 url 和 score
+  [FAIL] rate=1/3 expected=True: 只在 arxiv.org 搜 multimodal transformer 相关论文，时间限定上个月，max-resul
+  [FAIL] rate=1/3 expected=True: 这个网址的内容帮我提取出来 https://zh.wikipedia.org/wiki/人工智能 ，只要正文部分，不要导
+  [FAIL] rate=0/3 expected=True: extract content from this URL but it's a JS-heavy SPA: https
+  [FAIL] rate=0/3 expected=True: 我的老板让我研究一下竞品定价策略，对比一下 Notion vs Linear vs ClickUp 的团队版月费，要带引
+  [FAIL] rate=1/3 expected=True: fetch this page and give me the key points: https://docs.ant
+  [FAIL] rate=0/3 expected=True: research the EU AI Act implementation timeline — I need a ci
+  [FAIL] rate=0/3 expected=True: 查一下 NVIDIA Q4 2025 财报，从结果里 filter 出 revenue 和 EPS 的数字就行，别整页塞
+  [FAIL] rate=0/3 expected=True: crawl the docs at https://docs.example.com/api/ and save eac
+  [FAIL] rate=0/3 expected=True: crawl 一下 https://docs.example.com/api/ 把所有 endpoint 页面 save 
+  [FAIL] rate=0/3 expected=True: discover all URLs under https://example.com/blog/ — I'm look
+  [FAIL] rate=0/3 expected=True: 搜一下 Python 3.13 的发布日期，给我三条结果就够了，要带相关度评分
+  [FAIL] rate=0/3 expected=True: search for the latest news on the OpenAI o3 model release an
+  [FAIL] rate=0/3 expected=True: find me articles about solid-state battery commercialization
+  [FAIL] rate=1/3 expected=True: 搜一下上周的 AI 新闻，topic 设成 news，给我最新的 8 条带来源
+  [PASS] rate=0/3 expected=False: query my SQLite database at ./data/app.db for the top 10 cus
+  [PASS] rate=0/3 expected=False: git diff HEAD~3 to see what changed in the last 3 commits, t
+  [PASS] rate=0/3 expected=False: fix this TypeScript error in my code: Type 'string' is not a
+  [PASS] rate=0/3 expected=False: use curl to download https://example.com/large-file.zip and 
+  [PASS] rate=0/3 expected=False: 帮我把这个 Python 函数改造成异步的，文件在 ./utils/fetcher.py 第 45 行那个 fetch_
+  [PASS] rate=0/3 expected=False: refactor this React component to use hooks instead of class 
+  [PASS] rate=0/3 expected=False: git status 看下当前 working tree 状态，然后 stage 所有改动的 .py 文件，再帮我写个 
+  [PASS] rate=0/3 expected=False: git log 看一下最近 5 次提交改了啥，然后帮我给当前的 staged 改动写个规范的 commit messag
+  [PASS] rate=0/3 expected=False: read the file at ./src/index.ts and explain what the main fu
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 写一个搜索脚本，每天凌晨 3 点定时跑，把结果存到 PostgreSQL 数据库
+  [PASS] rate=0/3 expected=False: parse this JSON string and extract the 'name' field: {"name"
+Test : 18/45 correct, precision=100% recall=0% accuracy=40% (0.0s)
+  [FAIL] rate=0/3 expected=True: 搜一下最近的 Rust 1.85 版本更新了啥，过滤一下只保留和异步相关的内容，别把整个 release notes 全
+  [FAIL] rate=0/3 expected=True: fetch 这个 URL 的内容出来 https://docs.python.org/3/whatsnew/3.13.h
+  [FAIL] rate=0/3 expected=True: what's on the front page of hacker news today? just titles a
+  [FAIL] rate=0/3 expected=True: 深度研究一下中美 AI 芯片出口管制的演变历程，给我一份带引用来源的分析报告，对比 2022 到 2026 年的政策变化
+  [FAIL] rate=0/3 expected=True: 帮我查一下 2026 年中国新能源汽车补贴政策有什么最新变化，要最近一个月的新闻，给我 5 条带来源
+  [FAIL] rate=0/3 expected=True: map 一下 https://docs.example.com 这个站点，列出所有跟 authentication 相关
+  [FAIL] rate=0/3 expected=True: research 一下 LangChain 和 LlamaIndex 哪个更适合做 RAG，要带引用的对比报告，用 pr
+  [FAIL] rate=0/3 expected=True: 找一下 example.com 网站上所有关于 API 鉴权的页面 URL，我记不清具体路径了，先列出来再决定看哪个
+  [FAIL] rate=0/3 expected=True: 爬一下这个文档站点 https://docs.example.com/zh/ ，把每个页面存成 markdown 文件放
+  [PASS] rate=0/3 expected=False: install the tavily-cli package via homebrew and configure TA
+  [PASS] rate=0/3 expected=False: 读一下 ./src/main.py 这个文件，看看主函数在做什么，我想搞清楚为什么它会崩溃
+  [PASS] rate=0/3 expected=False: 在 PostgreSQL 里写个 query，找过去 30 天活跃用户，按注册时间倒序，给我 SQL 语句
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 在我的 FastAPI 应用里集成一个 /search endpoint，要支持
+  [PASS] rate=0/3 expected=False: write a Python script using the tavily-python SDK to search 
+  [PASS] rate=0/3 expected=False: set up a cron job on my Mac to run backup.sh every day at 3a
+
+Improving description...
+Proposed (94.0s): Use this skill for any web information need — URLs, websites, online lookups, or external sources. Five intents: (1) web search for articles, news, papers, or facts on any topic; (2) URL extraction — readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl — bulk-download pages from a docs section or domain as markdown; (4) URL discovery — list all URLs under a domain path; (5) cited research — multi-source report with sources. Especially useful when the user wants curated, filtered output (titles, scores, specific numbers, key paragraphs) rather than raw HTML flooding context — process results through Python so only relevant fields enter context. Trigger on 'search', 'look up', 'find articles', 'fetch this page', 'extract content', 'crawl docs', 'discover URLs', 'research with sources', and equivalents in any language (搜一下 / 查一下 / 提取 / 爬取 / 研究). Do NOT trigger for local file ops, git, code editing, local JSON parsing, or local scripts.
+
+============================================================
+Iteration 2/5
+Description: Use this skill for any web information need — URLs, websites, online lookups, or external sources. Five intents: (1) web search for articles, news, papers, or facts on any topic; (2) URL extraction — readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl — bulk-download pages from a docs section or domain as markdown; (4) URL discovery — list all URLs under a domain path; (5) cited research — multi-source report with sources. Especially useful when the user wants curated, filtered output (titles, scores, specific numbers, key paragraphs) rather than raw HTML flooding context — process results through Python so only relevant fields enter context. Trigger on 'search', 'look up', 'find articles', 'fetch this page', 'extract content', 'crawl docs', 'discover URLs', 'research with sources', and equivalents in any language (搜一下 / 查一下 / 提取 / 爬取 / 研究). Do NOT trigger for local file ops, git, code editing, local JSON parsing, or local scripts.
+============================================================
+Train: 37/78 correct, precision=100% recall=9% accuracy=47% (132.2s)
+  [FAIL] rate=0/3 expected=True: 帮我 search 一下 React 19 新出了哪些 hooks，给我 5 条结果就行，要带 url 和 score
+  [FAIL] rate=1/3 expected=True: 这个网址的内容帮我提取出来 https://zh.wikipedia.org/wiki/人工智能 ，只要正文部分，不要导
+  [FAIL] rate=0/3 expected=True: 我的老板让我研究一下竞品定价策略，对比一下 Notion vs Linear vs ClickUp 的团队版月费，要带引
+  [FAIL] rate=0/3 expected=True: 只在 arxiv.org 搜 multimodal transformer 相关论文，时间限定上个月，max-resul
+  [PASS] rate=2/3 expected=True: extract content from this URL but it's a JS-heavy SPA: https
+  [FAIL] rate=0/3 expected=True: fetch this page and give me the key points: https://docs.ant
+  [FAIL] rate=0/3 expected=True: research the EU AI Act implementation timeline — I need a ci
+  [FAIL] rate=0/3 expected=True: 查一下 NVIDIA Q4 2025 财报，从结果里 filter 出 revenue 和 EPS 的数字就行，别整页塞
+  [FAIL] rate=0/3 expected=True: crawl the docs at https://docs.example.com/api/ and save eac
+  [FAIL] rate=0/3 expected=True: crawl 一下 https://docs.example.com/api/ 把所有 endpoint 页面 save 
+  [FAIL] rate=0/3 expected=True: discover all URLs under https://example.com/blog/ — I'm look
+  [FAIL] rate=0/3 expected=True: 搜一下 Python 3.13 的发布日期，给我三条结果就够了，要带相关度评分
+  [FAIL] rate=1/3 expected=True: search for the latest news on the OpenAI o3 model release an
+  [FAIL] rate=0/3 expected=True: find me articles about solid-state battery commercialization
+  [FAIL] rate=0/3 expected=True: 搜一下上周的 AI 新闻，topic 设成 news，给我最新的 8 条带来源
+  [PASS] rate=0/3 expected=False: query my SQLite database at ./data/app.db for the top 10 cus
+  [PASS] rate=0/3 expected=False: git diff HEAD~3 to see what changed in the last 3 commits, t
+  [PASS] rate=0/3 expected=False: fix this TypeScript error in my code: Type 'string' is not a
+  [PASS] rate=0/3 expected=False: use curl to download https://example.com/large-file.zip and 
+  [PASS] rate=0/3 expected=False: 帮我把这个 Python 函数改造成异步的，文件在 ./utils/fetcher.py 第 45 行那个 fetch_
+  [PASS] rate=0/3 expected=False: refactor this React component to use hooks instead of class 
+  [PASS] rate=0/3 expected=False: git status 看下当前 working tree 状态，然后 stage 所有改动的 .py 文件，再帮我写个 
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 写一个搜索脚本，每天凌晨 3 点定时跑，把结果存到 PostgreSQL 数据库
+  [PASS] rate=0/3 expected=False: read the file at ./src/index.ts and explain what the main fu
+  [PASS] rate=0/3 expected=False: git log 看一下最近 5 次提交改了啥，然后帮我给当前的 staged 改动写个规范的 commit messag
+  [PASS] rate=0/3 expected=False: parse this JSON string and extract the 'name' field: {"name"
+Test : 19/45 correct, precision=100% recall=4% accuracy=42% (0.0s)
+  [FAIL] rate=0/3 expected=True: 搜一下最近的 Rust 1.85 版本更新了啥，过滤一下只保留和异步相关的内容，别把整个 release notes 全
+  [FAIL] rate=0/3 expected=True: what's on the front page of hacker news today? just titles a
+  [FAIL] rate=0/3 expected=True: fetch 这个 URL 的内容出来 https://docs.python.org/3/whatsnew/3.13.h
+  [FAIL] rate=0/3 expected=True: 深度研究一下中美 AI 芯片出口管制的演变历程，给我一份带引用来源的分析报告，对比 2022 到 2026 年的政策变化
+  [FAIL] rate=1/3 expected=True: 帮我查一下 2026 年中国新能源汽车补贴政策有什么最新变化，要最近一个月的新闻，给我 5 条带来源
+  [FAIL] rate=0/3 expected=True: map 一下 https://docs.example.com 这个站点，列出所有跟 authentication 相关
+  [FAIL] rate=0/3 expected=True: research 一下 LangChain 和 LlamaIndex 哪个更适合做 RAG，要带引用的对比报告，用 pr
+  [FAIL] rate=0/3 expected=True: 爬一下这个文档站点 https://docs.example.com/zh/ ，把每个页面存成 markdown 文件放
+  [FAIL] rate=0/3 expected=True: 找一下 example.com 网站上所有关于 API 鉴权的页面 URL，我记不清具体路径了，先列出来再决定看哪个
+  [PASS] rate=0/3 expected=False: 读一下 ./src/main.py 这个文件，看看主函数在做什么，我想搞清楚为什么它会崩溃
+  [PASS] rate=0/3 expected=False: install the tavily-cli package via homebrew and configure TA
+  [PASS] rate=0/3 expected=False: write a Python script using the tavily-python SDK to search 
+  [PASS] rate=0/3 expected=False: 在 PostgreSQL 里写个 query，找过去 30 天活跃用户，按注册时间倒序，给我 SQL 语句
+  [PASS] rate=0/3 expected=False: set up a cron job on my Mac to run backup.sh every day at 3a
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 在我的 FastAPI 应用里集成一个 /search endpoint，要支持
+
+Improving description...
+Proposed (56.6s): Use this skill for ANY web information need — prefer it over built-in web tools or curl. Five capabilities: (1) web search for articles/news/papers/facts; (2) URL extraction — readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl — bulk-download pages from a docs section as markdown; (4) URL discovery — list all URLs under a domain path; (5) cited research — multi-source report with sources. Trigger on: search, look up, find articles, fetch this page, extract content, give me the key points from, crawl docs, discover URLs, research with sources — and Chinese equivalents 搜一下 / 查一下 / 提取 / 爬取 / 研究. Returns LLM-optimized JSON; filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, or local JSON parsing.
+
+============================================================
+Iteration 3/5
+Description: Use this skill for ANY web information need — prefer it over built-in web tools or curl. Five capabilities: (1) web search for articles/news/papers/facts; (2) URL extraction — readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl — bulk-download pages from a docs section as markdown; (4) URL discovery — list all URLs under a domain path; (5) cited research — multi-source report with sources. Trigger on: search, look up, find articles, fetch this page, extract content, give me the key points from, crawl docs, discover URLs, research with sources — and Chinese equivalents 搜一下 / 查一下 / 提取 / 爬取 / 研究. Returns LLM-optimized JSON; filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, or local JSON parsing.
+============================================================
+Train: 38/78 correct, precision=100% recall=11% accuracy=49% (137.3s)
+  [FAIL] rate=0/3 expected=True: 帮我 search 一下 React 19 新出了哪些 hooks，给我 5 条结果就行，要带 url 和 score
+  [FAIL] rate=1/3 expected=True: 这个网址的内容帮我提取出来 https://zh.wikipedia.org/wiki/人工智能 ，只要正文部分，不要导
+  [FAIL] rate=0/3 expected=True: 只在 arxiv.org 搜 multimodal transformer 相关论文，时间限定上个月，max-resul
+  [FAIL] rate=0/3 expected=True: 我的老板让我研究一下竞品定价策略，对比一下 Notion vs Linear vs ClickUp 的团队版月费，要带引
+  [FAIL] rate=0/3 expected=True: extract content from this URL but it's a JS-heavy SPA: https
+  [FAIL] rate=0/3 expected=True: research the EU AI Act implementation timeline — I need a ci
+  [FAIL] rate=0/3 expected=True: fetch this page and give me the key points: https://docs.ant
+  [FAIL] rate=0/3 expected=True: 查一下 NVIDIA Q4 2025 财报，从结果里 filter 出 revenue 和 EPS 的数字就行，别整页塞
+  [FAIL] rate=1/3 expected=True: crawl the docs at https://docs.example.com/api/ and save eac
+  [FAIL] rate=0/3 expected=True: crawl 一下 https://docs.example.com/api/ 把所有 endpoint 页面 save 
+  [FAIL] rate=1/3 expected=True: discover all URLs under https://example.com/blog/ — I'm look
+  [FAIL] rate=0/3 expected=True: 搜一下 Python 3.13 的发布日期，给我三条结果就够了，要带相关度评分
+  [FAIL] rate=1/3 expected=True: search for the latest news on the OpenAI o3 model release an
+  [FAIL] rate=1/3 expected=True: find me articles about solid-state battery commercialization
+  [FAIL] rate=0/3 expected=True: 搜一下上周的 AI 新闻，topic 设成 news，给我最新的 8 条带来源
+  [PASS] rate=0/3 expected=False: git diff HEAD~3 to see what changed in the last 3 commits, t
+  [PASS] rate=0/3 expected=False: query my SQLite database at ./data/app.db for the top 10 cus
+  [PASS] rate=0/3 expected=False: use curl to download https://example.com/large-file.zip and 
+  [PASS] rate=0/3 expected=False: fix this TypeScript error in my code: Type 'string' is not a
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 写一个搜索脚本，每天凌晨 3 点定时跑，把结果存到 PostgreSQL 数据库
+  [PASS] rate=0/3 expected=False: 帮我把这个 Python 函数改造成异步的，文件在 ./utils/fetcher.py 第 45 行那个 fetch_
+  [PASS] rate=0/3 expected=False: refactor this React component to use hooks instead of class 
+  [PASS] rate=0/3 expected=False: git status 看下当前 working tree 状态，然后 stage 所有改动的 .py 文件，再帮我写个 
+  [PASS] rate=0/3 expected=False: read the file at ./src/index.ts and explain what the main fu
+  [PASS] rate=0/3 expected=False: parse this JSON string and extract the 'name' field: {"name"
+  [PASS] rate=0/3 expected=False: git log 看一下最近 5 次提交改了啥，然后帮我给当前的 staged 改动写个规范的 commit messag
+Test : 21/45 correct, precision=100% recall=11% accuracy=47% (0.0s)
+  [FAIL] rate=0/3 expected=True: 搜一下最近的 Rust 1.85 版本更新了啥，过滤一下只保留和异步相关的内容，别把整个 release notes 全
+  [FAIL] rate=0/3 expected=True: what's on the front page of hacker news today? just titles a
+  [FAIL] rate=0/3 expected=True: fetch 这个 URL 的内容出来 https://docs.python.org/3/whatsnew/3.13.h
+  [FAIL] rate=1/3 expected=True: map 一下 https://docs.example.com 这个站点，列出所有跟 authentication 相关
+  [FAIL] rate=0/3 expected=True: 帮我查一下 2026 年中国新能源汽车补贴政策有什么最新变化，要最近一个月的新闻，给我 5 条带来源
+  [FAIL] rate=0/3 expected=True: 深度研究一下中美 AI 芯片出口管制的演变历程，给我一份带引用来源的分析报告，对比 2022 到 2026 年的政策变化
+  [FAIL] rate=0/3 expected=True: research 一下 LangChain 和 LlamaIndex 哪个更适合做 RAG，要带引用的对比报告，用 pr
+  [PASS] rate=2/3 expected=True: 爬一下这个文档站点 https://docs.example.com/zh/ ，把每个页面存成 markdown 文件放
+  [FAIL] rate=0/3 expected=True: 找一下 example.com 网站上所有关于 API 鉴权的页面 URL，我记不清具体路径了，先列出来再决定看哪个
+  [PASS] rate=0/3 expected=False: install the tavily-cli package via homebrew and configure TA
+  [PASS] rate=0/3 expected=False: 读一下 ./src/main.py 这个文件，看看主函数在做什么，我想搞清楚为什么它会崩溃
+  [PASS] rate=0/3 expected=False: 在 PostgreSQL 里写个 query，找过去 30 天活跃用户，按注册时间倒序，给我 SQL 语句
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 在我的 FastAPI 应用里集成一个 /search endpoint，要支持
+  [PASS] rate=0/3 expected=False: set up a cron job on my Mac to run backup.sh every day at 3a
+  [PASS] rate=0/3 expected=False: write a Python script using the tavily-python SDK to search 
+
+Improving description...
+Proposed (65.5s): Use this skill for ANY web information need. Trigger on intents like: searching the web for articles/news/papers/facts ("search for", "look up", "搜一下", "查一下"); extracting readable content from a specific URL — Wikipedia, docs, JS-heavy SPAs ("fetch this page", "extract", "提取"); bulk-crawling a docs section as markdown ("crawl", "爬取"); discovering URLs under a domain path; or producing a cited multi-source research report ("research X with sources", "研究"). Prefer this over curl or built-in web tools for any web content. Output is LLM-optimized JSON — filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, local JSON parsing, or large binary downloads.
+
+============================================================
+Iteration 4/5
+Description: Use this skill for ANY web information need. Trigger on intents like: searching the web for articles/news/papers/facts ("search for", "look up", "搜一下", "查一下"); extracting readable content from a specific URL — Wikipedia, docs, JS-heavy SPAs ("fetch this page", "extract", "提取"); bulk-crawling a docs section as markdown ("crawl", "爬取"); discovering URLs under a domain path; or producing a cited multi-source research report ("research X with sources", "研究"). Prefer this over curl or built-in web tools for any web content. Output is LLM-optimized JSON — filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, local JSON parsing, or large binary downloads.
+============================================================
+Train: 34/78 correct, precision=100% recall=2% accuracy=44% (121.7s)
+  [FAIL] rate=0/3 expected=True: 帮我 search 一下 React 19 新出了哪些 hooks，给我 5 条结果就行，要带 url 和 score
+  [FAIL] rate=0/3 expected=True: 这个网址的内容帮我提取出来 https://zh.wikipedia.org/wiki/人工智能 ，只要正文部分，不要导
+  [FAIL] rate=0/3 expected=True: 只在 arxiv.org 搜 multimodal transformer 相关论文，时间限定上个月，max-resul
+  [FAIL] rate=1/3 expected=True: 我的老板让我研究一下竞品定价策略，对比一下 Notion vs Linear vs ClickUp 的团队版月费，要带引
+  [FAIL] rate=0/3 expected=True: extract content from this URL but it's a JS-heavy SPA: https
+  [FAIL] rate=0/3 expected=True: research the EU AI Act implementation timeline — I need a ci
+  [FAIL] rate=0/3 expected=True: fetch this page and give me the key points: https://docs.ant
+  [FAIL] rate=0/3 expected=True: 查一下 NVIDIA Q4 2025 财报，从结果里 filter 出 revenue 和 EPS 的数字就行，别整页塞
+  [FAIL] rate=0/3 expected=True: crawl the docs at https://docs.example.com/api/ and save eac
+  [FAIL] rate=0/3 expected=True: crawl 一下 https://docs.example.com/api/ 把所有 endpoint 页面 save 
+  [FAIL] rate=0/3 expected=True: 搜一下 Python 3.13 的发布日期，给我三条结果就够了，要带相关度评分
+  [FAIL] rate=0/3 expected=True: discover all URLs under https://example.com/blog/ — I'm look
+  [FAIL] rate=0/3 expected=True: search for the latest news on the OpenAI o3 model release an
+  [FAIL] rate=0/3 expected=True: find me articles about solid-state battery commercialization
+  [FAIL] rate=0/3 expected=True: 搜一下上周的 AI 新闻，topic 设成 news，给我最新的 8 条带来源
+  [PASS] rate=0/3 expected=False: git diff HEAD~3 to see what changed in the last 3 commits, t
+  [PASS] rate=0/3 expected=False: query my SQLite database at ./data/app.db for the top 10 cus
+  [PASS] rate=0/3 expected=False: use curl to download https://example.com/large-file.zip and 
+  [PASS] rate=0/3 expected=False: fix this TypeScript error in my code: Type 'string' is not a
+  [PASS] rate=0/3 expected=False: 帮我把这个 Python 函数改造成异步的，文件在 ./utils/fetcher.py 第 45 行那个 fetch_
+  [PASS] rate=0/3 expected=False: refactor this React component to use hooks instead of class 
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 写一个搜索脚本，每天凌晨 3 点定时跑，把结果存到 PostgreSQL 数据库
+  [PASS] rate=0/3 expected=False: git status 看下当前 working tree 状态，然后 stage 所有改动的 .py 文件，再帮我写个 
+  [PASS] rate=0/3 expected=False: read the file at ./src/index.ts and explain what the main fu
+  [PASS] rate=0/3 expected=False: git log 看一下最近 5 次提交改了啥，然后帮我给当前的 staged 改动写个规范的 commit messag
+  [PASS] rate=0/3 expected=False: parse this JSON string and extract the 'name' field: {"name"
+Test : 18/45 correct, precision=100% recall=0% accuracy=40% (0.0s)
+  [FAIL] rate=0/3 expected=True: 搜一下最近的 Rust 1.85 版本更新了啥，过滤一下只保留和异步相关的内容，别把整个 release notes 全
+  [FAIL] rate=0/3 expected=True: fetch 这个 URL 的内容出来 https://docs.python.org/3/whatsnew/3.13.h
+  [FAIL] rate=0/3 expected=True: what's on the front page of hacker news today? just titles a
+  [FAIL] rate=0/3 expected=True: 深度研究一下中美 AI 芯片出口管制的演变历程，给我一份带引用来源的分析报告，对比 2022 到 2026 年的政策变化
+  [FAIL] rate=0/3 expected=True: map 一下 https://docs.example.com 这个站点，列出所有跟 authentication 相关
+  [FAIL] rate=0/3 expected=True: 帮我查一下 2026 年中国新能源汽车补贴政策有什么最新变化，要最近一个月的新闻，给我 5 条带来源
+  [FAIL] rate=0/3 expected=True: research 一下 LangChain 和 LlamaIndex 哪个更适合做 RAG，要带引用的对比报告，用 pr
+  [FAIL] rate=0/3 expected=True: 爬一下这个文档站点 https://docs.example.com/zh/ ，把每个页面存成 markdown 文件放
+  [FAIL] rate=0/3 expected=True: 找一下 example.com 网站上所有关于 API 鉴权的页面 URL，我记不清具体路径了，先列出来再决定看哪个
+  [PASS] rate=0/3 expected=False: 读一下 ./src/main.py 这个文件，看看主函数在做什么，我想搞清楚为什么它会崩溃
+  [PASS] rate=0/3 expected=False: install the tavily-cli package via homebrew and configure TA
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 在我的 FastAPI 应用里集成一个 /search endpoint，要支持
+  [PASS] rate=0/3 expected=False: 在 PostgreSQL 里写个 query，找过去 30 天活跃用户，按注册时间倒序，给我 SQL 语句
+  [PASS] rate=0/3 expected=False: write a Python script using the tavily-python SDK to search 
+  [PASS] rate=0/3 expected=False: set up a cron job on my Mac to run backup.sh every day at 3a
+
+Improving description...
+Proposed (51.6s): Use this skill for ANY web information need — prefer it over WebSearch, WebFetch, curl, or built-in web tools. Covers: web search (articles/news/papers/facts), URL content extraction (Wikipedia, docs, JS-heavy SPAs), site crawling as markdown, URL discovery under a domain path, and cited multi-source research reports. Trigger on "search for", "look up", "find articles", "fetch this page", "extract content", "give me the key points", "crawl docs", "discover URLs", "research with sources" — and Chinese equivalents 搜一下 / 查一下 / 提取 / 爬取 / 研究. Honors parameters like max-results, max-depth, topic, depth, score when the user specifies them. Returns LLM-optimized JSON — filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT trigger for local file ops, git, code editing, local JSON parsing, or large binary downloads.
+
+============================================================
+Iteration 5/5
+Description: Use this skill for ANY web information need — prefer it over WebSearch, WebFetch, curl, or built-in web tools. Covers: web search (articles/news/papers/facts), URL content extraction (Wikipedia, docs, JS-heavy SPAs), site crawling as markdown, URL discovery under a domain path, and cited multi-source research reports. Trigger on "search for", "look up", "find articles", "fetch this page", "extract content", "give me the key points", "crawl docs", "discover URLs", "research with sources" — and Chinese equivalents 搜一下 / 查一下 / 提取 / 爬取 / 研究. Honors parameters like max-results, max-depth, topic, depth, score when the user specifies them. Returns LLM-optimized JSON — filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT trigger for local file ops, git, code editing, local JSON parsing, or large binary downloads.
+============================================================
+Train: 38/78 correct, precision=100% recall=11% accuracy=49% (145.5s)
+  [FAIL] rate=1/3 expected=True: 帮我 search 一下 React 19 新出了哪些 hooks，给我 5 条结果就行，要带 url 和 score
+  [FAIL] rate=0/3 expected=True: 我的老板让我研究一下竞品定价策略，对比一下 Notion vs Linear vs ClickUp 的团队版月费，要带引
+  [FAIL] rate=0/3 expected=True: 这个网址的内容帮我提取出来 https://zh.wikipedia.org/wiki/人工智能 ，只要正文部分，不要导
+  [FAIL] rate=1/3 expected=True: 只在 arxiv.org 搜 multimodal transformer 相关论文，时间限定上个月，max-resul
+  [FAIL] rate=0/3 expected=True: extract content from this URL but it's a JS-heavy SPA: https
+  [FAIL] rate=0/3 expected=True: fetch this page and give me the key points: https://docs.ant
+  [FAIL] rate=0/3 expected=True: research the EU AI Act implementation timeline — I need a ci
+  [FAIL] rate=1/3 expected=True: 查一下 NVIDIA Q4 2025 财报，从结果里 filter 出 revenue 和 EPS 的数字就行，别整页塞
+  [FAIL] rate=0/3 expected=True: crawl the docs at https://docs.example.com/api/ and save eac
+  [FAIL] rate=1/3 expected=True: crawl 一下 https://docs.example.com/api/ 把所有 endpoint 页面 save 
+  [FAIL] rate=0/3 expected=True: discover all URLs under https://example.com/blog/ — I'm look
+  [FAIL] rate=0/3 expected=True: 搜一下 Python 3.13 的发布日期，给我三条结果就够了，要带相关度评分
+  [FAIL] rate=1/3 expected=True: search for the latest news on the OpenAI o3 model release an
+  [FAIL] rate=0/3 expected=True: 搜一下上周的 AI 新闻，topic 设成 news，给我最新的 8 条带来源
+  [FAIL] rate=0/3 expected=True: find me articles about solid-state battery commercialization
+  [PASS] rate=0/3 expected=False: git diff HEAD~3 to see what changed in the last 3 commits, t
+  [PASS] rate=0/3 expected=False: query my SQLite database at ./data/app.db for the top 10 cus
+  [PASS] rate=0/3 expected=False: use curl to download https://example.com/large-file.zip and 
+  [PASS] rate=0/3 expected=False: fix this TypeScript error in my code: Type 'string' is not a
+  [PASS] rate=0/3 expected=False: 帮我把这个 Python 函数改造成异步的，文件在 ./utils/fetcher.py 第 45 行那个 fetch_
+  [PASS] rate=0/3 expected=False: refactor this React component to use hooks instead of class 
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 写一个搜索脚本，每天凌晨 3 点定时跑，把结果存到 PostgreSQL 数据库
+  [PASS] rate=0/3 expected=False: git status 看下当前 working tree 状态，然后 stage 所有改动的 .py 文件，再帮我写个 
+  [PASS] rate=0/3 expected=False: read the file at ./src/index.ts and explain what the main fu
+  [PASS] rate=0/3 expected=False: git log 看一下最近 5 次提交改了啥，然后帮我给当前的 staged 改动写个规范的 commit messag
+  [PASS] rate=0/3 expected=False: parse this JSON string and extract the 'name' field: {"name"
+Test : 18/45 correct, precision=100% recall=0% accuracy=40% (0.0s)
+  [FAIL] rate=0/3 expected=True: 搜一下最近的 Rust 1.85 版本更新了啥，过滤一下只保留和异步相关的内容，别把整个 release notes 全
+  [FAIL] rate=0/3 expected=True: what's on the front page of hacker news today? just titles a
+  [FAIL] rate=0/3 expected=True: fetch 这个 URL 的内容出来 https://docs.python.org/3/whatsnew/3.13.h
+  [FAIL] rate=0/3 expected=True: map 一下 https://docs.example.com 这个站点，列出所有跟 authentication 相关
+  [FAIL] rate=0/3 expected=True: 帮我查一下 2026 年中国新能源汽车补贴政策有什么最新变化，要最近一个月的新闻，给我 5 条带来源
+  [FAIL] rate=0/3 expected=True: 深度研究一下中美 AI 芯片出口管制的演变历程，给我一份带引用来源的分析报告，对比 2022 到 2026 年的政策变化
+  [FAIL] rate=0/3 expected=True: 爬一下这个文档站点 https://docs.example.com/zh/ ，把每个页面存成 markdown 文件放
+  [FAIL] rate=0/3 expected=True: 找一下 example.com 网站上所有关于 API 鉴权的页面 URL，我记不清具体路径了，先列出来再决定看哪个
+  [FAIL] rate=0/3 expected=True: research 一下 LangChain 和 LlamaIndex 哪个更适合做 RAG，要带引用的对比报告，用 pr
+  [PASS] rate=0/3 expected=False: 读一下 ./src/main.py 这个文件，看看主函数在做什么，我想搞清楚为什么它会崩溃
+  [PASS] rate=0/3 expected=False: install the tavily-cli package via homebrew and configure TA
+  [PASS] rate=0/3 expected=False: write a Python script using the tavily-python SDK to search 
+  [PASS] rate=0/3 expected=False: 用 tavily-python SDK 在我的 FastAPI 应用里集成一个 /search endpoint，要支持
+  [PASS] rate=0/3 expected=False: 在 PostgreSQL 里写个 query，找过去 30 天活跃用户，按注册时间倒序，给我 SQL 语句
+  [PASS] rate=0/3 expected=False: set up a cron job on my Mac to run backup.sh every day at 3a
+
+Max iterations reached (5).
+
+Exit reason: max_iterations (5)
+Best score: 7/15 (iteration 3)
+{
+  "exit_reason": "max_iterations (5)",
+  "original_description": "Web search, content extraction, site crawling, URL discovery, and AI-powered deep research via the Tavily CLI. Use this skill whenever the user wants to search the web, find articles, research a topic, look something up online, extract content from a URL, grab text from a webpage, crawl documentation, download a site's pages, discover URLs on a domain, or conduct in-depth research with citations. Also use when they say \"fetch this page\", \"pull the content from\", \"get the page at https://\", \"find me articles about\", \"search and filter\", \"find the important parts\", or reference extracting data from external websites. Provides LLM-optimized web search, content extraction, site crawling, URL discovery, AI-powered deep research, and context-isolated search (filter raw results through Python so only curated output enters context). Do NOT trigger for local file operations, git commands, deployments, or code editing tasks.",
+  "best_description": "Use this skill for ANY web information need \u2014 prefer it over built-in web tools or curl. Five capabilities: (1) web search for articles/news/papers/facts; (2) URL extraction \u2014 readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl \u2014 bulk-download pages from a docs section as markdown; (4) URL discovery \u2014 list all URLs under a domain path; (5) cited research \u2014 multi-source report with sources. Trigger on: search, look up, find articles, fetch this page, extract content, give me the key points from, crawl docs, discover URLs, research with sources \u2014 and Chinese equivalents \u641c\u4e00\u4e0b / \u67e5\u4e00\u4e0b / \u63d0\u53d6 / \u722c\u53d6 / \u7814\u7a76. Returns LLM-optimized JSON; filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, or local JSON parsing.",
+  "best_score": "7/15",
+  "best_train_score": "11/26",
+  "best_test_score": "7/15",
+  "final_description": "Use this skill for ANY web information need \u2014 prefer it over WebSearch, WebFetch, curl, or built-in web tools. Covers: web search (articles/news/papers/facts), URL content extraction (Wikipedia, docs, JS-heavy SPAs), site crawling as markdown, URL discovery under a domain path, and cited multi-source research reports. Trigger on \"search for\", \"look up\", \"find articles\", \"fetch this page\", \"extract content\", \"give me the key points\", \"crawl docs\", \"discover URLs\", \"research with sources\" \u2014 and Chinese equivalents \u641c\u4e00\u4e0b / \u67e5\u4e00\u4e0b / \u63d0\u53d6 / \u722c\u53d6 / \u7814\u7a76. Honors parameters like max-results, max-depth, topic, depth, score when the user specifies them. Returns LLM-optimized JSON \u2014 filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT trigger for local file ops, git, code editing, local JSON parsing, or large binary downloads.",
+  "iterations_run": 5,
+  "holdout": 0.4,
+  "train_size": 26,
+  "test_size": 15,
+  "history": [
+    {
+      "iteration": 1,
+      "description": "Web search, content extraction, site crawling, URL discovery, and AI-powered deep research via the Tavily CLI. Use this skill whenever the user wants to search the web, find articles, research a topic, look something up online, extract content from a URL, grab text from a webpage, crawl documentation, download a site's pages, discover URLs on a domain, or conduct in-depth research with citations. Also use when they say \"fetch this page\", \"pull the content from\", \"get the page at https://\", \"find me articles about\", \"search and filter\", \"find the important parts\", or reference extracting data from external websites. Provides LLM-optimized web search, content extraction, site crawling, URL discovery, AI-powered deep research, and context-isolated search (filter raw results through Python so only curated output enters context). Do NOT trigger for local file operations, git commands, deployments, or code editing tasks.",
+      "train_passed": 11,
+      "train_failed": 15,
+      "train_total": 26,
+      "train_results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 6,
+      "test_failed": 9,
+      "test_total": 15,
+      "test_results": [
+        {
+          "query": "\u641c\u4e00\u4e0b\u6700\u8fd1\u7684 Rust 1.85 \u7248\u672c\u66f4\u65b0\u4e86\u5565\uff0c\u8fc7\u6ee4\u4e00\u4e0b\u53ea\u4fdd\u7559\u548c\u5f02\u6b65\u76f8\u5173\u7684\u5185\u5bb9\uff0c\u522b\u628a\u6574\u4e2a release notes \u5168\u585e\u8fdb\u6765\uff0c\u6311\u91cd\u8981\u7684\u51e0\u6bb5\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch \u8fd9\u4e2a URL \u7684\u5185\u5bb9\u51fa\u6765 https://docs.python.org/3/whatsnew/3.13.html \uff0c\u6211\u53ea\u8981\u8ddf performance \u76f8\u5173\u7684\u7ae0\u8282\uff0c\u8fc7\u6ee4\u4e00\u4e0b",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "what's on the front page of hacker news today? just titles and urls, skip the boilerplate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6df1\u5ea6\u7814\u7a76\u4e00\u4e0b\u4e2d\u7f8e AI \u82af\u7247\u51fa\u53e3\u7ba1\u5236\u7684\u6f14\u53d8\u5386\u7a0b\uff0c\u7ed9\u6211\u4e00\u4efd\u5e26\u5f15\u7528\u6765\u6e90\u7684\u5206\u6790\u62a5\u544a\uff0c\u5bf9\u6bd4 2022 \u5230 2026 \u5e74\u7684\u653f\u7b56\u53d8\u5316",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u67e5\u4e00\u4e0b 2026 \u5e74\u4e2d\u56fd\u65b0\u80fd\u6e90\u6c7d\u8f66\u8865\u8d34\u653f\u7b56\u6709\u4ec0\u4e48\u6700\u65b0\u53d8\u5316\uff0c\u8981\u6700\u8fd1\u4e00\u4e2a\u6708\u7684\u65b0\u95fb\uff0c\u7ed9\u6211 5 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "map \u4e00\u4e0b https://docs.example.com \u8fd9\u4e2a\u7ad9\u70b9\uff0c\u5217\u51fa\u6240\u6709\u8ddf authentication \u76f8\u5173\u7684 URL\uff0c\u7528 instructions \u8fc7\u6ee4",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research \u4e00\u4e0b LangChain \u548c LlamaIndex \u54ea\u4e2a\u66f4\u9002\u5408\u505a RAG\uff0c\u8981\u5e26\u5f15\u7528\u7684\u5bf9\u6bd4\u62a5\u544a\uff0c\u7528 pro model \u8dd1",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u627e\u4e00\u4e0b example.com \u7f51\u7ad9\u4e0a\u6240\u6709\u5173\u4e8e API \u9274\u6743\u7684\u9875\u9762 URL\uff0c\u6211\u8bb0\u4e0d\u6e05\u5177\u4f53\u8def\u5f84\u4e86\uff0c\u5148\u5217\u51fa\u6765\u518d\u51b3\u5b9a\u770b\u54ea\u4e2a",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u722c\u4e00\u4e0b\u8fd9\u4e2a\u6587\u6863\u7ad9\u70b9 https://docs.example.com/zh/ \uff0c\u628a\u6bcf\u4e2a\u9875\u9762\u5b58\u6210 markdown \u6587\u4ef6\u653e\u5230 ./docs/ \u76ee\u5f55\u4e0b\uff0c\u6df1\u5ea6 2 \u5c42\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "install the tavily-cli package via homebrew and configure TAVILY_API_KEY in my .bashrc \u2014 show me the exact commands",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u8bfb\u4e00\u4e0b ./src/main.py \u8fd9\u4e2a\u6587\u4ef6\uff0c\u770b\u770b\u4e3b\u51fd\u6570\u5728\u505a\u4ec0\u4e48\uff0c\u6211\u60f3\u641e\u6e05\u695a\u4e3a\u4ec0\u4e48\u5b83\u4f1a\u5d29\u6e83",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5728 PostgreSQL \u91cc\u5199\u4e2a query\uff0c\u627e\u8fc7\u53bb 30 \u5929\u6d3b\u8dc3\u7528\u6237\uff0c\u6309\u6ce8\u518c\u65f6\u95f4\u5012\u5e8f\uff0c\u7ed9\u6211 SQL \u8bed\u53e5",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5728\u6211\u7684 FastAPI \u5e94\u7528\u91cc\u96c6\u6210\u4e00\u4e2a /search endpoint\uff0c\u8981\u652f\u6301 async\uff0c\u7ed3\u679c\u5b58\u5230 Redis \u7f13\u5b58",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a Python script using the tavily-python SDK to search the web and save results to a CSV file \u2014 I want to run this on a cron job daily",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set up a cron job on my Mac to run backup.sh every day at 3am \u2014 write the crontab entry",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 11,
+      "failed": 15,
+      "total": 26,
+      "results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "description": "Use this skill for any web information need \u2014 URLs, websites, online lookups, or external sources. Five intents: (1) web search for articles, news, papers, or facts on any topic; (2) URL extraction \u2014 readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl \u2014 bulk-download pages from a docs section or domain as markdown; (4) URL discovery \u2014 list all URLs under a domain path; (5) cited research \u2014 multi-source report with sources. Especially useful when the user wants curated, filtered output (titles, scores, specific numbers, key paragraphs) rather than raw HTML flooding context \u2014 process results through Python so only relevant fields enter context. Trigger on 'search', 'look up', 'find articles', 'fetch this page', 'extract content', 'crawl docs', 'discover URLs', 'research with sources', and equivalents in any language (\u641c\u4e00\u4e0b / \u67e5\u4e00\u4e0b / \u63d0\u53d6 / \u722c\u53d6 / \u7814\u7a76). Do NOT trigger for local file ops, git, code editing, local JSON parsing, or local scripts.",
+      "train_passed": 12,
+      "train_failed": 14,
+      "train_total": 26,
+      "train_results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 6,
+      "test_failed": 9,
+      "test_total": 15,
+      "test_results": [
+        {
+          "query": "\u641c\u4e00\u4e0b\u6700\u8fd1\u7684 Rust 1.85 \u7248\u672c\u66f4\u65b0\u4e86\u5565\uff0c\u8fc7\u6ee4\u4e00\u4e0b\u53ea\u4fdd\u7559\u548c\u5f02\u6b65\u76f8\u5173\u7684\u5185\u5bb9\uff0c\u522b\u628a\u6574\u4e2a release notes \u5168\u585e\u8fdb\u6765\uff0c\u6311\u91cd\u8981\u7684\u51e0\u6bb5\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "what's on the front page of hacker news today? just titles and urls, skip the boilerplate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch \u8fd9\u4e2a URL \u7684\u5185\u5bb9\u51fa\u6765 https://docs.python.org/3/whatsnew/3.13.html \uff0c\u6211\u53ea\u8981\u8ddf performance \u76f8\u5173\u7684\u7ae0\u8282\uff0c\u8fc7\u6ee4\u4e00\u4e0b",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6df1\u5ea6\u7814\u7a76\u4e00\u4e0b\u4e2d\u7f8e AI \u82af\u7247\u51fa\u53e3\u7ba1\u5236\u7684\u6f14\u53d8\u5386\u7a0b\uff0c\u7ed9\u6211\u4e00\u4efd\u5e26\u5f15\u7528\u6765\u6e90\u7684\u5206\u6790\u62a5\u544a\uff0c\u5bf9\u6bd4 2022 \u5230 2026 \u5e74\u7684\u653f\u7b56\u53d8\u5316",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u67e5\u4e00\u4e0b 2026 \u5e74\u4e2d\u56fd\u65b0\u80fd\u6e90\u6c7d\u8f66\u8865\u8d34\u653f\u7b56\u6709\u4ec0\u4e48\u6700\u65b0\u53d8\u5316\uff0c\u8981\u6700\u8fd1\u4e00\u4e2a\u6708\u7684\u65b0\u95fb\uff0c\u7ed9\u6211 5 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "map \u4e00\u4e0b https://docs.example.com \u8fd9\u4e2a\u7ad9\u70b9\uff0c\u5217\u51fa\u6240\u6709\u8ddf authentication \u76f8\u5173\u7684 URL\uff0c\u7528 instructions \u8fc7\u6ee4",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research \u4e00\u4e0b LangChain \u548c LlamaIndex \u54ea\u4e2a\u66f4\u9002\u5408\u505a RAG\uff0c\u8981\u5e26\u5f15\u7528\u7684\u5bf9\u6bd4\u62a5\u544a\uff0c\u7528 pro model \u8dd1",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u722c\u4e00\u4e0b\u8fd9\u4e2a\u6587\u6863\u7ad9\u70b9 https://docs.example.com/zh/ \uff0c\u628a\u6bcf\u4e2a\u9875\u9762\u5b58\u6210 markdown \u6587\u4ef6\u653e\u5230 ./docs/ \u76ee\u5f55\u4e0b\uff0c\u6df1\u5ea6 2 \u5c42\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u627e\u4e00\u4e0b example.com \u7f51\u7ad9\u4e0a\u6240\u6709\u5173\u4e8e API \u9274\u6743\u7684\u9875\u9762 URL\uff0c\u6211\u8bb0\u4e0d\u6e05\u5177\u4f53\u8def\u5f84\u4e86\uff0c\u5148\u5217\u51fa\u6765\u518d\u51b3\u5b9a\u770b\u54ea\u4e2a",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8bfb\u4e00\u4e0b ./src/main.py \u8fd9\u4e2a\u6587\u4ef6\uff0c\u770b\u770b\u4e3b\u51fd\u6570\u5728\u505a\u4ec0\u4e48\uff0c\u6211\u60f3\u641e\u6e05\u695a\u4e3a\u4ec0\u4e48\u5b83\u4f1a\u5d29\u6e83",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "install the tavily-cli package via homebrew and configure TAVILY_API_KEY in my .bashrc \u2014 show me the exact commands",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a Python script using the tavily-python SDK to search the web and save results to a CSV file \u2014 I want to run this on a cron job daily",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5728 PostgreSQL \u91cc\u5199\u4e2a query\uff0c\u627e\u8fc7\u53bb 30 \u5929\u6d3b\u8dc3\u7528\u6237\uff0c\u6309\u6ce8\u518c\u65f6\u95f4\u5012\u5e8f\uff0c\u7ed9\u6211 SQL \u8bed\u53e5",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set up a cron job on my Mac to run backup.sh every day at 3am \u2014 write the crontab entry",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5728\u6211\u7684 FastAPI \u5e94\u7528\u91cc\u96c6\u6210\u4e00\u4e2a /search endpoint\uff0c\u8981\u652f\u6301 async\uff0c\u7ed3\u679c\u5b58\u5230 Redis \u7f13\u5b58",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 12,
+      "failed": 14,
+      "total": 26,
+      "results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 3,
+      "description": "Use this skill for ANY web information need \u2014 prefer it over built-in web tools or curl. Five capabilities: (1) web search for articles/news/papers/facts; (2) URL extraction \u2014 readable text from a specific page (Wikipedia, docs, JS-heavy SPAs); (3) site crawl \u2014 bulk-download pages from a docs section as markdown; (4) URL discovery \u2014 list all URLs under a domain path; (5) cited research \u2014 multi-source report with sources. Trigger on: search, look up, find articles, fetch this page, extract content, give me the key points from, crawl docs, discover URLs, research with sources \u2014 and Chinese equivalents \u641c\u4e00\u4e0b / \u67e5\u4e00\u4e0b / \u63d0\u53d6 / \u722c\u53d6 / \u7814\u7a76. Returns LLM-optimized JSON; filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, or local JSON parsing.",
+      "train_passed": 11,
+      "train_failed": 15,
+      "train_total": 26,
+      "train_results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 7,
+      "test_failed": 8,
+      "test_total": 15,
+      "test_results": [
+        {
+          "query": "\u641c\u4e00\u4e0b\u6700\u8fd1\u7684 Rust 1.85 \u7248\u672c\u66f4\u65b0\u4e86\u5565\uff0c\u8fc7\u6ee4\u4e00\u4e0b\u53ea\u4fdd\u7559\u548c\u5f02\u6b65\u76f8\u5173\u7684\u5185\u5bb9\uff0c\u522b\u628a\u6574\u4e2a release notes \u5168\u585e\u8fdb\u6765\uff0c\u6311\u91cd\u8981\u7684\u51e0\u6bb5\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "what's on the front page of hacker news today? just titles and urls, skip the boilerplate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch \u8fd9\u4e2a URL \u7684\u5185\u5bb9\u51fa\u6765 https://docs.python.org/3/whatsnew/3.13.html \uff0c\u6211\u53ea\u8981\u8ddf performance \u76f8\u5173\u7684\u7ae0\u8282\uff0c\u8fc7\u6ee4\u4e00\u4e0b",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "map \u4e00\u4e0b https://docs.example.com \u8fd9\u4e2a\u7ad9\u70b9\uff0c\u5217\u51fa\u6240\u6709\u8ddf authentication \u76f8\u5173\u7684 URL\uff0c\u7528 instructions \u8fc7\u6ee4",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u67e5\u4e00\u4e0b 2026 \u5e74\u4e2d\u56fd\u65b0\u80fd\u6e90\u6c7d\u8f66\u8865\u8d34\u653f\u7b56\u6709\u4ec0\u4e48\u6700\u65b0\u53d8\u5316\uff0c\u8981\u6700\u8fd1\u4e00\u4e2a\u6708\u7684\u65b0\u95fb\uff0c\u7ed9\u6211 5 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6df1\u5ea6\u7814\u7a76\u4e00\u4e0b\u4e2d\u7f8e AI \u82af\u7247\u51fa\u53e3\u7ba1\u5236\u7684\u6f14\u53d8\u5386\u7a0b\uff0c\u7ed9\u6211\u4e00\u4efd\u5e26\u5f15\u7528\u6765\u6e90\u7684\u5206\u6790\u62a5\u544a\uff0c\u5bf9\u6bd4 2022 \u5230 2026 \u5e74\u7684\u653f\u7b56\u53d8\u5316",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research \u4e00\u4e0b LangChain \u548c LlamaIndex \u54ea\u4e2a\u66f4\u9002\u5408\u505a RAG\uff0c\u8981\u5e26\u5f15\u7528\u7684\u5bf9\u6bd4\u62a5\u544a\uff0c\u7528 pro model \u8dd1",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u722c\u4e00\u4e0b\u8fd9\u4e2a\u6587\u6863\u7ad9\u70b9 https://docs.example.com/zh/ \uff0c\u628a\u6bcf\u4e2a\u9875\u9762\u5b58\u6210 markdown \u6587\u4ef6\u653e\u5230 ./docs/ \u76ee\u5f55\u4e0b\uff0c\u6df1\u5ea6 2 \u5c42\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u627e\u4e00\u4e0b example.com \u7f51\u7ad9\u4e0a\u6240\u6709\u5173\u4e8e API \u9274\u6743\u7684\u9875\u9762 URL\uff0c\u6211\u8bb0\u4e0d\u6e05\u5177\u4f53\u8def\u5f84\u4e86\uff0c\u5148\u5217\u51fa\u6765\u518d\u51b3\u5b9a\u770b\u54ea\u4e2a",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "install the tavily-cli package via homebrew and configure TAVILY_API_KEY in my .bashrc \u2014 show me the exact commands",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u8bfb\u4e00\u4e0b ./src/main.py \u8fd9\u4e2a\u6587\u4ef6\uff0c\u770b\u770b\u4e3b\u51fd\u6570\u5728\u505a\u4ec0\u4e48\uff0c\u6211\u60f3\u641e\u6e05\u695a\u4e3a\u4ec0\u4e48\u5b83\u4f1a\u5d29\u6e83",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5728 PostgreSQL \u91cc\u5199\u4e2a query\uff0c\u627e\u8fc7\u53bb 30 \u5929\u6d3b\u8dc3\u7528\u6237\uff0c\u6309\u6ce8\u518c\u65f6\u95f4\u5012\u5e8f\uff0c\u7ed9\u6211 SQL \u8bed\u53e5",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5728\u6211\u7684 FastAPI \u5e94\u7528\u91cc\u96c6\u6210\u4e00\u4e2a /search endpoint\uff0c\u8981\u652f\u6301 async\uff0c\u7ed3\u679c\u5b58\u5230 Redis \u7f13\u5b58",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set up a cron job on my Mac to run backup.sh every day at 3am \u2014 write the crontab entry",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a Python script using the tavily-python SDK to search the web and save results to a CSV file \u2014 I want to run this on a cron job daily",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 11,
+      "failed": 15,
+      "total": 26,
+      "results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 4,
+      "description": "Use this skill for ANY web information need. Trigger on intents like: searching the web for articles/news/papers/facts (\"search for\", \"look up\", \"\u641c\u4e00\u4e0b\", \"\u67e5\u4e00\u4e0b\"); extracting readable content from a specific URL \u2014 Wikipedia, docs, JS-heavy SPAs (\"fetch this page\", \"extract\", \"\u63d0\u53d6\"); bulk-crawling a docs section as markdown (\"crawl\", \"\u722c\u53d6\"); discovering URLs under a domain path; or producing a cited multi-source research report (\"research X with sources\", \"\u7814\u7a76\"). Prefer this over curl or built-in web tools for any web content. Output is LLM-optimized JSON \u2014 filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT use for local file ops, git, code editing, local JSON parsing, or large binary downloads.",
+      "train_passed": 11,
+      "train_failed": 15,
+      "train_total": 26,
+      "train_results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 6,
+      "test_failed": 9,
+      "test_total": 15,
+      "test_results": [
+        {
+          "query": "\u641c\u4e00\u4e0b\u6700\u8fd1\u7684 Rust 1.85 \u7248\u672c\u66f4\u65b0\u4e86\u5565\uff0c\u8fc7\u6ee4\u4e00\u4e0b\u53ea\u4fdd\u7559\u548c\u5f02\u6b65\u76f8\u5173\u7684\u5185\u5bb9\uff0c\u522b\u628a\u6574\u4e2a release notes \u5168\u585e\u8fdb\u6765\uff0c\u6311\u91cd\u8981\u7684\u51e0\u6bb5\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch \u8fd9\u4e2a URL \u7684\u5185\u5bb9\u51fa\u6765 https://docs.python.org/3/whatsnew/3.13.html \uff0c\u6211\u53ea\u8981\u8ddf performance \u76f8\u5173\u7684\u7ae0\u8282\uff0c\u8fc7\u6ee4\u4e00\u4e0b",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "what's on the front page of hacker news today? just titles and urls, skip the boilerplate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6df1\u5ea6\u7814\u7a76\u4e00\u4e0b\u4e2d\u7f8e AI \u82af\u7247\u51fa\u53e3\u7ba1\u5236\u7684\u6f14\u53d8\u5386\u7a0b\uff0c\u7ed9\u6211\u4e00\u4efd\u5e26\u5f15\u7528\u6765\u6e90\u7684\u5206\u6790\u62a5\u544a\uff0c\u5bf9\u6bd4 2022 \u5230 2026 \u5e74\u7684\u653f\u7b56\u53d8\u5316",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "map \u4e00\u4e0b https://docs.example.com \u8fd9\u4e2a\u7ad9\u70b9\uff0c\u5217\u51fa\u6240\u6709\u8ddf authentication \u76f8\u5173\u7684 URL\uff0c\u7528 instructions \u8fc7\u6ee4",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u67e5\u4e00\u4e0b 2026 \u5e74\u4e2d\u56fd\u65b0\u80fd\u6e90\u6c7d\u8f66\u8865\u8d34\u653f\u7b56\u6709\u4ec0\u4e48\u6700\u65b0\u53d8\u5316\uff0c\u8981\u6700\u8fd1\u4e00\u4e2a\u6708\u7684\u65b0\u95fb\uff0c\u7ed9\u6211 5 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research \u4e00\u4e0b LangChain \u548c LlamaIndex \u54ea\u4e2a\u66f4\u9002\u5408\u505a RAG\uff0c\u8981\u5e26\u5f15\u7528\u7684\u5bf9\u6bd4\u62a5\u544a\uff0c\u7528 pro model \u8dd1",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u722c\u4e00\u4e0b\u8fd9\u4e2a\u6587\u6863\u7ad9\u70b9 https://docs.example.com/zh/ \uff0c\u628a\u6bcf\u4e2a\u9875\u9762\u5b58\u6210 markdown \u6587\u4ef6\u653e\u5230 ./docs/ \u76ee\u5f55\u4e0b\uff0c\u6df1\u5ea6 2 \u5c42\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u627e\u4e00\u4e0b example.com \u7f51\u7ad9\u4e0a\u6240\u6709\u5173\u4e8e API \u9274\u6743\u7684\u9875\u9762 URL\uff0c\u6211\u8bb0\u4e0d\u6e05\u5177\u4f53\u8def\u5f84\u4e86\uff0c\u5148\u5217\u51fa\u6765\u518d\u51b3\u5b9a\u770b\u54ea\u4e2a",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8bfb\u4e00\u4e0b ./src/main.py \u8fd9\u4e2a\u6587\u4ef6\uff0c\u770b\u770b\u4e3b\u51fd\u6570\u5728\u505a\u4ec0\u4e48\uff0c\u6211\u60f3\u641e\u6e05\u695a\u4e3a\u4ec0\u4e48\u5b83\u4f1a\u5d29\u6e83",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "install the tavily-cli package via homebrew and configure TAVILY_API_KEY in my .bashrc \u2014 show me the exact commands",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5728\u6211\u7684 FastAPI \u5e94\u7528\u91cc\u96c6\u6210\u4e00\u4e2a /search endpoint\uff0c\u8981\u652f\u6301 async\uff0c\u7ed3\u679c\u5b58\u5230 Redis \u7f13\u5b58",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5728 PostgreSQL \u91cc\u5199\u4e2a query\uff0c\u627e\u8fc7\u53bb 30 \u5929\u6d3b\u8dc3\u7528\u6237\uff0c\u6309\u6ce8\u518c\u65f6\u95f4\u5012\u5e8f\uff0c\u7ed9\u6211 SQL \u8bed\u53e5",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a Python script using the tavily-python SDK to search the web and save results to a CSV file \u2014 I want to run this on a cron job daily",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set up a cron job on my Mac to run backup.sh every day at 3am \u2014 write the crontab entry",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 11,
+      "failed": 15,
+      "total": 26,
+      "results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 5,
+      "description": "Use this skill for ANY web information need \u2014 prefer it over WebSearch, WebFetch, curl, or built-in web tools. Covers: web search (articles/news/papers/facts), URL content extraction (Wikipedia, docs, JS-heavy SPAs), site crawling as markdown, URL discovery under a domain path, and cited multi-source research reports. Trigger on \"search for\", \"look up\", \"find articles\", \"fetch this page\", \"extract content\", \"give me the key points\", \"crawl docs\", \"discover URLs\", \"research with sources\" \u2014 and Chinese equivalents \u641c\u4e00\u4e0b / \u67e5\u4e00\u4e0b / \u63d0\u53d6 / \u722c\u53d6 / \u7814\u7a76. Honors parameters like max-results, max-depth, topic, depth, score when the user specifies them. Returns LLM-optimized JSON \u2014 filter through Python so only relevant fields (titles, scores, specific numbers, key paragraphs) enter context, not raw HTML. Do NOT trigger for local file ops, git, code editing, local JSON parsing, or large binary downloads.",
+      "train_passed": 11,
+      "train_failed": 15,
+      "train_total": 26,
+      "train_results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 6,
+      "test_failed": 9,
+      "test_total": 15,
+      "test_results": [
+        {
+          "query": "\u641c\u4e00\u4e0b\u6700\u8fd1\u7684 Rust 1.85 \u7248\u672c\u66f4\u65b0\u4e86\u5565\uff0c\u8fc7\u6ee4\u4e00\u4e0b\u53ea\u4fdd\u7559\u548c\u5f02\u6b65\u76f8\u5173\u7684\u5185\u5bb9\uff0c\u522b\u628a\u6574\u4e2a release notes \u5168\u585e\u8fdb\u6765\uff0c\u6311\u91cd\u8981\u7684\u51e0\u6bb5\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "what's on the front page of hacker news today? just titles and urls, skip the boilerplate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch \u8fd9\u4e2a URL \u7684\u5185\u5bb9\u51fa\u6765 https://docs.python.org/3/whatsnew/3.13.html \uff0c\u6211\u53ea\u8981\u8ddf performance \u76f8\u5173\u7684\u7ae0\u8282\uff0c\u8fc7\u6ee4\u4e00\u4e0b",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "map \u4e00\u4e0b https://docs.example.com \u8fd9\u4e2a\u7ad9\u70b9\uff0c\u5217\u51fa\u6240\u6709\u8ddf authentication \u76f8\u5173\u7684 URL\uff0c\u7528 instructions \u8fc7\u6ee4",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u67e5\u4e00\u4e0b 2026 \u5e74\u4e2d\u56fd\u65b0\u80fd\u6e90\u6c7d\u8f66\u8865\u8d34\u653f\u7b56\u6709\u4ec0\u4e48\u6700\u65b0\u53d8\u5316\uff0c\u8981\u6700\u8fd1\u4e00\u4e2a\u6708\u7684\u65b0\u95fb\uff0c\u7ed9\u6211 5 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6df1\u5ea6\u7814\u7a76\u4e00\u4e0b\u4e2d\u7f8e AI \u82af\u7247\u51fa\u53e3\u7ba1\u5236\u7684\u6f14\u53d8\u5386\u7a0b\uff0c\u7ed9\u6211\u4e00\u4efd\u5e26\u5f15\u7528\u6765\u6e90\u7684\u5206\u6790\u62a5\u544a\uff0c\u5bf9\u6bd4 2022 \u5230 2026 \u5e74\u7684\u653f\u7b56\u53d8\u5316",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u722c\u4e00\u4e0b\u8fd9\u4e2a\u6587\u6863\u7ad9\u70b9 https://docs.example.com/zh/ \uff0c\u628a\u6bcf\u4e2a\u9875\u9762\u5b58\u6210 markdown \u6587\u4ef6\u653e\u5230 ./docs/ \u76ee\u5f55\u4e0b\uff0c\u6df1\u5ea6 2 \u5c42\u5c31\u884c",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u627e\u4e00\u4e0b example.com \u7f51\u7ad9\u4e0a\u6240\u6709\u5173\u4e8e API \u9274\u6743\u7684\u9875\u9762 URL\uff0c\u6211\u8bb0\u4e0d\u6e05\u5177\u4f53\u8def\u5f84\u4e86\uff0c\u5148\u5217\u51fa\u6765\u518d\u51b3\u5b9a\u770b\u54ea\u4e2a",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research \u4e00\u4e0b LangChain \u548c LlamaIndex \u54ea\u4e2a\u66f4\u9002\u5408\u505a RAG\uff0c\u8981\u5e26\u5f15\u7528\u7684\u5bf9\u6bd4\u62a5\u544a\uff0c\u7528 pro model \u8dd1",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8bfb\u4e00\u4e0b ./src/main.py \u8fd9\u4e2a\u6587\u4ef6\uff0c\u770b\u770b\u4e3b\u51fd\u6570\u5728\u505a\u4ec0\u4e48\uff0c\u6211\u60f3\u641e\u6e05\u695a\u4e3a\u4ec0\u4e48\u5b83\u4f1a\u5d29\u6e83",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "install the tavily-cli package via homebrew and configure TAVILY_API_KEY in my .bashrc \u2014 show me the exact commands",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a Python script using the tavily-python SDK to search the web and save results to a CSV file \u2014 I want to run this on a cron job daily",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5728\u6211\u7684 FastAPI \u5e94\u7528\u91cc\u96c6\u6210\u4e00\u4e2a /search endpoint\uff0c\u8981\u652f\u6301 async\uff0c\u7ed3\u679c\u5b58\u5230 Redis \u7f13\u5b58",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5728 PostgreSQL \u91cc\u5199\u4e2a query\uff0c\u627e\u8fc7\u53bb 30 \u5929\u6d3b\u8dc3\u7528\u6237\uff0c\u6309\u6ce8\u518c\u65f6\u95f4\u5012\u5e8f\uff0c\u7ed9\u6211 SQL \u8bed\u53e5",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set up a cron job on my Mac to run backup.sh every day at 3am \u2014 write the crontab entry",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 11,
+      "failed": 15,
+      "total": 26,
+      "results": [
+        {
+          "query": "\u5e2e\u6211 search \u4e00\u4e0b React 19 \u65b0\u51fa\u4e86\u54ea\u4e9b hooks\uff0c\u7ed9\u6211 5 \u6761\u7ed3\u679c\u5c31\u884c\uff0c\u8981\u5e26 url \u548c score",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u7684\u8001\u677f\u8ba9\u6211\u7814\u7a76\u4e00\u4e0b\u7ade\u54c1\u5b9a\u4ef7\u7b56\u7565\uff0c\u5bf9\u6bd4\u4e00\u4e0b Notion vs Linear vs ClickUp \u7684\u56e2\u961f\u7248\u6708\u8d39\uff0c\u8981\u5e26\u5f15\u7528\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a\u7f51\u5740\u7684\u5185\u5bb9\u5e2e\u6211\u63d0\u53d6\u51fa\u6765 https://zh.wikipedia.org/wiki/\u4eba\u5de5\u667a\u80fd \uff0c\u53ea\u8981\u6b63\u6587\u90e8\u5206\uff0c\u4e0d\u8981\u5bfc\u822a\u680f\u548c\u4fa7\u8fb9\u680f\u90a3\u4e9b\u4e71\u4e03\u516b\u7cdf\u7684",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u53ea\u5728 arxiv.org \u641c multimodal transformer \u76f8\u5173\u8bba\u6587\uff0c\u65f6\u95f4\u9650\u5b9a\u4e0a\u4e2a\u6708\uff0cmax-results \u7ed9 10",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "extract content from this URL but it's a JS-heavy SPA: https://app.linear.app \u2014 try advanced depth, I need the rendered text not the raw HTML",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "fetch this page and give me the key points: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "research the EU AI Act implementation timeline \u2014 I need a cited report with sources, take your time and use the pro model",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u67e5\u4e00\u4e0b NVIDIA Q4 2025 \u8d22\u62a5\uff0c\u4ece\u7ed3\u679c\u91cc filter \u51fa revenue \u548c EPS \u7684\u6570\u5b57\u5c31\u884c\uff0c\u522b\u6574\u9875\u585e context",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl the docs at https://docs.example.com/api/ and save each page as a markdown file in ./api-docs/",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "crawl \u4e00\u4e0b https://docs.example.com/api/ \u628a\u6240\u6709 endpoint \u9875\u9762 save \u6210 markdown\uff0cmax-depth \u8bbe 2\uff0climit 50",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "discover all URLs under https://example.com/blog/ \u2014 I'm looking for a specific post about postgres performance tuning but I don't remember the exact title",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b Python 3.13 \u7684\u53d1\u5e03\u65e5\u671f\uff0c\u7ed9\u6211\u4e09\u6761\u7ed3\u679c\u5c31\u591f\u4e86\uff0c\u8981\u5e26\u76f8\u5173\u5ea6\u8bc4\u5206",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "search for the latest news on the OpenAI o3 model release and give me 5 results with titles and URLs",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "\u641c\u4e00\u4e0b\u4e0a\u5468\u7684 AI \u65b0\u95fb\uff0ctopic \u8bbe\u6210 news\uff0c\u7ed9\u6211\u6700\u65b0\u7684 8 \u6761\u5e26\u6765\u6e90",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "find me articles about solid-state battery commercialization in 2025, but only the important parts \u2014 don't dump raw HTML into context, filter for the relevant paragraphs only",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "git diff HEAD~3 to see what changed in the last 3 commits, then help me write a commit message for the staged changes",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "query my SQLite database at ./data/app.db for the top 10 customers by revenue in the last 30 days",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "use curl to download https://example.com/large-file.zip and save it to /tmp/downloads/ \u2014 show me the curl command",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "fix this TypeScript error in my code: Type 'string' is not assignable to type 'number' at line 42 of utils.ts",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u628a\u8fd9\u4e2a Python \u51fd\u6570\u6539\u9020\u6210\u5f02\u6b65\u7684\uff0c\u6587\u4ef6\u5728 ./utils/fetcher.py \u7b2c 45 \u884c\u90a3\u4e2a fetch_data \u51fd\u6570",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "refactor this React component to use hooks instead of class component \u2014 the file is at ./components/UserProfile.tsx",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "\u7528 tavily-python SDK \u5199\u4e00\u4e2a\u641c\u7d22\u811a\u672c\uff0c\u6bcf\u5929\u51cc\u6668 3 \u70b9\u5b9a\u65f6\u8dd1\uff0c\u628a\u7ed3\u679c\u5b58\u5230 PostgreSQL \u6570\u636e\u5e93\u7684 search_results \u8868\u91cc",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git status \u770b\u4e0b\u5f53\u524d working tree \u72b6\u6001\uff0c\u7136\u540e stage \u6240\u6709\u6539\u52a8\u7684 .py \u6587\u4ef6\uff0c\u518d\u5e2e\u6211\u5199\u4e2a commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "read the file at ./src/index.ts and explain what the main function does \u2014 I'm trying to debug a crash",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "git log \u770b\u4e00\u4e0b\u6700\u8fd1 5 \u6b21\u63d0\u4ea4\u6539\u4e86\u5565\uff0c\u7136\u540e\u5e2e\u6211\u7ed9\u5f53\u524d\u7684 staged \u6539\u52a8\u5199\u4e2a\u89c4\u8303\u7684 commit message",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "parse this JSON string and extract the 'name' field: {\"name\":\"Alice\",\"age\":30,\"email\":\"alice@example.com\"}",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    }
+  ]
+}
+Report: /var/folders/ch/zh5ql_7x71v_ljzcxsy3s24w0000gn/T/skill_description_report_tavily_20260704_213656.html
+Results saved to: /Users/spoon/Code/tavily-skills/skills/skills/tavily/evals/results/2026-07-04_213656
+
