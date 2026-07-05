@@ -16,6 +16,7 @@
   - [superpowers/](#superpowers)
   - [anthropics/](#anthropics)
   - [obsidian/](#obsidian)
+  - [diagram/](#diagram)
   - [独立技能](#独立技能)
 - [安装方式](#安装方式)
 - [与上游项目的差异](#与上游项目的差异)
@@ -100,6 +101,17 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [json-canvas](./obsidian/json-canvas) | 创建和编辑 JSON Canvas（`.canvas`）文件：节点、连线、分组 |
 | [obsidian-cli](./obsidian/obsidian-cli) | 通过 Obsidian CLI 操作 vault，包括插件和主题开发 |
 | [defuddle](./obsidian/defuddle) | 使用 Defuddle 从网页提取干净 Markdown，节省 token |
+
+### [diagram/](./diagram)
+
+绘图技能家族，按输出格式分工，覆盖产品/技术画图全场景。详见 [diagram/README.md](./diagram/README.md)。
+
+| 技能 | 输出形态 | 主用途 |
+|------|---------|--------|
+| [diagram-mermaid](./diagram/diagram-mermaid) | Mermaid 代码块（内联 Markdown） | GitHub README/issue/PR 嵌入，零依赖，GitHub 直接渲染 |
+| [diagram-plantuml](./diagram/diagram-plantuml) | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道等专业图（图标库 9500+） |
+| [diagram-html](./diagram/diagram-html) | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 一键导出 PNG/JPEG/WebP/SVG |
+| [diagram-image](./diagram/diagram-image) | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 |
 
 ### 独立技能
 
