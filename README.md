@@ -126,6 +126,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [engram-mem](./engram-mem) | 基于本地 engram CLI(SQLite + FTS5)的跨会话持久记忆,工作与生活通用,支持决策、偏好、计划等记忆的存取与检索 |
 | [deslop-bi](./deslop-bi) | 双语去 AI 味：识别并修复中英文文本中的 AI 生成痕迹——浮夸修辞、套路结构、机器翻译腔、"深入探讨/打造/赋能"等中文 AI 高频词 |
 | [tavily](./tavily) | 通过 Tavily CLI 做网页搜索、内容提取、站点爬取、URL 发现和带引用的深度研究，支持 context-isolated 模式过滤原始结果 |
+| [hunk-review](./hunk-review) | 通过 Hunk daemon 与交互式 diff 审阅会话协作：检查会话结构、跳转文件/hunk、重载 diff 内容、添加内联 review 注释 |
 
 ## 安装方式
 
