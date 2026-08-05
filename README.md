@@ -128,6 +128,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [tavily](./tavily) | 通过 Tavily CLI 做网页搜索、内容提取、站点爬取、URL 发现和带引用的深度研究，支持 context-isolated 模式过滤原始结果 |
 | [hunk-review](./hunk-review) | 通过 Hunk daemon 与交互式 diff 审阅会话协作：检查会话结构、跳转文件/hunk、重载 diff 内容、添加内联 review 注释 |
 | [opencli](./opencli) | 把任意网站/Electron 应用/外部 CLI 变成 `opencli <site> <command>` 的统一操作面，agent 可驱动真实浏览器、抓取页面、填表点击、维护站点适配器和 sitemap |
+| [agentsview-cli](./agentsview-cli) | 本地 AI 会话历史查询：`agentsview` CLI 同步/搜索/恢复 Claude Code、Codex、Cursor 等会话，用量成本报告、语义检索、pg/duckdb/MCP 镜像 |
 
 ## 安装方式
 
