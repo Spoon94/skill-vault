@@ -189,8 +189,8 @@ HTML fixture instead of the response JSON fixture.
 
 ## See also
 
-- `references/adapter-template.md` — basic adapter file structure
-- `references/output-design.md` — column naming for the post-extract mapping
-- `references/success-rate-pitfalls.md` — broader "verify can pass while
+- `adapter-template.md` — basic adapter file structure
+- `output-design.md` — column naming for the post-extract mapping
+- `success-rate-pitfalls.md` — broader "verify can pass while
   data is silently wrong" catalog; the mocked-page.evaluate gap that
   motivates this whole pattern is one entry there

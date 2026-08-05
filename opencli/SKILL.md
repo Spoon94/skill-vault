@@ -30,7 +30,7 @@ OpenCLI 把任意网站、Electron 桌面应用、或外部 CLI 变成统一的 
 
 ### 三大支柱
 
-- **适配器命令** - `opencli <site> <command> [...]`。内置适配器在 `clis/`，用户私有适配器在 `~/.opencli/clis/`。每个命令有 strategy 标签（`PUBLIC | COOKIE | INTERCEPT | UI | LOCAL`），告诉你是否需要 Chrome。
+- **适配器命令** - `opencli <site> <command> [...]`。内置适配器在 `clis/`，用户私有适配器在 `~/.opencli/clis/`。每个命令有 strategy 标签（`public | cookie | intercept | ui | local`，`opencli list -f json` 输出小写），告诉你是否需要 Chrome。
 - **浏览器驱动** - `opencli browser *`（`open`/`state`/`click`/`type`/`select`/`find`/`extract`/`network`…），适配器没覆盖时临时用。
 - **当前标签绑定** - `opencli browser <session> bind` 把用户已经打开并登录的标签绑到会话，后续用 `opencli browser <session> ...` 操作。详见 `references/browser.md`。
 - **外部 CLI 透传** - `opencli gh`、`opencli docker` 等，用 `opencli external install <name>` 管理。
@@ -49,7 +49,7 @@ npx tsx src/main.ts <command>               # 同 npm 版操作面
 opencli doctor                              # 浏览器相关任务前必跑
 ```
 
-`opencli doctor` 诊断**浏览器桥**（daemon + 扩展 + Chrome 接线），范围窄：`PUBLIC`/`LOCAL` 适配器、`opencli list`、插件、外部 CLI 透传不需要它绿；只有 `COOKIE`/`INTERCEPT`/`UI` 适配器和 `opencli browser *` 需要。失败常见原因：Chrome 没开、扩展没装、调试端口被 1Password 等扩展占用。
+`opencli doctor` 诊断**浏览器桥**（daemon + 扩展 + Chrome 接线），范围窄：`public`/`local` 适配器、`opencli list`、插件、外部 CLI 透传不需要它绿；只有 `cookie`/`intercept`/`ui` 适配器和 `opencli browser *` 需要。失败常见原因：Chrome 没开、扩展没装、调试端口被 1Password 等扩展占用。
 
 ### Shell completion
 
@@ -76,26 +76,26 @@ opencli convention-audit [target]     # 扫描适配器是否符合 agent-native
 
 | `opencli list` 上的 strategy 标签 | 需要什么 |
 |---|---|
-| `PUBLIC` | 无 - 纯 HTTP，不碰浏览器 |
-| `COOKIE` | Chrome 登录目标站点 + 装扩展，命令从 live session 取凭证，不用重登 |
-| `INTERCEPT` | 同 COOKIE，加开一个自动化窗口抓签名请求 |
-| `UI` | 同 COOKIE，完整 DOM 交互 |
-| `LOCAL` | 无浏览器，连本地/dev 端点 |
+| `public` | 无 - 纯 HTTP，不碰浏览器 |
+| `cookie` | Chrome 登录目标站点 + 装扩展，命令从 live session 取凭证，不用重登 |
+| `intercept` | 同 cookie，加开一个自动化窗口抓签名请求 |
+| `ui` | 同 cookie，完整 DOM 交互 |
+| `local` | 无浏览器，连本地/dev 端点 |
 
 Electron 桌面应用（cursor/codex/chatwise/discord-app/doubao-app/antigravity/chatgpt-app）走 CDP 连运行中的应用，同 cookie-less 流程，调用前确保应用在跑。
 
 ### ⚠️ 适配器返回 `[]` / 空时怎么排查
 
-带 `domain` 的 `COOKIE` 适配器（如 `zhihu hot`）会**自己先导航**到 `https://<domain>` 再取数，不依赖前台标签。返回空时按序排查：
+带 `domain` 的 `cookie` 适配器（如 `zhihu hot`）会**自己先导航**到 `https://<domain>` 再取数，不依赖前台标签。返回空时按序排查：
 
 1. **先重跑一次** - 首次连接/冷启动偶发空结果，重跑即恢复（实测：前台 `about:blank` 时 `zhihu hot` 也正常）。
 2. **查登录态** - 用 `opencli browser <session> open https://<site>/` 打开站点，看是否跳登录页；跳了就在 Chrome 里登录。
 3. **换查询/入口重试** - 平台反爬降级、软 404 会返回结构正常但空的 payload（见「§适配器失效自动修复」的"空 ≠ 坏了"）。
 4. 以上都排除仍复现，才进 `--trace retain-on-failure` 修复流程。
 
-真正依赖当前页面状态的是**无 domain 的 `UI` 适配器**（如 antigravity 等桌面 App 操作，`navigateBefore=true`，不预导航直接操作当前页面）——用它们时确保目标 App/页面已在运行。
+真正依赖当前页面状态的是**无 domain 的 `ui` 适配器**（如 antigravity 等桌面 App 操作，`navigateBefore=true`，不预导航直接操作当前页面）——用它们时确保目标 App/页面已在运行。
 
-`PUBLIC`/`LOCAL` 适配器不碰浏览器（`browser: false`，Node 侧纯 fetch 或连本地端点），不带浏览器 cookie，与前台标签无关。
+`public`/`local` 适配器不碰浏览器（`browser: false`，Node 侧纯 fetch 或连本地端点），不带浏览器 cookie，与前台标签无关。
 
 ### 发现命令 - 别读文档，跑命令
 
@@ -382,7 +382,7 @@ opencli plugin create <name>               # 脚手架生成新插件
 ## 红线
 
 - 别把这个 skill 的命令列表贴进计划，会 rot。任务开始时跑 `opencli list -f json`。
-- 别假设每个适配器都需要浏览器 - `PUBLIC` 和 `LOCAL` 不需要，看 `strategy` 字段。
+- 别假设每个适配器都需要浏览器 - `public` 和 `local` 不需要，看 `strategy` 字段。
 - 别把失败适配器静默回退到手写 `fetch` - 先 `--trace retain-on-failure` 取浏览器证据和适配器源路径。
 - 别为了 "API-first" 把稳定的 UI/DOM 实现盲目迁到无契约内部接口（`PAGE_FETCH`/`INTERCEPT` 的 fix 频率约 `PUBLIC_API` 的 7-8 倍）。
 - 写操作默认先确认再执行（发帖/回复/删除等）。

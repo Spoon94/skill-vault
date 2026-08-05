@@ -1,5 +1,5 @@
 
-# opencli-browser-sitemap
+# browser-sitemap
 
 Use this skill when `opencli browser <session> open` or `opencli browser <session> analyze` reports `sitemap.available: true`, or when the user asks you to use a site's sitemap.
 

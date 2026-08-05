@@ -1,5 +1,18 @@
 # Sitemap Schema Reference
 
+## TOC
+
+- [v1.1 changelog](#v11-changelogvs-v1)
+- [1. 文件层约束](#1-文件层约束)
+- [2. 文件类型 schema](#2-文件类型-schema)
+- [3. Action Schema](#3-action-schemapages-内)
+- [4. 跨文件引用](#4-跨文件引用)
+- [5. Two-layer storage 行为 spec](#5-two-layer-storage-行为-spec)
+- [6. Trust Reality 红线](#6-trust-reality-红线)
+- [7. Validation rules](#7-validation-rulesphase-2-cron-audit-用)
+- [8. Cross-link](#8-cross-link)
+- [9. Open questions](#9-open-questionsv1-暂未定v2-跟数据决)
+
 详细 schema 规范。`SKILL.md` 给的是 inline 模板，本文件 spec 化字段、约束、validation 规则、跨文件引用格式。
 
 进入条件：先读 `SKILL.md` 拿到 framing（task execution graph for agents）和两层存储模型。本文件展开**怎么写得对**。
@@ -96,7 +109,7 @@ auth_strategy: COOKIE_API   # 引用 strategy-selection.md ladder
 **Optional**: `Site-wide pitfalls` (引用即可)
 **Frontmatter required**: `site`, `login_required`, `auth_strategy`
 
-`auth_strategy` 取值：`PUBLIC_API | COOKIE_API | PAGE_FETCH | INTERCEPT | DOM_STATE | UI_SELECTOR`，定义见 [`../../opencli-adapter-author/references/strategy-selection.md`](../../opencli-adapter-author/references/strategy-selection.md)。
+`auth_strategy` 取值：`PUBLIC_API | COOKIE_API | PAGE_FETCH | INTERCEPT | DOM_STATE | UI_SELECTOR`，定义见 [`../adapter/strategy-selection.md`](../adapter/strategy-selection.md)。
 
 **取主体不取并集**：`auth_strategy` 单值，覆盖该站绝大多数请求的策略。少数例外（如 twitter 公开 profile 可裸 fetch，主体仍是 COOKIE_API）在对应 page 的 `Linked APIs` section 里逐条标 `contract_strength` 区分，不靠 frontmatter 表达。array form 加复杂度无收益。
 
@@ -300,7 +313,7 @@ source: local
 - `endpoint_id` — 必须存在于同站 `~/.opencli/sites/<site>/endpoints.json`
 - `triggers_on_pages` — array of `page_id`
 - `triggered_by_actions` — array of `action:<stable-id>`
-- `contract_strength` — `stable | visible-ui | internal-unstable`，定义见 `strategy-selection.md`
+- `contract_strength` — `stable | visible-ui | internal-unstable`，定义见 `../adapter/strategy-selection.md`
 
 **Optional per entry**:
 - `notes` — meta 信息（GraphQL queryId path、已知 schema 变化、特殊 auth 头）。**不要**复制 endpoint URL / method / params / response shape — 那些只在 `endpoints.json`
@@ -508,7 +521,7 @@ action `Recovery` 字段可包含 directive：
 adapter_health_update: <adapter command> -> suspect | broken
 ```
 
-语义：当**本 action 因为该 adapter 失败而触发 Recovery**时，consumption skill（`opencli-browser-sitemap`）必须：
+语义：当**本 action 因为该 adapter 失败而触发 Recovery**时，consumption reference（`../browser-sitemap.md`）必须：
 
 1. 在 local overlay 找到 reference 该 adapter 的 workflow（一般是 `Best path: adapter: <adapter command>` 的那条）
 2. 改写 workflow 的 `adapter_health` 为 directive 指定的等级
@@ -518,9 +531,9 @@ adapter_health_update: <adapter command> -> suspect | broken
 
 不写 directive 时，Recovery 只指导当前 agent 怎么 fallback，不影响其他 agent。带 directive = "我栽了，让我把这事告诉以后的 agent"。
 
-**实现责任**：在 `opencli-browser-sitemap` skill 的 consumption loop 里。Schema 这里只 spec directive 写侧格式，不 spec 实现细节。
+**实现责任**：在 `../browser-sitemap.md` 的 consumption loop 里。Schema 这里只 spec directive 写侧格式，不 spec 实现细节。
 
-**Recovery 回 `healthy` 不在本 schema 范围**：`adapter_health` 从 `suspect` 回 `healthy` 的路径（TTL 自动衰减 / 跑 Fallback 成功后 probe Best path / 人工 reset）留给 `opencli-browser-sitemap` skill spec 拍。本 PR 只定写侧（"failed → suspect"），不定读侧（"suspect → healthy"）的恢复策略。
+**Recovery 回 `healthy` 不在本 schema 范围**：`adapter_health` 从 `suspect` 回 `healthy` 的路径（TTL 自动衰减 / 跑 Fallback 成功后 probe Best path / 人工 reset）留给 `../browser-sitemap.md` spec 拍。本 PR 只定写侧（"failed → suspect"），不定读侧（"suspect → healthy"）的恢复策略。
 
 ---
 
@@ -647,8 +660,8 @@ sitemap 是 hint，browser state 是 truth。当冲突时：
 
 ## 8. Cross-link
 
-- [`../../opencli-adapter-author/references/strategy-selection.md`](../../opencli-adapter-author/references/strategy-selection.md) — `contract_strength` 和 `auth_strategy` 取值定义
-- [`../../opencli-adapter-author/references/api-discovery.md`](../../opencli-adapter-author/references/api-discovery.md) — `endpoint_id` 怎么发现
+- [`../adapter/strategy-selection.md`](../adapter/strategy-selection.md) — `contract_strength` 和 `auth_strategy` 取值定义
+- [`../adapter/api-discovery.md`](../adapter/api-discovery.md) — `endpoint_id` 怎么发现
 - `~/.opencli/sites/<site>/endpoints.json` — endpoint 的真实 URL/method/params/response
 
 ---

@@ -1,5 +1,5 @@
 
-# opencli-sitemap-author
+# sitemap-author
 
 You are authoring a **task execution graph for agents**, not an SEO sitemap. The artifact should help an agent using `opencli browser` decide where it is, what path to take next, which OpenCLI adapter to prefer, and how to recover when the page disagrees with memory.
 
@@ -46,7 +46,7 @@ Phase 2 cron audit 按 token count 不按 byte count（CJK 中文 token-per-char
 ## Authoring Loop
 
 1. **Load existing memory**: read local overlay first, then global seed if present.
-2. **Verify reality**: use `opencli browser <session> state`, `find`, `network`, and `analyze`; browser state is truth. If you just completed an `opencli-adapter-author` session for this site, start from the retained browse trace under `~/.opencli/sites/<site>/traces/` as seed evidence instead of re-discovering the path from zero.
+2. **Verify reality**: use `opencli browser <session> state`, `find`, `network`, and `analyze`; browser state is truth. If you just completed an adapter-author session for this site, start from the retained browse trace under `~/.opencli/sites/<site>/traces/` as seed evidence instead of re-discovering the path from zero.
 3. **Record only durable structure**: page purpose, stable anchors, state signature, actions, workflows, API references, pitfalls.
 4. **Use stable ids**: page/action/workflow ids should survive URL params, locale text drift, and minor layout changes.
 5. **Write local draft**: update `~/.opencli/sites/<site>/sitemap/...` unless explicitly promoting to repo.

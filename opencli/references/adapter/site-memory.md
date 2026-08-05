@@ -7,7 +7,7 @@
 ## 两层结构
 
 ```
-skills/opencli-adapter-author/references/site-memory/<site>.md
+adapter/site-memory/<site>.md（skill 目录下）
     — 公共种子。手写 + PR 审核进入。多 agent 共享的第一批起点。
     — 已铺：eastmoney / xueqiu / bilibili / tonghuashun
 
@@ -20,7 +20,7 @@ skills/opencli-adapter-author/references/site-memory/<site>.md
 
 ---
 
-## Layer 1 — In-repo 种子（`references/site-memory/<site>.md`）
+## Layer 1 — In-repo 种子（`adapter/site-memory/<site>.md`）
 
 每个覆盖站点一个 `.md`，结构固定：
 
@@ -195,7 +195,7 @@ key = 字段代号（`f237` / `f152`），value 三件套：
 
 ```
 Step 2 开始前 → 读  ~/.opencli/sites/<site>/
-                → 读  references/site-memory/<site>.md
+                → 读  adapter/site-memory/<site>.md
                 命中后 → 不跳写 adapter，仍要跑 Step 5 (endpoint 验证) + Step 7 (字段抽查)
                         verified_at 超 30 天 → 当作过期，按冷启动走 Step 3 → 4
 
