@@ -1,9 +1,25 @@
+# browser 原语
 
-# opencli-browser
+## TOC
 
-The first reader of this CLI is an agent, not a human. Every subcommand returns a structured envelope that tells you exactly what matched, how confident the match is, and what to do if it didn't. Lean on those envelopes — do not guess.
+- [Prerequisites](#prerequisites)
+- [Session lifecycle](#session-lifecycle)
+- [Mental model](#mental-model)
+- [Critical rules](#critical-rules)
+- [Sitemaps](#sitemaps)
+- [Target contract](#target-contract-target-for-click--type--select--get-textvalueattributes)
+- [Command reference](#command-reference)
+- [Compound form controls](#compound-form-controls)
+- [Cost guide](#cost-guide)
+- [Chaining rules](#chaining-rules)
+- [Recipes](#recipes)
+- [Pitfalls](#pitfalls)
+- [Troubleshooting](#troubleshooting)
+- [See also](#see-also)
 
-This skill is for **driving a live browser** to accomplish an agent task. If you are building a reusable adapter under `~/.opencli/clis/<site>/` use `opencli-adapter-author` instead.
+The first reader of this CLI is an agent, not a human. Every subcommand returns a structured envelope that tells you exactly what matched, how confident the match is, and what to do if it didn't. Lean on those envelopes - do not guess.
+
+This reference covers **driving a live browser** to accomplish an agent task. If you are building a reusable adapter under `~/.opencli/clis/<site>/`, read `adapter-author.md` instead.
 
 ---
 
@@ -69,7 +85,7 @@ Bound sessions have no OpenCLI idle-close timer; the binding lasts until `unbind
 
 ## Sitemaps
 
-If `opencli browser <session> open` or `opencli browser <session> analyze` returns `sitemap.available: true`, switch to `opencli-browser-sitemap` before continuing a multi-step site flow. The sitemap is prior context for pages, actions, workflows, APIs, and pitfalls; it is not truth. If the browser state disagrees with the sitemap, trust the browser and mark the sitemap stale via `opencli-sitemap-author`.
+If `opencli browser <session> open` or `opencli browser <session> analyze` returns `sitemap.available: true`, switch to the sitemap-consumption section (`browser-sitemap.md`) before continuing a multi-step site flow. The sitemap is prior context for pages, actions, workflows, APIs, and pitfalls; it is not truth. If the browser state disagrees with the sitemap, trust the browser and mark the sitemap stale via `sitemap-author.md`.
 
 ---
 
@@ -433,7 +449,7 @@ normal DOM `state`, or navigate/bind directly to the iframe URL when possible.
 
 ## See also
 
-- `opencli-adapter-author` — turning what you just figured out into a reusable `~/.opencli/clis/<site>/<command>.js`.
-- `opencli-browser-sitemap` — consuming site sitemap context while driving a browser task.
-- `opencli-sitemap-author` — creating or updating sitemap knowledge when you discover a durable path or stale entry.
-- `opencli-autofix` — when an existing adapter breaks, this skill walks you through `--trace retain-on-failure` evidence and filing a fix.
+- `adapter-author.md` — turning what you just figured out into a reusable `~/.opencli/clis/<site>/<command>.js`.
+- `browser-sitemap.md` — consuming site sitemap context while driving a browser task.
+- `sitemap-author.md` — creating or updating sitemap knowledge when you discover a durable path or stale entry.
+- `autofix.md` — when an existing adapter breaks, this skill walks you through `--trace retain-on-failure` evidence and filing a fix.

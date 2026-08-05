@@ -1,5 +1,14 @@
 # Adapter Template
 
+## TOC
+
+- [活例子：convertible.js](#活例子convertiblejs)
+- [三段解剖](#三段解剖)
+- [COOKIE adapter 骨架](#cookie-adapter-骨架需要登录态)
+- [同类型 adapter 对照](#同类型-adapter-对照)
+- [Verify fixture](#verify-fixture每个-adapter-配一份-openclisitessiteverifynamejson)
+- [私人 adapter vs repo 贡献](#私人-adapter-vs-repo-贡献)
+
 一份 adapter 就是一次 `cli({...})` 调用。文件结构固定，三段：declaration、args、func。
 
 拿 `clis/eastmoney/convertible.js` 当活例子，对照拆解。

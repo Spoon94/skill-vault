@@ -13,7 +13,7 @@
 **根因**：adapter 丢了 URL 前缀 / 拼错了路径 / 吃到了相对路径。pattern 失败不是 fixture 太严，是 adapter 输出真的破了。
 
 **防御**：
-- `autofix` skill 现有纪律：**verify pattern 失败 = 收紧 adapter，不是收紧 fixture**（`opencli-autofix` SKILL.md §Rules for Patching 第 6 条）
+- `autofix` skill 现有纪律：**verify pattern 失败 = 收紧 adapter，不是收紧 fixture**（`../autofix.md` §Rules for Patching 第 6 条）
 - 要改 fixture 的唯一合法理由：**站点本身换了格式**（例如 URL 规范迁移）。这种情况下在 `~/.opencli/sites/<site>/notes.md` 顶部写一段说明
 
 ---

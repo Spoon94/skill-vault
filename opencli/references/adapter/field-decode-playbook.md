@@ -152,7 +152,7 @@ opencli browser <session> eval "fetch('...&fid=f237&po=1...').then(...)"
 
 推出一个新代号后：
 
-1. **补进 `references/field-conventions.md`**：找到对应站点的表格加一行。下次直接查。
+1. **补进 `field-conventions.md`**：找到对应站点的表格加一行。下次直接查。
 2. **在 adapter 代码里留一条注释**：如果是实测推出来的不常见代号，写一行 `// f237 = convertible premium rate (verified 2026-04-20 against page)` 方便复核。
 3. **通过 `opencli browser verify` 验一次**：字段值能对上网页上眼见的数字。
 

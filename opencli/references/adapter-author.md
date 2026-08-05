@@ -1,5 +1,5 @@
 
-# opencli-adapter-author
+# adapter-author
 
 你是要给一个站点写 adapter 的 agent。这份 skill 目标：**从零到通过 `opencli browser verify` 的 30 分钟内闭环**。
 
@@ -11,7 +11,7 @@
 
 ## 前置：看你落在哪
 
-先拿 `coverage-matrix.md` 快速自测。三个问题：
+先拿 `adapter/coverage-matrix.md` 快速自测。三个问题：
 
 1. 数据在浏览器里看得到吗？（否 → 先解决鉴权）
 2. 数据是 HTTP/JSON/HTML 吗？（否 → 不在 skill 范围）
@@ -245,7 +245,7 @@ DONE
 ## 卡住了
 
 - 诊断类：`opencli doctor` → 看 `notes.md` → 搜 autofix skill
-- 字段解码类：`field-decode-playbook.md` 全三节走完 → 先输出 raw 迭代
+- 字段解码类：`adapter/field-decode-playbook.md` 全三节走完 → 先输出 raw 迭代
 - endpoint 找不到：api-discovery §5 intercept 兜底
 
 不要猜。猜错了 verify 能通过但数据是错的，用户看到乱码才发现。
