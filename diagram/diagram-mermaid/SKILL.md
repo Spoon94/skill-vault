@@ -2,22 +2,17 @@
 name: diagram-mermaid
 description: >-
   Generate Mermaid code blocks (` ```mermaid ` fences) for inline Markdown
-  rendering of technical diagrams. Covers 11 diagram types — flowchart,
-  sequence, class, state, ER (entity-relationship), Gantt, pie, mindmap,
-  timeline, gitGraph, and journey (user journey). Use whenever the user
-  asks for a flowchart, sequence diagram, state diagram, ER diagram, Gantt
-  chart, pie chart, mindmap, timeline, git graph, or user journey map.
-  Trigger on: "画流程图" "画时序图" "状态图" "ER图" "甘特图" "饼图" "思维导图"
-  "时间线" "git图" "用户旅程" "Mermaid" "GitHub 渲染" "嵌入文档" or any
-  diagram request where the output should be inline Markdown (GitHub
-  README/issue/PR, Obsidian, VS Code Markdown preview, etc.). Part of the
-  diagram skill family (diagram-mermaid / diagram-plantuml / diagram-html /
-  diagram-image) — pick this skill when the user wants Mermaid code blocks
-  (vs. PlantUML code blocks, standalone HTML, or SVG/PNG files), needs
-  zero-dependency output that renders natively in GitHub/Markdown, or wants
-  one of the 11 supported diagram types. This is the lightest-weight entry
-  point of the diagram family — use it as the default for "画个流程图/时序图"
-  unless the user explicitly asks for another format.
+  rendering of technical diagrams. Covers 11 types — flowchart, sequence,
+  class, state, ER, Gantt, pie, mindmap, timeline, gitGraph, and journey. Use
+  whenever the user asks for a flowchart, sequence diagram, state diagram, ER
+  diagram, Gantt chart, pie chart, mindmap, timeline, git graph, or user
+  journey map. Trigger on: "画流程图" "画时序图" "状态图" "ER图" "甘特图" "饼图" "思维导图" "时间线"
+  "git图" "用户旅程" "Mermaid" "GitHub 渲染" "嵌入文档" or any diagram request where the
+  output should be inline Markdown. Part of the diagram skill family — pick
+  this skill for Mermaid code blocks, zero-dependency output that renders
+  natively in GitHub/Markdown, or one of the 11 supported types.
+  Lightest-weight entry point of the diagram family — default for "画个流程图/时序图"
+  unless another format is explicitly requested.
 ---
 
 # diagram-mermaid

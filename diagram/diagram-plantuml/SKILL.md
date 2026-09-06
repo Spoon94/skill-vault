@@ -2,26 +2,18 @@
 name: diagram-plantuml
 description: >-
   Generate PlantUML code blocks (` ```plantuml ` fences) for inline Markdown
-  rendering of professional technical diagrams. Covers UML (class/sequence/
-  activity/state/component/use-case/deployment/object/package/communication/
-  composite/interaction/profile), Cloud architecture (AWS/Azure/GCP/Alibaba/
-  IBM/OpenStack/Kubernetes), Network topology (Cisco/Citrix), Security
-  architecture (IAM/encryption/firewall/threat detection/compliance),
-  ArchiMate enterprise architecture, BPMN business process, Data analytics
-  pipelines (ETL/ELT/warehouse/ML), IoT device/sensor/edge diagrams, and
-  Mindmap — using PlantUML syntax with 9500+ mxgraph stencil icons. Use
-  whenever the user asks for UML diagrams, cloud architecture, network
-  topology, security architecture, ArchiMate, BPMN, data pipeline diagrams,
-  IoT diagrams, or any professional technical diagram that benefits from
-  standardized notation and rich iconography. Trigger on: "画UML图" "类图"
-  "时序图" "活动图" "状态图" "AWS架构" "Azure架构" "GCP架构" "阿里云架构"
-  "K8s架构" "网络拓扑" "安全架构" "ArchiMate" "BPMN" "数据管道" "ETL" "IoT
-  架构" "思维导图" "PlantUML" or any diagram needing cloud/network/security
-  icons. Part of the diagram skill family (diagram-mermaid / diagram-plantuml
-  / diagram-html / diagram-image) — pick this skill when the user wants
-  PlantUML code blocks (vs. Mermaid code blocks, standalone HTML, or SVG/PNG
-  files), needs UML/cloud/network/security/BPMN/ArchiMate/IoT specialized
-  notation, or wants 9500+ mxgraph icon stencils.
+  rendering of professional technical diagrams. Covers UML
+  (class/sequence/activity/state/component/use-case/deployment), Cloud
+  architecture (AWS/Azure/GCP/Alibaba/IBM/OpenStack/Kubernetes), Network
+  topology (Cisco/Citrix), Security architecture
+  (IAM/encryption/firewall/threat detection), ArchiMate, BPMN, Data pipelines
+  (ETL/ELT/warehouse/ML), IoT device/sensor/edge diagrams, and Mindmap — using
+  PlantUML syntax with 9500+ mxgraph stencil icons. Trigger on: "画UML图" "类图"
+  "时序图" "活动图" "状态图" "AWS架构" "Azure架构" "GCP架构" "阿里云架构" "K8s架构" "网络拓扑" "安全架构"
+  "ArchiMate" "BPMN" "数据管道" "ETL" "IoT 架构" "思维导图" "PlantUML". Part of the
+  diagram skill family — pick this skill for PlantUML code blocks,
+  UML/cloud/network/security/BPMN/ArchiMate/IoT notation, or 9500+ icon
+  stencils.
 ---
 
 # diagram-plantuml

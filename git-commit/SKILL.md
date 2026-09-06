@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Use when writing Git commit messages, reviewing commits, or setting up commit message linting. Keywords: commit message, git commit, commitlint, semantic versioning, commit format.
+description: 'Use when writing Git commit messages, reviewing commits, or setting up commit message linting. Keywords: commit message, git commit, commitlint, semantic versioning, commit format.'
 ---
 
 # Conventional Commits
