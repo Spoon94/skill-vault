@@ -116,7 +116,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [diagram-image](./diagram/diagram-image) | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 |
 | [graphviz](./diagram/graphviz) | DOT 代码块（内联 Markdown） | 依赖树/调用图/包层级，需细粒度边路由的图，自动布局 |
 | [infocard](./diagram/infocard) | HTML/CSS 卡片（直接内嵌 Markdown） | 编辑风信息卡片：知识摘要/数据高亮/公告，杂志级排版 |
-| [infographic](./diagram/infographic) | 模板化信息图（空格分隔 KV 语法） | KPI 看板/时间线/路线图/SWOT/漏斗/对比/组织树，60+ 模板 |
+| [infographic](./diagram/infographic) | 模板化信息图（空格分隔 KV 语法） | KPI 看板/时间线/路线图/SWOT/漏斗/对比/组织树，58 个内置模板 |
 
 ### 独立技能
 
