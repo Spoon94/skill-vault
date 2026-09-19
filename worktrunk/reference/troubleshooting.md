@@ -2,7 +2,7 @@
 
 Claude-specific troubleshooting guidance for common worktrunk issues.
 
-## Commit Message Generation
+## Commit message generation
 
 ### Command not found
 
@@ -35,13 +35,11 @@ Common issues:
 3. Check TOML syntax: `cat ~/.config/worktrunk/config.toml`
 4. Look for validation errors (path must be relative, not absolute)
 
-### Template conflicts
+### Template config errors
 
-Check for mutually exclusive options:
-- `template` and `template-file` cannot both be set
-- `squash-template` and `squash-template-file` cannot both be set
-
-If a template file is used, verify it exists at the specified path.
+Only inline `template` and `squash-template` values are supported. If the
+config still uses the retired `template-file` or `squash-template-file` keys,
+paste each file's contents into the corresponding inline setting.
 
 ## Hooks
 
@@ -50,7 +48,7 @@ If a template file is used, verify it exists at the specified path.
 Check sequence:
 1. Verify `.config/wt.toml` exists: `ls -la .config/wt.toml`
 2. Check TOML syntax (use `wt hook show` to see parsed config)
-3. Verify hook type spelling matches one of the seven types
+3. Verify hook type spelling matches one of the ten types
 4. Test command manually in the worktree
 
 ### Hook failing
@@ -58,7 +56,7 @@ Check sequence:
 Debug steps:
 1. Run the command manually in the worktree to see errors
 2. Check for missing dependencies (npm packages, system tools)
-3. Verify template variables expand correctly (`wt hook show --verbose`)
+3. Verify template variables expand correctly with `wt hook show --expanded` (shows each command with its variables substituted)
 4. For background hooks, check `.git/wt/logs/` for output
 
 ### Slow blocking hooks
@@ -74,6 +72,17 @@ pre-start = "npm install"
 post-start = "npm run build"
 ```
 
+## Aliases
+
+### Inspecting an alias
+
+- `wt config alias show <name>` prints the raw template.
+- `wt config alias dry-run <name> [-- args...]` prints the rendered command without running it.
+
+### A `for-each` or `--execute` alias uses the same value in every worktree
+
+The alias body rendered once at dispatch, baking the variable to the invoking worktree's value before the nested `wt` command iterated. See `reference/extending.md#nesting-templates` for how to pass the template through unrendered.
+
 ## List
 
 ### `wt list` times out after 120s
@@ -81,7 +90,7 @@ post-start = "npm run build"
 The timeout warning names the tasks that didn't finish:
 
 ```
-wt list timed out after 120s (170 results received); blocked tasks:
+Listing worktrees timed out after 120s (170 results received); blocked tasks:
   <branch>: working-tree-diff, working-tree-conflicts
 ```
 
@@ -104,18 +113,9 @@ for pid in $(pgrep -f 'git fsmonitor--daemon'); do
 done
 ```
 
-Sockets listed as bare `fsmonitor--daemon.ipc` (no resolved path) belong to deleted worktrees — safe to kill:
+Sockets listed as bare `fsmonitor--daemon.ipc` (no resolved path) belong to deleted worktrees. Any `wt remove` cleans these up: it terminates the removed worktree's own daemon and sweeps daemons whose worktree no longer exists, including ones orphaned by `git worktree remove` or `rm -rf` (mechanism details: [What can Worktrunk delete?](https://worktrunk.dev/faq/#what-can-worktrunk-delete)).
 
-```bash
-for pid in $(pgrep -f 'git fsmonitor--daemon'); do
-  sock=$(lsof -p $pid 2>/dev/null | grep 'fsmonitor--daemon.ipc' | awk '{print $NF}' | head -1)
-  [ "$sock" = "fsmonitor--daemon.ipc" ] && kill -9 $pid
-done
-```
-
-For a specific hung worktree, kill the daemon whose socket path matches it, or just `pkill -9 -f 'git fsmonitor--daemon'` and let the next `wt list` respawn the live ones. Disabling fsmonitor globally (`git config --global core.fsmonitor false`) avoids the class of problem entirely at the cost of some `git status` speed on large repos.
-
-Daemons leak when a worktree is removed while its daemon is already unresponsive — `wt remove` calls `git fsmonitor--daemon stop`, but a daemon that can't answer its IPC can't be stopped through it.
+The residual case both paths deliberately leave is a wedged daemon on a *live* worktree that is never removed: `git status` in that worktree blocks on the unresponsive IPC, but the daemon still serves a real worktree, so reaping it implicitly is out of scope. Terminate it manually: kill the daemon whose socket path matches the worktree, or `pkill -9 -f 'git fsmonitor--daemon'` and let the next `wt list` respawn the live ones.
 
 ## PowerShell on Windows
 

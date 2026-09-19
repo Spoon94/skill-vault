@@ -60,10 +60,18 @@ Options:
   --base-url URL          Override base URL from spec
   --transport TYPE        MCP HTTP transport: auto|sse|streamable (default: auto)
   --env KEY=VALUE         Env var for stdio server process (repeatable)
+  --root PATH|FILE_URI   Expose a filesystem root to an MCP server (repeatable)
+  --complete SPEC       Complete an MCP prompt or resource-template argument
+  --session-start NAME   Start a persistent session daemon (requires --mcp or --mcp-stdio)
+  --session NAME         Route command through an existing session daemon
+  --session-stop NAME    Stop a named session daemon (sends SIGTERM)
+  --session-list         List all active sessions with PID and alive/dead status
   --oauth                 Enable OAuth (authorization code + PKCE flow)
   --oauth-client-id ID    OAuth client ID (supports env:/file: prefixes)
   --oauth-client-secret S OAuth client secret (supports env:/file: prefixes)
   --oauth-scope SCOPE     OAuth scope(s) to request
+  --oauth-manual-callback Print the auth URL and read the redirect URL from stdin
+                          (headless hosts: VPS over SSH, containers)
   --cache-key KEY         Custom cache key
   --cache-ttl SECONDS     Cache TTL (default: 3600)
   --refresh               Bypass cache
@@ -72,6 +80,8 @@ Options:
   --fields FIELDS         Override GraphQL selection set (e.g. "id name email")
   --pretty                Pretty-print JSON output
   --raw                   Print raw response body
+  --json                  Force valid JSON for every command. --list emits a JSON array;
+                          MCP calls emit the full envelope (structuredContent, isError).
   --toon                  Encode output as TOON (token-efficient for LLMs)
   --head N                Limit output to first N records (arrays)
   --version               Show version
@@ -190,6 +200,54 @@ File parameters show `(file path)` in `--help` output. MIME types are auto-detec
 mcp2cli --mcp-stdio "node server.js" --env API_KEY=env:API_SECRET_KEY --env DEBUG=1 search --query "test"
 ```
 
+### MCP roots and completion
+
+Workspace-scoped servers can request the filesystem roots exposed by the
+client. Repeat `--root`; local paths become `file://` URIs.
+
+```bash
+mcp2cli --mcp-stdio "npx @modelcontextprotocol/server-filesystem /tmp" \
+  --root "$PWD" --root file:///var/shared --list
+```
+
+Ask the server to complete a prompt argument or resource-template variable:
+
+```bash
+mcp2cli --mcp https://example.com/mcp --complete "greeting:name=San"
+mcp2cli --mcp https://example.com/mcp \
+  --complete "file:///docs/{topic}:topic=api"
+```
+
+For persistent connections, pass roots when starting the daemon and route
+completion through the named session:
+
+```bash
+mcp2cli --mcp-stdio "node server.js" --root "$PWD" --session-start workspace
+mcp2cli --session workspace --complete "greeting:name=San"
+```
+
+### Session management — persistent MCP connections
+ 
+Every `--mcp-stdio` invocation spawns a fresh subprocess, pays startup cost, then exits.
+Sessions keep the MCP server alive in a background daemon, reachable via Unix domain socket.
+ 
+```bash
+# Start a persistent session for a stdio server
+mcp2cli --mcp-stdio "npx @modelcontextprotocol/server-filesystem /tmp" \
+  --session-start myfs
+ 
+# Use the session — no subprocess spawn, no startup delay
+mcp2cli --session myfs --list
+mcp2cli --session myfs read-file --path /tmp/hello.txt
+mcp2cli --session myfs write-file --path /tmp/world.txt --content "hi"
+ 
+# Check active sessions
+mcp2cli --session-list
+ 
+# Stop when done
+mcp2cli --session-stop myfs
+```
+
 ### Bake mode — saved configurations
 
 Save connection settings as named configurations to avoid repeating flags:
@@ -199,12 +257,14 @@ Save connection settings as named configurations to avoid repeating flags:
 mcp2cli bake create petstore --spec https://api.example.com/spec.json \
   --exclude "delete-*,update-*" --methods GET,POST --cache-ttl 7200
 
-mcp2cli bake create mygit --mcp-stdio "npx @mcp/github" \
-  --include "search-*,list-*" --exclude "delete-*"
+mcp2cli bake create myfs --mcp-stdio "npx -y @modelcontextprotocol/server-filesystem /tmp" \
+  --include "search-*,list-*" --exclude "list-allowed-*"
 
 # Use with @ prefix
 mcp2cli @petstore --list
 mcp2cli @petstore list-pets --limit 10
+mcp2cli @myfs --list                      # search-files, list-directory, list-directory-with-sizes
+mcp2cli @myfs search-files --path /tmp --pattern "**/*.md"   # pattern is a glob, relative to --path
 
 # Manage
 mcp2cli bake list
