@@ -80,7 +80,18 @@ opencli convention-audit [target]     # 扫描适配器是否符合 agent-native
 | `cookie` | Chrome 登录目标站点 + 装扩展，命令从 live session 取凭证，不用重登 |
 | `intercept` | 同 cookie，加开一个自动化窗口抓签名请求 |
 | `ui` | 同 cookie，完整 DOM 交互 |
-| `local` | 无浏览器，连本地/dev 端点 |
+| `local` | 无浏览器，连本地/dev 端口 |
+
+**术语对照**：`references/` 里的文档用上游文档层术语（大写 6 元组），运行时 `opencli list -f json` 实际输出下写 tag，二者对应关系如下：
+
+| references 里的术语 | 运行时 `list -f json` 的 strategy 值 |
+|---|---|
+| PUBLIC_API | `public` |
+| COOKIE_API | `cookie` |
+| INTERCEPT | `intercept` |
+| UI_SELECTOR | `ui` |
+| LOCAL | `local` |
+| PAGE_FETCH / DOM_STATE | （文档层概念，运行时无对应 tag） |
 
 Electron 桌面应用（cursor/codex/chatwise/discord-app/doubao-app/antigravity/chatgpt-app）走 CDP 连运行中的应用，同 cookie-less 流程，调用前确保应用在跑。
 
