@@ -46,7 +46,7 @@ Phase 2 cron audit 按 token count 不按 byte count（CJK 中文 token-per-char
 ## Authoring Loop
 
 1. **Load existing memory**: read local overlay first, then global seed if present.
-2. **Verify reality**: use `opencli browser <session> state`, `find`, `network`, and `analyze`; browser state is truth. If you just completed an adapter-author session for this site, start from the retained browse trace under `~/.opencli/sites/<site>/traces/` as seed evidence instead of re-discovering the path from zero.
+2. **Verify reality**: use `opencli browser <session> state`, `find`, `network`, and `analyze`; browser state is truth. If you just completed an `adapter-author` session for this site, start from the retained browse trace under `~/.opencli/sites/<site>/traces/` as seed evidence instead of re-discovering the path from zero.
 3. **Record only durable structure**: page purpose, stable anchors, state signature, actions, workflows, API references, pitfalls.
 4. **Use stable ids**: page/action/workflow ids should survive URL params, locale text drift, and minor layout changes.
 5. **Write local draft**: update `~/.opencli/sites/<site>/sitemap/...` unless explicitly promoting to repo.
@@ -115,7 +115,7 @@ Fallback path 第一行声明触发条件 + adapter_health_update directive，�
 ```yaml
 on_adapter_fail:
   - adapter_health_update: opencli twitter post -> suspect
-  - opencli browser <session> state (verify current page)
+  - opencli browser state (verify current page)
   - if not on /home: goto /home
   - action:open_compose in pages/home.md
   - ...

@@ -38,7 +38,7 @@ OpenCLI 把任意网站、Electron 桌面应用、或外部 CLI 变成统一的 
 ### 安装与体检
 
 ```bash
-# npm 全局安装（推荐，需 Node >= 20）
+# npm 全局安装（推荐，需 Node >= 21）
 npm install -g @jackwener/opencli
 
 # 从源码跑（无全局安装）
@@ -109,11 +109,13 @@ opencli <site> <command> --help  # 看位置参数和命令专属 flag
 
 别硬编码适配器列表 - 100+ 站点每周都在变。`opencli list -f json` 是真相源，每条命令一个 entry，含 `{site, name, aliases, description, strategy, browser, args, columns, ...}`。
 
+高变更的已登录站点，先查适配器有没有现成工作流再裸开浏览器（如 ChatGPT web 有会话读取、Deep Research 结果抽取等高层命令，用 `opencli chatgpt --help` 或 `opencli list -f json` 发现当前面）。
+
 ### 通用 flag（每个适配器命令都生效）
 
 | flag | 作用 |
 |---|---|
-| `-f, --format <fmt>` | `table`（TTY 默认）· `yaml`（非 TTY 默认）· `json` · `md` · `csv`。agent 几乎总用 `-f json` |
+| `-f, --format <fmt>` | `table`（TTY 默认）· `yaml`（非 TTY 默认）· `json` · `plain` · `md` · `csv`。agent 几乎总用 `-f json`；`plain` 取单个主字段（`response`/`content` 等），适合管道。个别命令经 `cmd.defaultFormat` 覆盖默认（如 chat 类默认 `plain`），别想当然，看 `--help`。 |
 | `-v, --verbose` | 调试日志 + 失败堆栈 |
 
 命令专属 flag（`--limit`/`--tab`/`--filter`…）不通用，看 `<site> <command> --help`。
@@ -203,6 +205,7 @@ opencli doctor   # 没绿啥都干不了
 | `browser get text/value/attributes <target>` | 读单字段 |
 | `browser network` | API shape 预览 + 缓存 key 列表 |
 | `browser network --detail <key>` | 取单个 cached body |
+| `browser frames` | 列跨域 iframe target，索引喂给 `eval --frame` |
 | `browser extract` | 长文 Markdown 抽取（带 `next_start_char` 游标） |
 | `browser eval <js>` | 页面内只读 JS |
 | `browser wait selector/text/download` | 等条件 |
@@ -219,6 +222,7 @@ opencli doctor   # 没绿啥都干不了
 | `invalid_selector` | CSS 被 `querySelectorAll` 拒了 |
 | `selector_not_found` | CSS 匹配 0 个，用 `find` 换更松的选择器 |
 | `selector_ambiguous` | CSS 匹配 >1 且没 `--nth` |
+| `selector_nth_out_of_range` | `--nth` 超出匹配数 |
 | `option_not_found` | `select` 没找到选项，信封含 `available: string[]` |
 
 完整命令参考、compound 表单控件、cost guide、recipes、pitfalls 见 `references/browser.md`。
@@ -325,7 +329,7 @@ opencli doctor   # 没绿啥都干不了
 - `columns` 数组和 `func` 返回对象 keys 完全对齐（含顺序）
 - `browser:` field 决定 func 签名：`browser:false -> (args)`，`browser:true -> (page, args)`
 - 已知失败按 typed error 分类抛，别 silent `return []` 或 sentinel row
-- 调试 dump 只能落在 `~/.opencli/sites/<site>/fixtures/` 或 `/tmp/`，严禁留在 repo 根或 `clis/`
+- 调试原始 dump/抓包只短暂落 `/tmp/` 或受控 cache，任务结束清理；通过数据分级的长期样本才进 `~/.opencli/sites/<site>/fixtures/`。例外：JSDOM 单测 fixture 冻结在 `clis/<site>/__fixtures__/`（有意 commit 的 review artifact），严禁 repo 根/工作目录留 `.dbg-*.html / raw-*.json`
 
 strategy 选择（`PUBLIC_API/COOKIE_API/PAGE_FETCH/INTERCEPT/DOM_STATE/UI_SELECTOR`）、字段解码、site-memory 回写等细节见 `references/adapter/` 下对应文件。
 
@@ -365,7 +369,7 @@ opencli plugin uninstall <name>            # 卸载
 opencli plugin create <name>               # 脚手架生成新插件
 ```
 
-内置 external 在 `src/external-clis.yaml`，用户覆盖在 `~/.opencli/external-clis.yaml`。
+内置 external 在 `src/external-clis.yaml`，用户覆盖在 `~/.opencli/external-clis.yaml`。常见内置：`gh`、`docker`、`vercel`、`lark-cli`、`longbridge`、`dws`、`wecom-cli`、`obsidian`、`ntn`、`tg`、`discord`、`wx`。无 `install` 配置的条目（如 `ntn`，官方用 shell 安装器）需先手动装好才能透传。
 
 ---
 

@@ -40,9 +40,9 @@ the live extractor walks.
 
 1. **Capture** the page's HTML from a live verify run:
    ```bash
-   opencli browser <session> open https://www.example.com/<page>
+   opencli browser open https://www.example.com/<page>
    # In another shell, dump page.content():
-   opencli browser <session> eval 'document.documentElement.outerHTML' \
+   opencli browser eval 'document.documentElement.outerHTML' \
      > /tmp/raw-<command>.html
    ```
 
@@ -189,8 +189,8 @@ HTML fixture instead of the response JSON fixture.
 
 ## See also
 
-- `adapter-template.md` — basic adapter file structure
-- `output-design.md` — column naming for the post-extract mapping
-- `success-rate-pitfalls.md` — broader "verify can pass while
+- `references/adapter-template.md` — basic adapter file structure
+- `references/output-design.md` — column naming for the post-extract mapping
+- `references/success-rate-pitfalls.md` — broader "verify can pass while
   data is silently wrong" catalog; the mocked-page.evaluate gap that
   motivates this whole pattern is one entry there
