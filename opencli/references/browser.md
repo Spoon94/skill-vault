@@ -85,7 +85,7 @@ Bound sessions have no OpenCLI idle-close timer; the binding lasts until `unbind
 
 ## Sitemaps
 
-If `opencli browser <session> open` or `opencli browser <session> analyze` returns `sitemap.available: true`, switch to the sitemap-consumption section (`browser-sitemap.md`) before continuing a multi-step site flow. The sitemap is prior context for pages, actions, workflows, APIs, and pitfalls; it is not truth. If the browser state disagrees with the sitemap, trust the browser and mark the sitemap stale via `sitemap-author.md`.
+If `browser open` or `browser analyze` returns `sitemap.available: true`, switch to `browser-sitemap.md` before continuing a multi-step site flow. The sitemap is prior context for pages, actions, workflows, APIs, and pitfalls; it is not truth. If the browser state disagrees with the sitemap, trust the browser and mark the sitemap stale via `sitemap-author.md`.
 
 ---
 
@@ -408,9 +408,9 @@ opencli browser article extract --start 8000 --chunk-size 8000
 ### Cross-origin iframe
 
 ```bash
-opencli browser <session> checkout frames
+opencli browser checkout frames
 # -> [{"index": 0, "url": "https://checkout.stripe.com/...", ...}]
-opencli browser <session> checkout eval "(() => document.querySelector('input[name=cardnumber]')?.value)()" --frame 0
+opencli browser checkout eval "(() => document.querySelector('input[name=cardnumber]')?.value)()" --frame 0
 ```
 
 `browser state --source ax` may omit cross-origin iframe contents or fail to

@@ -127,7 +127,7 @@ Use `opencli browser` to inspect the live website. **Never use the broken adapte
 
 ```bash
 # Open the page and inspect current DOM
-opencli browser <session> open https://example.com/target-page && opencli browser <session> state
+opencli browser open https://example.com/target-page && opencli browser state
 
 # Look for elements that match the adapter's intent
 # Compare the snapshot with what the adapter expects
@@ -137,16 +137,16 @@ opencli browser <session> open https://example.com/target-page && opencli browse
 
 ```bash
 # Open page with network interceptor, then trigger the action manually
-opencli browser <session> open https://example.com/target-page && opencli browser <session> state
+opencli browser open https://example.com/target-page && opencli browser state
 
 # Interact to trigger API calls
-opencli browser <session> click <N> && opencli browser <session> network
+opencli browser click <N> && opencli browser network
 
 # Narrow to the request you care about by the fields its body should have
-opencli browser <session> network --filter author,text,likes
+opencli browser network --filter author,text,likes
 
 # Inspect specific API response (key is the `key` field from the default JSON output)
-opencli browser <session> network --detail <key>
+opencli browser network --detail <key>
 ```
 
 ## Step 4: Patch the Adapter
@@ -263,7 +263,7 @@ If `gh` is not installed or not authenticated, tell the user and skip — do not
 **Soft stops (report after attempting):**
 - **3 repair rounds exhausted** — stop, report what was tried and what failed
 - **Feature completely removed** — the data no longer exists
-- **Major redesign** — needs full adapter rewrite via `adapter-author.md`
+- **Major redesign** — needs full adapter rewrite via `adapter-author.md` skill
 
 In all stop cases, clearly communicate the situation to the user rather than making futile patches.
 
@@ -278,7 +278,7 @@ In all stop cases, clearly communicate the situation to the user rather than mak
 
 3. AI reads summary/state: page loaded but uses ".HotItem" instead of ".HotList-item"
 
-4. AI explores: opencli browser <session> open https://www.zhihu.com/hot && opencli browser <session> state
+4. AI explores: opencli browser open https://www.zhihu.com/hot && opencli browser state
    → Confirms new class name ".HotItem" with child ".HotItem-content"
 
 5. AI patches: Edit adapter at `adapterSourcePath` — replace ".HotList-item" with ".HotItem"

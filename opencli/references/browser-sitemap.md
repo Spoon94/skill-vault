@@ -1,7 +1,7 @@
 
 # browser-sitemap
 
-Use this skill when `opencli browser <session> open` or `opencli browser <session> analyze` reports `sitemap.available: true`, or when the user asks you to use a site's sitemap.
+Use this skill when `opencli browser open` or `opencli browser analyze` reports `sitemap.available: true`, or when the user asks you to use a site's sitemap.
 
 The sitemap is **prior knowledge**, not ground truth. It should reduce blind clicking, but it must never override the live browser state.
 

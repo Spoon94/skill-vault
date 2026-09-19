@@ -1,18 +1,5 @@
 # Sitemap Schema Reference
 
-## TOC
-
-- [v1.1 changelog](#v11-changelogvs-v1)
-- [1. 文件层约束](#1-文件层约束)
-- [2. 文件类型 schema](#2-文件类型-schema)
-- [3. Action Schema](#3-action-schemapages-内)
-- [4. 跨文件引用](#4-跨文件引用)
-- [5. Two-layer storage 行为 spec](#5-two-layer-storage-行为-spec)
-- [6. Trust Reality 红线](#6-trust-reality-红线)
-- [7. Validation rules](#7-validation-rulesphase-2-cron-audit-用)
-- [8. Cross-link](#8-cross-link)
-- [9. Open questions](#9-open-questionsv1-暂未定v2-跟数据决)
-
 详细 schema 规范。`SKILL.md` 给的是 inline 模板，本文件 spec 化字段、约束、validation 规则、跨文件引用格式。
 
 进入条件：先读 `SKILL.md` 拿到 framing（task execution graph for agents）和两层存储模型。本文件展开**怎么写得对**。
@@ -313,7 +300,7 @@ source: local
 - `endpoint_id` — 必须存在于同站 `~/.opencli/sites/<site>/endpoints.json`
 - `triggers_on_pages` — array of `page_id`
 - `triggered_by_actions` — array of `action:<stable-id>`
-- `contract_strength` — `stable | visible-ui | internal-unstable`，定义见 `../adapter/strategy-selection.md`
+- `contract_strength` — `stable | visible-ui | internal-unstable`，定义见 `strategy-selection.md`
 
 **Optional per entry**:
 - `notes` — meta 信息（GraphQL queryId path、已知 schema 变化、特殊 auth 头）。**不要**复制 endpoint URL / method / params / response shape — 那些只在 `endpoints.json`
@@ -459,7 +446,7 @@ evidence: opencli browser <cmd>
 
 **Do**：实际操作。优先级：
 1. 已有 adapter 命令（`opencli twitter post`）
-2. semantic browser command（`opencli browser <session> click "Post" button`）
+2. semantic browser command（`opencli browser click "Post" button`）
 3. 显式 selector（最后选项，写 stable anchor 不是裸 CSS）
 
 **Postconditions**：成功观察信号。必须具体 — "page changed" 不算，"URL is /compose AND textarea is focused" 才算。
@@ -503,7 +490,7 @@ do: opencli twitter like <tweet-url> || click [data-testid="like"] (within card 
 post: testid 翻转 like -> unlike，icon 红色
 fail: testid 不变 | 弹 login modal
 recover: adapter_health_update: opencli twitter like -> suspect; dom_click within card scope
-evidence: opencli twitter like + opencli browser <session> click
+evidence: opencli twitter like + opencli browser click
 ```
 
 两层 routing 不冲突：
@@ -521,7 +508,7 @@ action `Recovery` 字段可包含 directive：
 adapter_health_update: <adapter command> -> suspect | broken
 ```
 
-语义：当**本 action 因为该 adapter 失败而触发 Recovery**时，consumption reference（`../browser-sitemap.md`）必须：
+语义：当**本 action 因为该 adapter 失败而触发 Recovery**时，consumption skill（`opencli-browser-sitemap`）必须：
 
 1. 在 local overlay 找到 reference 该 adapter 的 workflow（一般是 `Best path: adapter: <adapter command>` 的那条）
 2. 改写 workflow 的 `adapter_health` 为 directive 指定的等级
@@ -531,9 +518,9 @@ adapter_health_update: <adapter command> -> suspect | broken
 
 不写 directive 时，Recovery 只指导当前 agent 怎么 fallback，不影响其他 agent。带 directive = "我栽了，让我把这事告诉以后的 agent"。
 
-**实现责任**：在 `../browser-sitemap.md` 的 consumption loop 里。Schema 这里只 spec directive 写侧格式，不 spec 实现细节。
+**实现责任**：在 `opencli-browser-sitemap` skill 的 consumption loop 里。Schema 这里只 spec directive 写侧格式，不 spec 实现细节。
 
-**Recovery 回 `healthy` 不在本 schema 范围**：`adapter_health` 从 `suspect` 回 `healthy` 的路径（TTL 自动衰减 / 跑 Fallback 成功后 probe Best path / 人工 reset）留给 `../browser-sitemap.md` spec 拍。本 PR 只定写侧（"failed → suspect"），不定读侧（"suspect → healthy"）的恢复策略。
+**Recovery 回 `healthy` 不在本 schema 范围**：`adapter_health` 从 `suspect` 回 `healthy` 的路径（TTL 自动衰减 / 跑 Fallback 成功后 probe Best path / 人工 reset）留给 `opencli-browser-sitemap` skill spec 拍。本 PR 只定写侧（"failed → suspect"），不定读侧（"suspect → healthy"）的恢复策略。
 
 ---
 
@@ -574,7 +561,7 @@ sitemap 内部多文件互相引用。引用格式：
 
 agent 发现新路径 / stale 修正 / 半成品流程时写 draft。**draft 必须放在 `sitemap/` 目录内**，命名为 `sitemap/draft-<topic>.md` 或 `sitemap/pages/<page>.draft.md`。
 
-**❌ 不要**放在父目录（如 `~/.opencli/sites/<site>/sitemap.draft.md`） — `opencli browser <session> open` 的 sitemap availability 检测只看 `sitemap/` 目录是否存在。draft 放父目录 → 检测不到 → agent 不会被提醒"有 sitemap" → 你的发现没人用。
+**❌ 不要**放在父目录（如 `~/.opencli/sites/<site>/sitemap.draft.md`） — `opencli browser open` 的 sitemap availability 检测只看 `sitemap/` 目录是否存在。draft 放父目录 → 检测不到 → agent 不会被提醒"有 sitemap" → 你的发现没人用。
 
 正确：
 ```
@@ -594,7 +581,7 @@ agent 发现新路径 / stale 修正 / 半成品流程时写 draft。**draft 必
 
 ### 5.2 `site-alias.json`（optional, Phase 2）
 
-`opencli browser <session> open` 用 adapter registry 把 hostname → site 映射（如 `news.ycombinator.com → hackernews`）。如果 sitemap 先于 adapter 存在（即一个站还没人写 adapter 但有人写了 sitemap），registry 没数据，sitemap dir 检测不到。
+`opencli browser open` 用 adapter registry 把 hostname → site 映射（如 `news.ycombinator.com → hackernews`）。如果 sitemap 先于 adapter 存在（即一个站还没人写 adapter 但有人写了 sitemap），registry 没数据，sitemap dir 检测不到。
 
 future fix：sitemap dir 内放 `site-alias.json` 声明它服务的 hostname：
 
