@@ -147,11 +147,16 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 ## 与上游项目的差异
 
-为保证开箱可用，仅做了一处路径引用修改：
+为保证开箱可用，本仓库对 vendored 内容维护以下本地不变式，任何上游同步都必须保住：
 
-- `superpowers/brainstorming/SKILL.md` 中的 `skills/brainstorming/visual-companion.md` → `visual-companion.md`
+| # | 不变式 | 原因 | 影响范围 |
+|---|--------|------|----------|
+| I1 | `description` ≤ 1024 字符，超长时存裁剪版 | pi harness 硬限制，超出报 `description exceeds 1024 characters` | `diagram/diagram-{html,mermaid,plantuml}`（上游 1219/1159/1452 字符，本地为合规裁剪版） |
+| I2 | `description` 含 `:` / 引号等 YAML 特殊字符时必须加引号 | 否则 YAML 解析报 `Nested mappings are not allowed in compact mappings` | `semble/SKILL.md`（上游未加引号，本地加了） |
+| I3 | 引用仓库内相对路径扁平化 | 上游用仓库内相对路径，本地目录结构扁平 | `superpowers/brainstorming/SKILL.md` 中 `skills/brainstorming/visual-companion.md` → `visual-companion.md` |
+| I4 | opencli 结构不同：上游 `Opencli/skills/` 下 7 个子技能（usage/browser/adapter-author/sitemap-author/browser-sitemap/autofix/smart-search）合并为单个 `opencli/SKILL.md` + `opencli/references/` | 统一入口，按任务类型路由，避免 7 个 skill 全部进上下文 | `opencli/` 全目录：去掉子技能 frontmatter，`references/` 路径前缀重写为本地布局（`adapter/`、`sitemap/`、`search/`） |
 
-其余所有内容与各上游项目保持一致。
+除上述不变式外，其余内容与各上游项目保持一致。
 
 ## 贡献
 
