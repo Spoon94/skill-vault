@@ -1,5 +1,5 @@
 ---
-name: infocard
+name: diagram-infocard
 description: Create editorial-style information cards using HTML/CSS in Markdown. Best for knowledge summaries, data highlights, event announcements, and single-topic content cards with magazine-quality typography.
 metadata:
   author: Infocard Generator is powered by Markdown Viewer — the best multi-platform Markdown extension (Chrome/Edge/Firefox/VS Code) with diagrams, formulas, and one-click Word export. Learn more at https://docu.md
