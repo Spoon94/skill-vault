@@ -114,6 +114,9 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [diagram-plantuml](./diagram/diagram-plantuml) | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道等专业图（图标库 9500+） |
 | [diagram-html](./diagram/diagram-html) | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 一键导出 PNG/JPEG/WebP/SVG |
 | [diagram-image](./diagram/diagram-image) | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 |
+| [graphviz](./diagram/graphviz) | DOT 代码块（内联 Markdown） | 依赖树/调用图/包层级，需细粒度边路由的图，自动布局 |
+| [infocard](./diagram/infocard) | HTML/CSS 卡片（直接内嵌 Markdown） | 编辑风信息卡片：知识摘要/数据高亮/公告，杂志级排版 |
+| [infographic](./diagram/infographic) | 模板化信息图（空格分隔 KV 语法） | KPI 看板/时间线/路线图/SWOT/漏斗/对比/组织树，60+ 模板 |
 
 ### 独立技能
 
@@ -159,6 +162,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | I3 | 引用仓库内相对路径扁平化 | 上游用仓库内相对路径，本地目录结构扁平 | `superpowers/brainstorming/SKILL.md` 中 `skills/brainstorming/visual-companion.md` → `visual-companion.md` |
 | I4 | opencli 结构不同：上游 `OpenCLI/skills/` 下 7 个子技能（opencli-usage / opencli-browser / opencli-adapter-author / opencli-sitemap-author / opencli-browser-sitemap / opencli-autofix / smart-search）合并为单个 `opencli/SKILL.md` + `opencli/references/` | 统一入口，按任务类型路由，避免 7 个 skill 全部进上下文 | `opencli/` 全目录：去掉子技能 frontmatter，`references/` 路径前缀重写为本地布局（`adapter/`、`sitemap/`、`search/`） |
 | I5 | opencli 的 strategy 术语有两套（references 的上游文档层大写术语 vs 运行时的小写 tag），`SKILL.md` 需维护映射表 | 上游文档与自家 CLI 输出脱节；本地需要让 agent 能把 references 术语和 `list -f json` 实际输出对上 | `opencli/SKILL.md`「术语对照」表 |
+| I6 | `diagram/` 家族跨两个上游集合：`arch-diagram/diagram/` 的 4 个 `diagram-*` + `arch-diagram/skills/`（即 markdown-viewer/skills）的 3 个无前缀目录（`graphviz` / `infocard` / `infographic`） | 同属绘图技能集中放置便于路由与发现；新增 3 个保留上游目录名与 `name` 字段以保上游保真，接受家族内命名不统一 | `diagram/graphviz/`、`diagram/infocard/`、`diagram/infographic/` |
 
 除上述不变式外，其余内容与各上游项目保持一致。
 
