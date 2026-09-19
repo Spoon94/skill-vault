@@ -37,7 +37,7 @@
 │   ├─ 单主题信息卡片（知识摘要/数据高亮/公告，编辑风排版）
 │   │   → infocard（HTML/CSS 直接内嵌）
 │   └─ 模板化信息图（KPI 看板/时间线/路线图/SWOT/漏斗/对比）
-│       → infographic（KV 语法 + 60+ 模板）
+│       → infographic（KV 语法 + 58 个内置模板）
 │
 └─ 用户明确指定格式 → 直接走对应 skill
 ```
@@ -99,12 +99,12 @@ DOT 语言有向/无向图，自动布局。
 
 编辑风信息卡片，HTML/CSS 直接内嵌 Markdown（不用代码块包裹）。
 
-- **结构**：`SKILL.md` + `styles/`（多套排版风格）
+- **结构**：`SKILL.md` + `layouts/`（36 个）+ `styles/`（29 个）
 - **来源**：导入自 markdown-viewer/skills
 
 ### infographic
 
-模板化信息图，空格分隔 KV 语法（非 YAML），60+ 模板覆盖 KPI/时间线/路线图/SWOT/漏斗/对比/组织树/图表。
+模板化信息图，空格分隔 KV 语法（非 YAML），58 个内置模板覆盖 KPI/时间线/路线图/SWOT/漏斗/对比/组织树/图表。
 
 - **结构**：`SKILL.md` + `references/`（syntax / templates / examples）
 - **来源**：导入自 markdown-viewer/skills
@@ -146,9 +146,7 @@ cp -r diagram-mermaid diagram-plantuml diagram-html diagram-image graphviz infoc
 
 ## 设计文档
 
-完整的方案设计（包括 4 个 skill 的选型理由、对比、路由决策、错误处理、测试方案）见：
-
-[`/Users/spoon/Code/arch-diagram/docs/specs/2026-07-05-diagram-skill-family-design.md`](../docs/specs/2026-07-05-diagram-skill-family-design.md)
+完整的方案设计（原生 4 个 skill 的选型理由、对比、路由决策、错误处理、测试方案；graphviz/infocard/infographic 为后续并入，不在该文档内）见 arch-diagram 上游仓库的 `docs/specs/2026-07-05-diagram-skill-family-design.md`（本仓库未拷入该文档）。
 
 ## 来源项目
 
@@ -164,4 +162,7 @@ cp -r diagram-mermaid diagram-plantuml diagram-html diagram-image graphviz infoc
 
 ## License
 
-各 skill 沿用其来源项目的 license（archify 和 fireworks-tech-graph 均为 MIT）。diagram-mermaid 为新建，无 license 限制。
+各 skill 沿用其来源项目的 license：
+
+- `diagram-mermaid`、`diagram-plantuml`、`diagram-html`、`diagram-image`：MIT（diagram-mermaid 为新建，无 license 限制）
+- `graphviz`、`infocard`、`infographic`：来自 markdown-viewer/skills，其 README 声明 **GPL-3.0**（该仓库无 LICENSE 文件，README 声明是唯一依据），使用/再分发请按 GPL-3.0 处理
