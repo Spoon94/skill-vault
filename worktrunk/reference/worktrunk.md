@@ -1,7 +1,7 @@
 # Worktrunk
 
-Worktrunk is a CLI for git worktree management, designed for running AI agents
-in parallel.
+Worktrunk is a CLI for Git worktree management, designed for **parallel AI agent
+workflows**.
 
 Worktrunk's three core commands make worktrees as easy as branches.
 Plus, Worktrunk has a bunch of quality-of-life features to simplify working
@@ -13,7 +13,7 @@ A quick demo:
 
 AI agents like Claude Code and Codex can handle longer tasks without
 supervision, such that it's possible to manage 5-10+ in parallel. Git's native
-worktree feature give each agent its own working directory, so they don't step
+worktree feature gives each agent its own working directory, so they don't step
 on each other's changes.
 
 But the git worktree UX is clunky. Even a task as small as starting a new
@@ -22,9 +22,9 @@ worktree requires typing the branch name three times: `git worktree add -b feat
 
 ## Worktrunk makes git worktrees as easy as branches
 
-Worktrees are addressed by branch name; paths are computed from a configurable template.
+Worktrees are addressed by branch name; paths are computed from a configurable template. Commands that take a branch also accept the path of the worktree it is checked out in.
 
-> Start with the core commands
+<p class="workflow-stage">Start with the core commands</p>
 
 **Core commands:**
 
@@ -39,40 +39,40 @@ Worktrees are addressed by branch name; paths are computed from a configurable t
   <tbody>
     <tr>
       <td>Switch worktrees</td>
-      <td>wt switch feat</td>
-      <td>cd ../repo.feat</td>
+      <td data-label="Worktrunk"><code>wt switch feat</code></td>
+      <td data-label="Plain git"><code>cd ../repo.feat</code></td>
     </tr>
     <tr>
       <td>Create + start Claude</td>
-      <td>wt switch -c -x claude feat</td>
-      <td>git worktree add -b feat ../repo.feat && \
+      <td data-label="Worktrunk"><code>wt switch -c -x claude feat</code></td>
+      <td data-label="Plain git"><pre><code>git worktree add -b feat ../repo.feat && \
 cd ../repo.feat && \
-claude</td>
+claude</code></pre></td>
     </tr>
     <tr>
       <td>Clean up</td>
-      <td>wt remove</td>
-      <td>cd ../repo && \
+      <td data-label="Worktrunk"><code>wt remove</code></td>
+      <td data-label="Plain git"><pre><code>cd ../repo && \
 git worktree remove ../repo.feat && \
-git branch -d feat</td>
+git branch -d feat</code></pre></td>
     </tr>
     <tr>
       <td>List with status</td>
-      <td>wt list</td>
-      <td>git worktree list (paths only)</td>
+      <td data-label="Worktrunk"><code>wt list</code></td>
+      <td data-label="Plain git"><span class="cmd-compare-value"><code>git worktree list</code> (paths only)</span></td>
     </tr>
   </tbody>
 </table>
 
-> Expand into the more advanced commands as needed
+<p class="workflow-stage">Expand into the more advanced commands as needed</p>
 
-**Workflow automation:**
+<p class="workflow-heading"><strong>Workflow automation:</strong></p>
 
 - **[Hooks](https://worktrunk.dev/hook/)** — run commands on create, pre-merge, post-merge, etc
 - **[LLM commit messages](https://worktrunk.dev/llm-commits/)** — generate commit messages from diffs
 - **[Merge workflow](https://worktrunk.dev/merge/)** — squash, rebase, merge, clean up in one command
-- **[Interactive picker](https://worktrunk.dev/switch/#interactive-picker)** — browse worktrees with live diff and log previews
-- **[Copy build caches](https://worktrunk.dev/step/#wt-step-copy-ignored)** — skip cold starts by sharing `target/`, `node_modules/`, etc between worktrees
+- **[Interactive picker](https://worktrunk.dev/switch/#interactive-picker)** — browse worktrees with streaming CI status and diff, log, PR and comment previews
+- **[Share build caches](https://worktrunk.dev/step/#wt-step-copy-ignored)** — ten worktrees get `target/`, `node_modules/`, etc without building or copying them (on APFS, btrfs, and XFS)
 - **[`wt list --full`](https://worktrunk.dev/list/#full-mode)** — [CI status](https://worktrunk.dev/list/#ci-status) and [AI-generated summaries](https://worktrunk.dev/list/#llm-summaries) per branch
 - **[PR checkout](https://worktrunk.dev/switch/#pull-requests-and-merge-requests)** — `wt switch pr:123` to jump straight to a PR's branch
 - **[Dev server per worktree](https://worktrunk.dev/tips-patterns/#dev-server-per-worktree)** — `hash_port` template filter gives each worktree a unique port
@@ -107,7 +107,9 @@ winget install max-sixty.worktrunk
 git-wt config shell install
 ```
 
-Alternatively, disable Windows Terminal's alias (Settings → Privacy & security → For developers → App Execution Aliases → disable "Windows Terminal") to use `wt` directly.
+Alternatively, disable Windows Terminal's alias (Settings → Apps → Advanced app settings → App execution aliases → "Terminal"/"Terminal Preview") to use `wt` directly.
+
+> Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/) — [policy](https://worktrunk.dev/code-signing/).
 
 **Arch Linux:**
 
@@ -129,20 +131,20 @@ Or with [Pixi](https://pixi.sh): `pixi global install worktrunk && wt config she
 
 Create a worktree for a new feature:
 
-```bash
+```console
 $ wt switch --create feature-auth
-<span class=g>✓</span> <span class=g>Created branch <b>feature-auth</b> from <b>main</b> and worktree @ <b>~/repo.feature-auth</b></span>
+✓ Created branch feature-auth from main and worktree @ ~/repo.feature-auth
 ```
 
 This creates a new branch and worktree, then switches to it. Do your work, then check all worktrees with [`wt list`](https://worktrunk.dev/list/):
 
-```bash
+```console
 $ wt list
-  <b>Branch</b>        <b>Status</b>        <b>HEAD±</b>    <b>main↕</b>  <b>Remote⇅</b>  <b>Commit</b>    <b>Age</b>   <b>Message</b>
-@ feature-auth  <span class=c>+</span>   <span class=d>↑</span>      <span class=g>+27</span>   <span class=r>-8</span>   <span class=g>↑1</span>               <span class=d>4bc72dc9</span>  <span class=d>2h</span>    <span class=d>Add authentication module</span>
-^ main              <span class=d>^</span><span class=d>⇡</span>                         <span class=g>⇡1</span>      <span class=d>0e631add</span>  <span class=d>1d</span>    <span class=d>Initial commit</span>
+  Branch        Status      HEAD±     main↕    main…±    Remote⇅  Commit    Age  Message
+@ feature-auth  +   ↑      +27   -8   ↑1       +31                4bc72dc    2h  Add authenticati…
+^ main              ^⇡                                    ⇡1      0e631ad    1d  Initial commit
 
-<span class=d>○</span> <span class=d>Showing 2 worktrees, 1 with changes, 1 ahead, 1 column hidden</span>
+○ Showing 2 worktrees, 1 with changes, 1 ahead, hidden: Path
 ```
 
 The `@` marks the current worktree. `+` means staged changes, `↑1` means 1 commit ahead of main, `⇡` means unpushed commits.
@@ -159,19 +161,19 @@ wt remove                         # after PR is merged
 
 **Local merge** — squash, rebase onto main, fast-forward merge, clean up:
 
-```bash
+```console
 $ wt merge main
-<span class=c>◎</span> <span class=c>Generating commit message and committing changes... <span style='color:var(--bright-black,#555)'>(2 files, <span class=g>+53</span></span></span>, no squashing needed<span style='color:var(--bright-black,#555)'>)</span>
-<span style='background:var(--bright-white,#fff)'> </span> <b>Add authentication module</b>
-<span class=g>✓</span> <span class=g>Committed changes @ <span class=d>a1b2c3d</span></span>
-<span class=c>◎</span> <span class=c>Merging 1 commit to <b>main</b> @ <span class=d>a1b2c3d</span> (no rebase needed)</span>
-<span style='background:var(--bright-white,#fff)'> </span> * <span style='color:var(--yellow,#a60)'>a1b2c3d</span> Add authentication module
-<span style='background:var(--bright-white,#fff)'> </span>  auth.rs | 51 <span class=g>+++++++++++++++++++++++++++++++++++++++++++++++++++</span>
-<span style='background:var(--bright-white,#fff)'> </span>  lib.rs  |  2 <span class=g>++</span>
-<span style='background:var(--bright-white,#fff)'> </span>  2 files changed, 53 insertions(+)
-<span class=g>✓</span> <span class=g>Merged to <b>main</b> <span style='color:var(--bright-black,#555)'>(1 commit, 2 files, +53</span></span><span style='color:var(--bright-black,#555)'>)</span>
-<span class=c>◎</span> <span class=c>Removing <b>feature-auth</b> worktree &amp; branch in background (same commit as <b>main</b>,</span> <span class=d>_</span><span class=c>)</span>
-<span class=d>○</span> Switched to worktree for <b>main</b> @ <b>~/repo</b>
+◎ Generating commit message and committing changes... (2 files, +53, no squashing needed)
+  Add authentication module
+✓ Committed changes @ a1b2c3d
+◎ Merging 1 commit to main @ a1b2c3d (no rebase needed)
+  * a1b2c3d Add authentication module
+   auth.rs | 51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+   lib.rs  |  2 ++
+   2 files changed, 53 insertions(+)
+✓ Merged to main (1 commit, 2 files, +53)
+◎ Removing feature-auth worktree & branch in background (same commit as main, _)
+○ Switched to worktree for main @ ~/repo
 ```
 
 For parallel agents, create multiple worktrees and launch an agent in each:
@@ -193,12 +195,5 @@ The `-x` flag runs a command after switching; arguments after `--` are passed to
   status & PR links](https://worktrunk.dev/list/#ci-status)
 - Browse [tips & patterns](https://worktrunk.dev/tips-patterns/) for recipes: aliases, dev servers, databases, agent handoffs, and more
 - [Extending Worktrunk](https://worktrunk.dev/extending/) — customize workflows with hooks & aliases
+- Watch [@DevOpsToolbox's video on Worktrunk](https://youtu.be/WBQiqr6LevQ?t=345)
 - Run `wt --help` or `wt <command> --help` for quick CLI reference
-
-## Further reading
-
-- [Claude Code: Best practices for agentic coding](https://www.anthropic.com/engineering/claude-code-best-practices) — Anthropic's official guide, including the worktree pattern
-- [Shipping faster with Claude Code and Git Worktrees](https://incident.io/blog/shipping-faster-with-claude-code-and-git-worktrees) — incident.io's workflow for parallel agents
-- [Git worktree pattern discussion](https://github.com/anthropics/claude-code/issues/1052) — Community discussion in the Claude Code repo
-- [@DevOpsToolbox's video on Worktrunk](https://youtu.be/WBQiqr6LevQ?t=345)
-- [git-worktree documentation](https://git-scm.com/docs/git-worktree) — Official git reference
