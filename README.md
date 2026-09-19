@@ -68,6 +68,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [using-git-worktrees](./superpowers/using-git-worktrees) | 使用 Git worktrees |
 | [using-superpowers](./superpowers/using-superpowers) | superpowers 使用简介 |
 | [verification-before-completion](./superpowers/verification-before-completion) | 完成前验证 |
+| [diagnosing-superpowers](./superpowers/diagnosing-superpowers) | 复盘诊断出问题的 superpowers 会话：重复劳动、忽略计划、效果差、成本高，并生成给维护者的 bug report |
 
 ### [anthropics/](./anthropics)
 
@@ -101,6 +102,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [json-canvas](./obsidian/json-canvas) | 创建和编辑 JSON Canvas（`.canvas`）文件：节点、连线、分组 |
 | [obsidian-cli](./obsidian/obsidian-cli) | 通过 Obsidian CLI 操作 vault，包括插件和主题开发 |
 | [defuddle](./obsidian/defuddle) | 使用 Defuddle 从网页提取干净 Markdown，节省 token |
+| [knap](./obsidian/knap) | 用 Knap CLI 从模板和结构化数据（JSON/CSV）渲染 Markdown，批量生成笔记或格式化 Defuddle 输出 |
 
 ### [diagram/](./diagram)
 
@@ -112,6 +114,9 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [diagram-plantuml](./diagram/diagram-plantuml) | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道等专业图（图标库 9500+） |
 | [diagram-html](./diagram/diagram-html) | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 一键导出 PNG/JPEG/WebP/SVG |
 | [diagram-image](./diagram/diagram-image) | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 |
+| [diagram-graphviz](./diagram/diagram-graphviz) | DOT 代码块（内联 Markdown） | 依赖树/调用图/包层级，需细粒度边路由的图，自动布局 |
+| [diagram-infocard](./diagram/diagram-infocard) | HTML/CSS 卡片（直接内嵌 Markdown） | 编辑风信息卡片：知识摘要/数据高亮/公告，杂志级排版 |
+| [diagram-infographic](./diagram/diagram-infographic) | 模板化信息图（空格分隔 KV 语法） | KPI 看板/时间线/路线图/SWOT/漏斗/对比/组织树，58 个内置模板 |
 
 ### 独立技能
 
@@ -147,11 +152,20 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 ## 与上游项目的差异
 
-为保证开箱可用，仅做了一处路径引用修改：
+为保证开箱可用，本仓库对 vendored 内容维护以下本地不变式，任何上游同步都必须保住：
 
-- `superpowers/brainstorming/SKILL.md` 中的 `skills/brainstorming/visual-companion.md` → `visual-companion.md`
+| # | 不变式 | 原因 | 影响范围 |
+|---|--------|------|----------|
+| I1 | `description` ≤ 1024 字符，超长时存裁剪版 | pi harness 硬限制，超出报 `description exceeds 1024 characters` | `diagram/diagram-{html,mermaid,plantuml}`（上游 1219/1159/1452 字符，本地为合规裁剪版） |
+| I2 | `description` 含 `:` / 引号等 YAML 特殊字符时必须加引号 | 否则 YAML 解析报 `Nested mappings are not allowed in compact mappings` | `semble/SKILL.md`（上游未加引号，本地加了） |
+| I3 | 引用仓库内相对路径扁平化 | 上游用仓库内相对路径，本地目录结构扁平 | `superpowers/brainstorming/SKILL.md` 中 `skills/brainstorming/visual-companion.md` → `visual-companion.md` |
+| I4 | opencli 结构不同：上游 `OpenCLI/skills/` 下 7 个子技能（opencli-usage / opencli-browser / opencli-adapter-author / opencli-sitemap-author / opencli-browser-sitemap / opencli-autofix / smart-search）合并为单个 `opencli/SKILL.md` + `opencli/references/` | 统一入口，按任务类型路由，避免 7 个 skill 全部进上下文 | `opencli/` 全目录：去掉子技能 frontmatter，`references/` 路径前缀重写为本地布局（`adapter/`、`sitemap/`、`search/`） |
+| I5 | opencli 的 strategy 术语有两套（references 的上游文档层大写术语 vs 运行时的小写 tag），`SKILL.md` 需维护映射表 | 上游文档与自家 CLI 输出脱节；本地需要让 agent 能把 references 术语和 `list -f json` 实际输出对上 | `opencli/SKILL.md`「术语对照」表 |
+| I6 | `diagram/` 家族跨两个上游集合：`arch-diagram/diagram/` 的 4 个 `diagram-*` + `arch-diagram/skills/`（即 markdown-viewer/skills）的 3 个改名为 `diagram-*` 的目录（`diagram-graphviz` / `diagram-infocard` / `diagram-infographic`，上游裸名 graphviz / infocard / infographic） | 同属绘图技能集中放置便于路由与发现 | `diagram/diagram-{graphviz,infocard,infographic}/` |
+| I7 | diagram 家族统一用 `diagram-*` 前缀命名，与上游 `markdown-viewer/skills` 的裸名（graphviz/infocard/infographic）不同 | 家族内命名一致性优先于上游保真；便于按名字定位 | `diagram/diagram-{graphviz,infocard,infographic}/`；下次同步这 3 个时需重做改名 + 改 `name` 字段补丁 |
+| I8 | `worktrunk/reference/claude-code.md` 中关于 `wt-switch-create` 的描述保留上游原文，但加了「本仓库未收录」标注 | 该 skill 已删除（用户不需要），上游文本仍提及它；标注避免 agent 误以为可用 | `worktrunk/reference/claude-code.md` |
 
-其余所有内容与各上游项目保持一致。
+除上述不变式外，其余内容与各上游项目保持一致。
 
 ## 贡献
 

@@ -1,8 +1,8 @@
 # Strategy Selection
 
-SKILL.md 顶层已给出 strategy gate 的 enum、表格和必填字段。本文件展开**为什么**这套 ladder 是按"契约"而不是"接口高度"组织的，以及具体怎么用 `opencli browser <session> analyze` 的 `api_candidates` 证据填 strategy note。
+SKILL.md 顶层已给出 strategy gate 的 enum、表格和必填字段。本文件展开**为什么**这套 ladder 是按"契约"而不是"接口高度"组织的，以及具体怎么用 `opencli browser analyze` 的 `api_candidates` 证据填 strategy note。
 
-进入条件：你已经按 `site-recon.md` 跑过 `opencli browser <session> analyze`、按 `api-discovery.md` 抓过候选 endpoint。本文件是写 note 之前的最后一站。
+进入条件：你已经按 `site-recon.md` 跑过 `opencli browser analyze`、按 `api-discovery.md` 抓过候选 endpoint。本文件是写 note 之前的最后一站。
 
 ---
 
@@ -50,7 +50,7 @@ SKILL.md 顶层已给出 strategy gate 的 enum、表格和必填字段。本文
 
 ## 3. 怎么把 `api_candidates` 转化为 strategy note 证据
 
-`opencli browser <session> analyze <url>` 的输出里 `api_candidates[]` 字段，每条带：
+`opencli browser analyze <url>` 的输出里 `api_candidates[]` 字段，每条带：
 
 ```json
 {
@@ -85,7 +85,7 @@ analyze 输出：17 个 JSON XHR，原 Pattern A
 
 按 1.0.17 前的旧判定，agent 会按 Pattern A 写 `PAGE_FETCH` adapter，replay 拿到 noise data → adapter silent-fail。**新判定**：`real_data_candidates = 0` → Pattern 落到 C → 提示 SSR HTML scrape → 正确的 strategy 是 `DOM_STATE` / `UI_SELECTOR`。
 
-`opencli browser <session> analyze` 的 `recommended_next_step` 也已更新为 "Inspect api_candidates, then replay the best endpoint" — 不再按 XHR count 推 API。
+`browser analyze` 的 `recommended_next_step` 也已更新为 "Inspect api_candidates, then replay the best endpoint" — 不再按 XHR count 推 API。
 
 ---
 
@@ -143,6 +143,7 @@ Why the maintenance cost is acceptable: <因为业务需求要 raw timeline curs
 | 文件 | 关系 |
 |---|---|
 | [`api-discovery.md`](./api-discovery.md) | §1-5 是 endpoint 发现的具体方法。本文件指它，但本文件管"用 endpoint 证据填 strategy note"，那边管"怎么先找到 endpoint" |
+| [`deep-recon.md`](./deep-recon.md) | 无文档私有协议、写入、分页/缓存或证据冲突时，先做动作归因和 contract gate；只有通过后才进入本文件选 strategy |
 | [`site-recon.md`](./site-recon.md) | Pattern A-E 是 site classification。Pattern A 命中 ≠ `PAGE_FETCH` 必然合适 — 还要看 `api_candidates` 是不是 `likely_data` |
 | [`coverage-matrix.md`](./coverage-matrix.md) | 鉴权列已对齐 6 档 strategy enum |
 | [`adapter-template.md`](./adapter-template.md) | 写代码模板。strategy note 应该在打开 template 之前已经定好 |
