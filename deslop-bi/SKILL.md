@@ -28,6 +28,10 @@ underlying tells exist in both languages — pumped-up significance, rule of
 three, formulaic structures, dead rhythm — but the surface vocabulary differs.
 Detect by principle; rewrite in the source language.
 
+> **Not for controlled language.** If the goal is unambiguous, machine-parseable
+> output (controlled English / 受控中文), use `clarify-bi` instead — that skill
+> flattens voice on purpose; this one restores it.
+
 ---
 
 ## 0. Detect the language first

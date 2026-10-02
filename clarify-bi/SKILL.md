@@ -22,6 +22,8 @@ Use when the text will be **parsed by a machine or a non-native reader with no h
 
 **Do not use** for creative writing, marketing copy, persuasive text, or anything where voice and nuance are the point. Controlled language is deliberately flat and literal.
 
+> **Not for humanizing.** If the goal is to remove AI-flavored prose and make text sound more human, use `deslop-bi` instead — that skill restores voice; this one removes it. 要让文本更像人写的，用 `deslop-bi`；本 skill 方向相反。
+
 ## Language selection
 
 - Input is English → rewrite to **STE** (rules below).
