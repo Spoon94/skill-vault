@@ -1,13 +1,13 @@
 ---
-name: counterexample
-description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks for a counterexample / edge case / "where does this break" / falsification, or when the user asks to run a falsification check on a just-produced artifact.
+name: falsify
+description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks to falsify / counterexample / edge case / "where does this break" / falsification / 「证伪」, or when the user asks to run a falsification check on a just-produced artifact.
 license: MIT
 allowed-tools: Read, Grep, Glob
 metadata:
   origin: self-created
 ---
 
-# counterexample — Force a Falsification Block
+# falsify — Force a Falsification Block
 
 The trap of a polished artifact is that it can **sell a wrong mental model with confidence**. A beautiful explanation, diagram, plan, or design reads as correct precisely because it is polished. Before any such output is trusted, force in at least one concrete case where the model **breaks**.
 
@@ -48,7 +48,7 @@ Append the counterexample block **to the same artifact** if you produced it — 
 
 ## Optional: hook mode
 
-There is no mechanism that automatically runs one skill as a hook after another skill's output — never enter hook mode just because an artifact was produced. Hook mode applies only when the user explicitly asks for it (「对上面这个方案做反例检查」, "counterexample check", 「给这个讲解挑反例」). Take the referenced output as input and do only the counterexample block above — do not regenerate the explanation. State at the top: "Counterexample check on the [type of artifact] above."
+There is no mechanism that automatically runs one skill as a hook after another skill's output — never enter hook mode just because an artifact was produced. Hook mode applies only when the user explicitly asks for it (「对上面这个方案做反例检查」, "counterexample check", "falsify this", 「给这个讲解挑反例」). Take the referenced output as input and do only the counterexample block above — do not regenerate the explanation. State at the top: "Counterexample check on the [type of artifact] above."
 
 ## Output contract
 
