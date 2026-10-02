@@ -136,6 +136,16 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [agentsview-cli](./agentsview-cli) | 本地 AI 会话历史查询：`agentsview` CLI 同步/搜索/恢复 Claude Code、Codex、Cursor 等会话，用量成本报告、语义检索、pg/duckdb/MCP 镜像 |
 | [herdr](./herdr) | 通过 Herdr CLI 控制终端多路复用器：检查/操作 pane、tab、workspace，启动和协调 agent，读取输出，等待状态变化 |
 
+### 解释 / 讲解类（Karpathy 四档阶梯 + trq212 `/eli5` 学习）
+
+| 技能 | 描述 |
+|------|------|
+| [eli5](./eli5) | 用 HTML artifact「大图少字」给完全不懂的人讲清一个主题（vendored from `anthropics/claude-plugins-community`，Apache-2.0） |
+| [show-me](./show-me) | 把当前话题用简洁图/代码形状/HTML artifact 讲明白（vendored from `humanlayer/skills`，MIT） |
+| [explain-to-me](./explain-to-me) | 自适应深度讲解难概念与生代码，多语言、可引导到 ASCII 心智模型（vendored from `kv0906/cc-skills`，与 asd-ste100 / explaining-with-ascii 同源） |
+| [ste](./ste) | 用 ASD-STE100 受控英语重写交付文本，**约束只作用于最终输出层**；支持 80% 力度；参考 `kv0906/cc-skills/asd-ste100`（MIT） |
+| [counterexample](./counterexample) | 为任意产物强制生成具体反例/失效案例，防「精致讲解兜售错的心智模型」（新建，落实 @sarjeets_x 的警告） |
+
 ## 安装方式
 
 将需要的 skill 目录复制到对应平台的 skills 目录：
