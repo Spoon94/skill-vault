@@ -1,0 +1,12 @@
+{
+  "name": "show-me",
+  "description": "Explain the current topic with concise diagrams, code-shape sketches, and focused HTML artifacts",
+  "version": "1.0.1",
+  "author": {
+    "name": "humanlayer",
+    "email": "support@humanlayer.dev"
+  },
+  "repository": "https://github.com/humanlayer/skills",
+  "license": "MIT",
+  "keywords": ["visualization", "diagrams", "mermaid", "code", "html"]
+}

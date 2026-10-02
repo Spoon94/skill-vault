@@ -1,6 +1,7 @@
 ---
 name: counterexample
 description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks for a counterexample / edge case / "where does this break" / falsification, or as a follow-on check after any explanation, explainer, design, or plan is produced.
+license: MIT
 ---
 
 # counterexample — Force a Falsification Block
