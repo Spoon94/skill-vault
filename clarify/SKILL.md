@@ -1,5 +1,5 @@
 ---
-name: clarify-bi
+name: clarify
 description: Rewrite deliverable text into controlled language — English (ASD-STE100) or Chinese (受控中文) — one meaning per word, active voice, short sentences, one instruction per sentence. Use when asked to clarify / simplify text/wording / disambiguate output, apply STE / STE100 / controlled English, make text safe for downstream agents, or non-native readers; or 消除歧义 / 受控中文 / 精简交付文本 / 重写 / 改写 / 术语统一 / 规范化用词.
 license: MIT
 allowed-tools: Read Grep Glob
@@ -8,7 +8,7 @@ metadata:
   upstream: https://github.com/kv0906/cc-skills/tree/main/explain-to-me/skills/asd-ste100
 ---
 
-# clarify-bi — Controlled-Language Rewriting (EN/ZH)
+# clarify — Controlled-Language Rewriting (EN/ZH)
 
 Rewrite the **final deliverable text** into a controlled language: **ASD-STE100** for English, **受控中文 (controlled Chinese)** for Chinese. The rules apply **only to the output layer** — never let them leak into your reasoning, analysis, or drafting.
 

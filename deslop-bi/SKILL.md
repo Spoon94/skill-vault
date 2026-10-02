@@ -29,7 +29,7 @@ three, formulaic structures, dead rhythm — but the surface vocabulary differs.
 Detect by principle; rewrite in the source language.
 
 > **Not for controlled language.** If the goal is unambiguous, machine-parseable
-> output (controlled English / 受控中文), use `clarify-bi` instead — that skill
+> output (controlled English / 受控中文), use `clarify` instead — that skill
 > flattens voice on purpose; this one restores it.
 
 ---
