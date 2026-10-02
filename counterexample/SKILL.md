@@ -2,6 +2,7 @@
 name: counterexample
 description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks for a counterexample / edge case / "where does this break" / falsification, or when the user asks to run a falsification check on a just-produced artifact.
 license: MIT
+allowed-tools: Read, Grep, Glob
 metadata:
   origin: self-created
 ---
@@ -17,6 +18,8 @@ This skill has no opinion about content. It only enforces one thing: **the outpu
 - After any explanation, explainer, diagram, plan, design, or claim is produced — run this as a check before presenting or acting on it.
 - When the user asks for a counterexample, edge case, falsification, "where does this break", "when is this wrong", or "stress-test this".
 - When an output reads suspiciously smooth, complete, or happy-path-only.
+
+Target artifact or claim: $ARGUMENTS — 若无参数，检查当前对话中最近产出的产物。
 
 ## What to produce
 
@@ -41,6 +44,7 @@ Append the counterexample block **to the same artifact** if you produced it — 
 - **Boundary, not demolition.** The point is not to destroy the model but to find where it stops being true — so the corrected claim is stronger.
 - **No weakening.** Do not soften a real failure into a footnote, caveat, or "rare edge case" if it is realistic and within scope.
 - **One deep counterexample beats five shallow ones.** Prefer the single most instructive break over a scattershot list.
+- **No fabricated cases.** A counterexample must come from actually running the falsification test yourself when feasible, or from an explicit, checkable reasoning chain (cite the exact code path / input / state that produces the failure). If you cannot ground it either way, you MUST use the "Counterexample — none found (with search)" branch instead of inventing one. 反例必须来自实跑或可复现推理链；两者都做不到时走 none-found 分支，禁止编造。
 
 ## Optional: hook mode
 

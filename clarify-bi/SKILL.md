@@ -2,6 +2,7 @@
 name: clarify-bi
 description: Rewrite deliverable text into controlled language — English (ASD-STE100) or Chinese (受控中文) — one meaning per word, active voice, short sentences, one instruction per sentence. Use when asked to clarify / simplify text/wording / disambiguate output, apply STE / STE100 / controlled English, make text safe for downstream agents, or non-native readers; or 消除歧义 / 受控中文 / 精简交付文本 / 重写 / 改写 / 术语统一 / 规范化用词.
 license: MIT
+allowed-tools: Read, Grep, Glob
 metadata:
   upstream-references: https://github.com/kv0906/cc-skills/tree/main/explain-to-me/skills/asd-ste100
 ---
@@ -81,6 +82,8 @@ By default apply the rules fully. If the user asks for a softer pass ("80% of th
 3. Rewrite each flagged sentence, **preserving every fact, condition, exception, scope qualifier, and number exactly**. If a shorter phrasing would drop required precision (a safety condition, a scope limit), keep the longer phrasing and flag the trade-off — never silently simplify.
 4. Produce the before/after table.
 5. If the input already complies, say so. Do not force changes onto compliant text.
+
+Input text: $ARGUMENTS — 若无参数，处理当前对话中的交付文本。
 
 ## Output contract
 

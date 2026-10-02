@@ -11,4 +11,6 @@ metadata:
 
 Explain like I'm someone who knows nothing about this topic, using a HTML artifact with big pictures and few words.
 
+参考合格样例：`references/example.html` — 这是 big pictures and few words 的标准。
+
 Topic: $ARGUMENTS
