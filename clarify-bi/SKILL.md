@@ -1,6 +1,6 @@
 ---
 name: clarify-bi
-description: Rewrite deliverable text into controlled language — English (ASD-STE100) or Chinese (受控中文) — one meaning per word, active voice, short sentences, one instruction per sentence. Use when asked to clarify / simplify / disambiguate output, apply STE / STE100 / controlled English, make text safe for downstream agents, translation, or non-native readers; or 消除歧义 / 受控中文 / 精简交付文本.
+description: Rewrite deliverable text into controlled language — English (ASD-STE100) or Chinese (受控中文) — one meaning per word, active voice, short sentences, one instruction per sentence. Use when asked to clarify / simplify text/wording / disambiguate output, apply STE / STE100 / controlled English, make text safe for downstream agents, or non-native readers; or 消除歧义 / 受控中文 / 精简交付文本 / 重写 / 改写 / 术语统一 / 规范化用词.
 license: MIT
 metadata:
   upstream-references: https://github.com/kv0906/cc-skills/tree/main/explain-to-me/skills/asd-ste100
@@ -56,13 +56,15 @@ Common replacements: `prior to`→`before`, `utilize`→`use`, `commence`→`sta
 
 | 规则 | 做 | 不做 |
 |---|---|---|
-| 主语不省略 | 「agent 删除文件」 | 「删除文件」（谁删？）|
+| 主体不明时必补主语 | 动作主体明确时可省略；不明或可能歧义时必须补出 | 「删除文件」（谁删？若上下文不明则必补） |
 | 少用「被」字句 | 「服务验证 token」 | 「token 被验证」 |
 | 一句一个动作 | 「打开文件。读第 3 行。」 | 「打开文件并读第 3 行，然后检查是否匹配」 |
 | 一词一义 | 同一动作全程用同一个词 | 「检查 / 核查 / 验证」混用指同一动作 |
 | 直接动词 | 「分析数据」 | 「对数据进行分析」（去掉「进行…的」壳）|
 | 术语先定义 | 首次出现行话立即解释 | 行话用到底不解释 |
 | 短定语 | 定语拆成短句 | 「那个负责管理所有上游任务队列优先级分配的处理器的配置」 |
+| 的的不休 | 「A 的 B」→ 拆为短句或改为动宾结构 | 三个及以上「的」连用，如「系统的配置的更新的时间」 |
+| 标点数字统一 | 阿拉伯数字用于计量/编号；中文数字用于约数/惯用；逗号连接完整句用句号断开 | 「3个」、「约5个」混用；一逗到底 |
 
 常见替换：「利用」→「用」，「进行 X」→「X」，「通过…来」→直接动词，「务必」→「必须」或删，「相关」→写明具体关系，「妥善」→写明具体动作。
 
