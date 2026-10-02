@@ -1,0 +1,17 @@
+---
+name: eli5
+description: Explain a topic like I'm a 5 year old. Use when the user types /eli5 <topic> or asks for a dead-simple picture explainer of how something works.
+license: Apache-2.0
+argument-hint: "<topic>"
+metadata:
+  origin: vendored
+  upstream: https://github.com/anthropics/claude-plugins-community/tree/main/eli5
+---
+
+# eli5
+
+Explain like I'm someone who knows nothing about this topic, using a HTML artifact with big pictures and few words.
+
+参考合格样例：`references/example.html` — 这是 big pictures and few words 的标准。
+
+Topic: $ARGUMENTS
