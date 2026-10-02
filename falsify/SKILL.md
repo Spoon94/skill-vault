@@ -2,7 +2,7 @@
 name: falsify
 description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks to falsify / counterexample / edge case / "where does this break" / falsification / 「证伪」, or when the user asks to run a falsification check on a just-produced artifact.
 license: MIT
-allowed-tools: Read, Grep, Glob
+allowed-tools: Read Grep Glob
 metadata:
   origin: self-created
 ---

@@ -4,6 +4,7 @@ description: Help the user understand the current topic visually with concise di
 license: MIT
 disable-model-invocation: true
 metadata:
+  origin: vendored
   upstream: https://github.com/humanlayer/skills/tree/main/plugins/show-me
   upstream-version: "1.0.1"
 ---

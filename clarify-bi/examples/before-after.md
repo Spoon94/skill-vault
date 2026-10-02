@@ -1,5 +1,7 @@
 # Before / After Examples
 
+> 本文件整份 vendored 自 kv0906/cc-skills（MIT），未做修改。
+
 ## Part 1 — Official STE Examples
 
 These illustrate real ASD-STE100 rules, drawn from public secondary sources (see `references/writing-rules.md`). They are paraphrased illustrations of the rule, not quotes from the standard itself.

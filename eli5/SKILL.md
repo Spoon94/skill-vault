@@ -4,6 +4,7 @@ description: Explain a topic like I'm a 5 year old. Use when the user types /eli
 license: Apache-2.0
 argument-hint: "<topic>"
 metadata:
+  origin: vendored
   upstream: https://github.com/anthropics/claude-plugins-community/tree/main/eli5
 ---
 
