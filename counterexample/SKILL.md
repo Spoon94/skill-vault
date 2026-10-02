@@ -1,6 +1,6 @@
 ---
 name: counterexample
-description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks for a counterexample / edge case / "where does this break" / falsification, or as a follow-on check after any explanation, explainer, design, or plan is produced.
+description: Force a concrete counterexample or falsification case into an artifact, explanation, plan, design, claim, or mental model before it is trusted. Use to stress-test a polished output that might be selling a wrong model, when the user asks for a counterexample / edge case / "where does this break" / falsification, or when the user asks to run a falsification check on a just-produced artifact.
 license: MIT
 metadata:
   origin: self-created
@@ -44,7 +44,7 @@ Append the counterexample block **to the same artifact** if you produced it — 
 
 ## Optional: hook mode
 
-When asked to run as a **follow-on hook** after another skill's output (an explainer, a diagram, a plan, a design), take that output as input and do only the counterexample block above — do not regenerate the explanation. State at the top: "Counterexample check on the [type of artifact] above."
+There is no mechanism that automatically runs one skill as a hook after another skill's output — never enter hook mode just because an artifact was produced. Hook mode applies only when the user explicitly asks for it (「对上面这个方案做反例检查」, "counterexample check", 「给这个讲解挑反例」). Take the referenced output as input and do only the counterexample block above — do not regenerate the explanation. State at the top: "Counterexample check on the [type of artifact] above."
 
 ## Output contract
 
