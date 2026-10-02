@@ -142,7 +142,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 |------|------|
 | [eli5](./eli5) | 用 HTML artifact「大图少字」给完全不懂的人讲清一个主题（vendored from `anthropics/claude-plugins-community`，Apache-2.0） |
 | [show-me](./show-me) | 把当前话题用简洁图/代码形状/HTML artifact 讲明白（vendored from `humanlayer/skills`，MIT） |
-| [ste](./ste) | 用 ASD-STE100 受控英语重写交付文本，**约束只作用于最终输出层**；支持 80% 力度；参考 `kv0906/cc-skills/asd-ste100`（MIT） |
+| [clarify-bi](./clarify-bi) | 中英双语受控语言重写：英文按 ASD-STE100、中文按受控中文，一词一义、主动语态、短句；**约束只作用于最终输出层**；支持 80% 力度（新建；英文规则素材借自 `kv0906/cc-skills/asd-ste100`，MIT） |
 | [counterexample](./counterexample) | 为任意产物强制生成具体反例/失效案例，防「精致讲解兜售错的心智模型」（新建，落实 @sarjeets_x 的警告） |
 
 ## 安装方式
