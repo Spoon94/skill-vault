@@ -15,7 +15,6 @@ This skill has no opinion about content. It only enforces one thing: **the outpu
 
 ## When to invoke
 
-- After any explanation, explainer, diagram, plan, design, or claim is produced — run this as a check before presenting or acting on it.
 - When the user asks for a counterexample, edge case, falsification, "where does this break", "when is this wrong", or "stress-test this".
 - When an output reads suspiciously smooth, complete, or happy-path-only.
 

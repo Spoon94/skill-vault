@@ -36,7 +36,7 @@ Use when the text will be **parsed by a machine or a non-native reader with no h
 | Principle | Do | Don't |
 |---|---|---|
 | One word, one meaning | Pick one term per concept; reuse it every time | Rotate synonyms for the same idea |
-| Name the actor | Make the subject explicit | Drop the subject |
+| Name the actor | EN: always make the subject explicit · ZH: 主体不明时必须补（明确时可省） | Drop the subject |
 | Active voice | "The agent deletes the file." / 「agent 删除文件」 | Passive with unclear actor |
 | One instruction per sentence | Split compound instructions | Chain actions with "and then" / 「然后」「并」 |
 | Short sentences | ≤20 words (EN instructions), ≤25 (EN descriptions); ≤30 字 (中文指令), ≤40 字 (中文描述) | Long compound sentences |
@@ -96,7 +96,7 @@ Return:
 | Rule violated / 违反规则 | Original | Rewritten |
 |---|---|---|
 | Present perfect tense | "We have received your request." | "We received your request." |
-| 主语省略 | 「完成后及时更新状态」 | 「任务完成后，agent 立即更新状态」 |
+| 主体不明时必补主语 | 「完成后及时更新状态」 | 「任务完成后，agent 立即更新状态」 |
 ```
 
 3. A short **left-unsimplified** note for anything deliberately kept long (and why).
