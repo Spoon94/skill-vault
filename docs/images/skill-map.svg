@@ -1,50 +1,75 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif">
-<rect width="1000" height="560" fill="#f8f6f3"/>
-<text x="500" y="44" text-anchor="middle" font-size="22" font-weight="700" fill="#1a1a1a">核心技能：讲解 + 绘图</text>
-<text x="500" y="70" text-anchor="middle" font-size="13" fill="#6a6a6a">左侧讲解编排 · 中间渲染产出 · 右侧打磨交付 —— 其余工具技能见下方索引</text>
-<rect x="40" y="100" width="280" height="420" rx="12" fill="#dbeafe"/>
-<text x="180.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">讲解编排 · 让人懂</text>
-<rect x="60" y="140" width="240" height="64" rx="10" ry="10" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2"/>
-<text x="180.0" y="171.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">eli5</text>
-<text x="180.0" y="188.0" text-anchor="middle" font-size="10" fill="#4a4a4a">给完全不懂的人<br/>HTML 大图少字</text>
-<rect x="60" y="220" width="240" height="64" rx="10" ry="10" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2"/>
-<text x="180.0" y="251.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">show-me</text>
-<text x="180.0" y="268.0" text-anchor="middle" font-size="10" fill="#4a4a4a">技术向图文编排<br/>选最小视图讲清</text>
-<text x="180" y="330" text-anchor="middle" font-size="11" fill="#4a4a4a">编排层：决定讲什么、用什么形式</text>
-<rect x="360" y="100" width="280" height="420" rx="12" fill="#fdeecd"/>
-<text x="500.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">渲染产出 · 画图</text>
-<rect x="380" y="140" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="162.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-mermaid</text>
-<text x="500.0" y="179.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">嵌入基础图</text>
-<rect x="380" y="194" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="216.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-plantuml</text>
-<text x="500.0" y="233.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">UML/云架构</text>
-<rect x="380" y="248" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="270.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-graphviz</text>
-<text x="500.0" y="287.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">依赖调用图</text>
-<rect x="380" y="302" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="324.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-html</text>
-<text x="500.0" y="341.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">可分享成品</text>
-<rect x="380" y="356" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="378.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-image</text>
-<text x="500.0" y="395.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">CI 批量产图</text>
-<rect x="380" y="410" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="432.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-infocard</text>
-<text x="500.0" y="449.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">信息卡片</text>
-<rect x="380" y="464" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
-<text x="500.0" y="486.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-infographic</text>
-<text x="500.0" y="503.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">看板对比</text>
-<text x="500" y="530" text-anchor="middle" font-size="11" fill="#4a4a4a">渲染层：自带图不够时按格式取</text>
-<rect x="680" y="100" width="280" height="420" rx="12" fill="#d4f0e8"/>
-<text x="820.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">打磨交付 · 做扎实</text>
-<rect x="700" y="140" width="240" height="64" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
-<text x="820.0" y="171.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">falsify</text>
-<text x="820.0" y="188.0" text-anchor="middle" font-size="10" fill="#4a4a4a">验伪：反例+失效机制+边界</text>
-<rect x="700" y="220" width="240" height="64" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
-<text x="820.0" y="251.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">clarify</text>
-<text x="820.0" y="268.0" text-anchor="middle" font-size="10" fill="#4a4a4a">要精确 · ASD-STE100 受控语言</text>
-<rect x="700" y="300" width="240" height="64" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
-<text x="820.0" y="331.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">deslop-bi</text>
-<text x="820.0" y="348.0" text-anchor="middle" font-size="10" fill="#4a4a4a">要自然 · 去 AI 味</text>
-<text x="820" y="400" text-anchor="middle" font-size="11" fill="#4a4a4a">质量 + 语言：验伪 → 定风格</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 830" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif">
+<rect width="1000" height="830" fill="#f8f6f3"/>
+<text x="500" y="42" text-anchor="middle" font-size="22" font-weight="700" fill="#1a1a1a">技能全景 · 63 个</text>
+<text x="500" y="66" text-anchor="middle" font-size="12.5" fill="#6a6a6a">上方：核心三条线（讲解 → 渲染 → 打磨）· 下方：全部工具技能按场景归位</text>
+<rect x="40" y="90" width="280" height="410" rx="12" fill="#dbeafe"/>
+<text x="180.0" y="114" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">讲解编排 · 让人懂</text>
+<rect x="60" y="130" width="240" height="60" rx="10" ry="10" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2"/>
+<text x="180.0" y="159.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">eli5</text>
+<text x="180.0" y="175.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">给完全不懂的人 · HTML 大图</text>
+<rect x="60" y="205" width="240" height="60" rx="10" ry="10" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2"/>
+<text x="180.0" y="234.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">show-me</text>
+<text x="180.0" y="250.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">技术向 · 图文编排</text>
+<text x="180.0" y="320" text-anchor="middle" font-size="11" fill="#6a6a6a">编排层：决定讲什么、用什么形式</text>
+<rect x="360" y="90" width="280" height="410" rx="12" fill="#fdeecd"/>
+<text x="500.0" y="114" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">渲染产出 · 画图</text>
+<rect x="380" y="130" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="152.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-mermaid</text>
+<text x="500.0" y="168.0" text-anchor="middle" font-size="9" fill="#4a4a4a">嵌入基础图</text>
+<rect x="380" y="183" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="205.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-plantuml</text>
+<text x="500.0" y="221.0" text-anchor="middle" font-size="9" fill="#4a4a4a">UML/云架构</text>
+<rect x="380" y="236" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="258.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-graphviz</text>
+<text x="500.0" y="274.0" text-anchor="middle" font-size="9" fill="#4a4a4a">依赖调用图</text>
+<rect x="380" y="289" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="311.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-html</text>
+<text x="500.0" y="327.0" text-anchor="middle" font-size="9" fill="#4a4a4a">可分享成品</text>
+<rect x="380" y="342" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="364.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-image</text>
+<text x="500.0" y="380.0" text-anchor="middle" font-size="9" fill="#4a4a4a">CI 批量产图</text>
+<rect x="380" y="395" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="417.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-infocard</text>
+<text x="500.0" y="433.0" text-anchor="middle" font-size="9" fill="#4a4a4a">信息卡片</text>
+<rect x="380" y="448" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="470.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1a1a1a">diagram-infographic</text>
+<text x="500.0" y="486.0" text-anchor="middle" font-size="9" fill="#4a4a4a">看板对比</text>
+<rect x="680" y="90" width="280" height="410" rx="12" fill="#d4f0e8"/>
+<text x="820.0" y="114" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">打磨交付 · 做扎实</text>
+<rect x="700" y="130" width="240" height="60" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
+<text x="820.0" y="159.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">falsify</text>
+<text x="820.0" y="175.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">验伪 · 反例+边界</text>
+<rect x="700" y="205" width="240" height="60" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
+<text x="820.0" y="234.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">clarify</text>
+<text x="820.0" y="250.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">精确 · ASD-STE100 受控</text>
+<rect x="700" y="280" width="240" height="60" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
+<text x="820.0" y="309.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">deslop-bi</text>
+<text x="820.0" y="325.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">自然 · 去 AI 味</text>
+<text x="820.0" y="395" text-anchor="middle" font-size="11" fill="#6a6a6a">质量 + 语言：验伪 → 定风格</text>
+<line x1="60" y1="540" x2="940" y2="540" stroke="#d1ccc4" stroke-width="1.5"/>
+<text x="500" y="568" text-anchor="middle" font-size="15" font-weight="700" fill="#1a1a1a">其余工具技能 · 全部归位</text>
+<rect x="60" y="590" width="150" height="142" rx="9" fill="#ede9fe"/>
+<text x="135" y="669.0" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a1a1a">开发流程</text>
+<text x="228" y="614" font-size="11.5" fill="#3a3a3a">superpowers 全家：brainstorming · systematic-debugging · test-driven-development</text>
+<text x="228" y="635" font-size="11.5" fill="#3a3a3a">writing-skills · writing-plans · executing-plans · requesting-code-review</text>
+<text x="228" y="656" font-size="11.5" fill="#3a3a3a">receiving-code-review · finishing-a-development-branch · dispatching-parallel-agents</text>
+<text x="228" y="677" font-size="11.5" fill="#3a3a3a">subagent-driven-development · using-git-worktrees · using-superpowers</text>
+<text x="228" y="698" font-size="11.5" fill="#3a3a3a">verification-before-completion · diagnosing-superpowers</text>
+<text x="228" y="719" font-size="11.5" fill="#3a3a3a">＋ git-commit 提交规范 · worktrunk worktree · hunk-review diff 审阅</text>
+<rect x="60" y="744" width="150" height="37" rx="9" fill="#ccfbf1"/>
+<text x="135" y="770.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a1a1a">检索信息</text>
+<text x="228" y="768" font-size="11.5" fill="#3a3a3a">semble 代码语义检索 · tavily 网页搜索提取 · gh GitHub 操作 · defuddle 正文提取</text>
+<rect x="60" y="793" width="150" height="58" rx="9" fill="#fee2e2"/>
+<text x="135" y="830.0" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a1a1a">笔记记忆</text>
+<text x="228" y="817" font-size="11.5" fill="#3a3a3a">engram-mem 持久记忆 · agentsview-cli 会话历史</text>
+<text x="228" y="838" font-size="11.5" fill="#3a3a3a">obsidian-markdown · obsidian-bases · json-canvas · obsidian-cli · knap</text>
+<rect x="60" y="863" width="150" height="37" rx="9" fill="#dbeafe"/>
+<text x="135" y="889.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a1a1a">操作驱动</text>
+<text x="228" y="887" font-size="11.5" fill="#3a3a3a">tmux 终端多路 · herdr agent 终端 · opencli 驱动网站/App · mcp2cli MCP/API 转 CLI</text>
+<rect x="60" y="912" width="150" height="100" rx="9" fill="#e8e6e3"/>
+<text x="135" y="970.0" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a1a1a">官方示例</text>
+<text x="228" y="936" font-size="11.5" fill="#3a3a3a">anthropics 18 个：algorithmic-art · brand-guidelines · canvas-design · claude-api</text>
+<text x="228" y="957" font-size="11.5" fill="#3a3a3a">doc-coauthoring · docx · pdf · pptx · xlsx · frontend-design · internal-comms</text>
+<text x="228" y="978" font-size="11.5" fill="#3a3a3a">mcp-builder · skill-creator · slack-gif-creator · theme-factory</text>
+<text x="228" y="999" font-size="11.5" fill="#3a3a3a">web-artifacts-builder · webapp-testing</text>
 </svg>
