@@ -55,7 +55,7 @@ There is no mechanism that automatically runs one skill as a hook after another 
 ```markdown
 ## Counterexample
 
-**Model as stated + load-bearing assumptions:** <one sentence; the assumptions it rests on>
+**Model as stated + load-bearing assumptions:** <one sentence; the assumptions it rests on, and which one, if changed, flips the conclusion>
 **Counterexample:** <concrete case>
 **Why it breaks:** <mechanism / violated assumption>
 **What it reveals:** <corrected / bounded claim>
