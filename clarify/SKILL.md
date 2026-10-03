@@ -42,7 +42,7 @@ Use when the text will be **parsed by a machine or a non-native reader with no h
 | One instruction per sentence | Split compound instructions | Chain actions with "and then" / 「然后」「并」 |
 | Short sentences | ≤20 words (EN instructions), ≤25 (EN descriptions); ≤30 字 (中文指令), ≤40 字 (中文描述) | Long compound sentences |
 | Lists for sequences | Numbered/bulleted list for 3+ steps | Bury a sequence in one prose sentence |
-| Preserve precision | Keep every fact, condition, exception, number | Simplify away a safety condition or scope limit |
+| Preserve precision | Keep every fact, condition, exception, number, **and degree of certainty**（可能/大概/也许 原样保留） | Simplify away a safety condition or scope limit |
 
 ## English rules (ASD-STE100)
 
@@ -69,6 +69,10 @@ Common replacements: `prior to`→`before`, `utilize`→`use`, `commence`→`sta
 | 短定语 | 定语拆成短句 | 「那个负责管理所有上游任务队列优先级分配的处理器的配置」 |
 | 的的不休 | 「A 的 B」→ 拆为短句或改为动宾结构 | 三个及以上「的」连用，如「系统的配置的更新的时间」 |
 | 标点数字统一 | 阿拉伯数字用于计量/编号；中文数字用于约数/惯用；逗号连接完整句用句号断开 | 「3个」、「约5个」混用；一逗到底 |
+| 条件前置 | 条件写在动作前：「如果被锁定，跳过。否则，删除文件」 | 「删除文件。如果被锁定则跳过」（先命令后条件） |
+| 同名同物不合并 | 不同实体必须用不同名；指代不明时标为问题让用户确认 | 两个实体挤进一个名字；指代不明时擅自猜一个意思 |
+| 保确定性 | 「可能/大概/也许/一定」等确定性标记原样保留 | 重写时丢掉「可能」，把猜测洗成断言 |
+| 语义不升级 | 可能就是可能，建议就是建议；有歧义标出来给用户判断 | 可能原因→既定事实；建议→要求 |
 
 常见替换：「利用」→「用」，「进行 X」→「X」，「通过…来」→直接动词，「务必」→「必须」或删，「相关」→写明具体关系，「妥善」→写明具体动作。
 
@@ -83,6 +87,10 @@ By default apply the rules fully. If the user asks for a softer pass ("80% of th
 3. Rewrite each flagged sentence, **preserving every fact, condition, exception, scope qualifier, and number exactly**. If a shorter phrasing would drop required precision (a safety condition, a scope limit), keep the longer phrasing and flag the trade-off — never silently simplify.
 4. Produce the before/after table.
 5. If the input already complies, say so. Do not force changes onto compliant text.
+6. **对照自检（Audit）**——把原文和改写稿对照，主动找三类问题并列出：
+   - **新增**：改写稿里有没有原文没有的内容（模型自己加的）
+   - **遗漏**：原文内容有没有丢
+   - **变义**：意思有没有被偷换（含确定性丢失、语义升级）
 
 Input text: $ARGUMENTS — 若无参数，处理当前对话中的交付文本。
 
@@ -101,6 +109,15 @@ Return:
 ```
 
 3. A short **left-unsimplified** note for anything deliberately kept long (and why).
+
+4. An **audit report** — the self-check from step 6:
+
+```markdown
+## Audit / 对照自检
+- 新增: <改写稿中原文没有的内容，或 "无">
+- 遗漏: <原文中丢失的内容，或 "无">
+- 变义: <语义被改变处，或 "无">
+```
 
 ## References
 
