@@ -36,7 +36,7 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 ![技能全景](docs/images/skill-map.svg)
 
-8 个场景分组，63 个技能——**从场景出发找技能**：要讲清话题、要画图、要打磨文本、要检索信息……先看图定位场景，再进对应目录看 `SKILL.md`。
+核心三条线：**讲解编排**（eli5 · show-me 让人懂）→ **渲染产出**（7 个 diagram-\* 画图）→ **打磨交付**（falsify 验伪 · clarify 精确 · deslop-bi 自然）。其余检索、流程、记忆、操作类工具技能见下方索引。
 
 ## 组合使用
 

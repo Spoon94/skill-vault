@@ -1,121 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 740" font-family="'Helvetica Neue',Helvetica,Arial,'PingFang SC','Microsoft YaHei',sans-serif">
-<rect width="1000" height="740" fill="#ffffff"/>
-<text x="500" y="38" text-anchor="middle" font-size="18" font-weight="600" fill="#111827">技能全景：按使用场景选</text>
-<text x="500" y="60" text-anchor="middle" font-size="12" fill="#6b7280">每个技能归入它最常用的场景 —— 从场景出发找技能</text>
-<rect x="30" y="82.0" width="150" height="60" rx="10" ry="10" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
-<text x="105.0" y="104.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">理解讲解</text>
-<text x="105.0" y="123.0" text-anchor="middle" font-size="10" fill="#6b7280">把复杂讲简单</text>
-<line x1="180" y1="112.0" x2="197" y2="112.0" stroke="#93c5fd" stroke-width="1.5"/>
-<rect x="205" y="88" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#93c5fd" stroke-width="1.5"/>
-<text x="284.0" y="109.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">eli5</text>
-<text x="284.0" y="125.0" text-anchor="middle" font-size="9.5" fill="#6b7280">外行·HTML大图</text>
-<rect x="375" y="88" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#93c5fd" stroke-width="1.5"/>
-<text x="454.0" y="109.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">show-me</text>
-<text x="454.0" y="125.0" text-anchor="middle" font-size="9.5" fill="#6b7280">技术·图文编排</text>
-<rect x="30" y="193.0" width="150" height="60" rx="10" ry="10" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
-<text x="105.0" y="215.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">绘图</text>
-<text x="105.0" y="234.0" text-anchor="middle" font-size="10" fill="#6b7280">产出各种图</text>
-<line x1="180" y1="223.0" x2="197" y2="223.0" stroke="#86efac" stroke-width="1.5"/>
-<rect x="205" y="170" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="284.0" y="191.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-mermaid</text>
-<text x="284.0" y="207.0" text-anchor="middle" font-size="9.5" fill="#6b7280">嵌入基础图</text>
-<rect x="375" y="170" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="454.0" y="191.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-plantuml</text>
-<text x="454.0" y="207.0" text-anchor="middle" font-size="9.5" fill="#6b7280">UML/云架构</text>
-<rect x="545" y="170" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="624.0" y="191.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-graphviz</text>
-<text x="624.0" y="207.0" text-anchor="middle" font-size="9.5" fill="#6b7280">依赖调用图</text>
-<rect x="715" y="170" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="794.0" y="191.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-html</text>
-<text x="794.0" y="207.0" text-anchor="middle" font-size="9.5" fill="#6b7280">可分享成品</text>
-<rect x="205" y="228" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="284.0" y="249.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-image</text>
-<text x="284.0" y="265.0" text-anchor="middle" font-size="9.5" fill="#6b7280">CI 批量产图</text>
-<rect x="375" y="228" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="454.0" y="249.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-infocard</text>
-<text x="454.0" y="265.0" text-anchor="middle" font-size="9.5" fill="#6b7280">信息卡片</text>
-<rect x="545" y="228" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
-<text x="624.0" y="249.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">diagram-infographic</text>
-<text x="624.0" y="265.0" text-anchor="middle" font-size="9.5" fill="#6b7280">看板对比</text>
-<rect x="30" y="304.0" width="150" height="60" rx="10" ry="10" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
-<text x="105.0" y="326.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">打磨文本</text>
-<text x="105.0" y="345.0" text-anchor="middle" font-size="10" fill="#6b7280">改到可交付</text>
-<line x1="180" y1="334.0" x2="197" y2="334.0" stroke="#fdba74" stroke-width="1.5"/>
-<rect x="205" y="310" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#fdba74" stroke-width="1.5"/>
-<text x="284.0" y="331.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">clarify</text>
-<text x="284.0" y="347.0" text-anchor="middle" font-size="9.5" fill="#6b7280">精确无歧义</text>
-<rect x="375" y="310" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#fdba74" stroke-width="1.5"/>
-<text x="454.0" y="331.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">deslop-bi</text>
-<text x="454.0" y="347.0" text-anchor="middle" font-size="9.5" fill="#6b7280">自然人味</text>
-<rect x="545" y="310" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#fdba74" stroke-width="1.5"/>
-<text x="624.0" y="331.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">falsify</text>
-<text x="624.0" y="347.0" text-anchor="middle" font-size="9.5" fill="#6b7280">验伪反例</text>
-<rect x="30" y="386.0" width="150" height="60" rx="10" ry="10" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
-<text x="105.0" y="408.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">检索信息</text>
-<text x="105.0" y="427.0" text-anchor="middle" font-size="10" fill="#6b7280">找答案</text>
-<line x1="180" y1="416.0" x2="197" y2="416.0" stroke="#5eead4" stroke-width="1.5"/>
-<rect x="205" y="392" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#5eead4" stroke-width="1.5"/>
-<text x="284.0" y="413.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">semble</text>
-<text x="284.0" y="429.0" text-anchor="middle" font-size="9.5" fill="#6b7280">代码语义检索</text>
-<rect x="375" y="392" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#5eead4" stroke-width="1.5"/>
-<text x="454.0" y="413.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">tavily</text>
-<text x="454.0" y="429.0" text-anchor="middle" font-size="9.5" fill="#6b7280">网页搜索提取</text>
-<rect x="545" y="392" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#5eead4" stroke-width="1.5"/>
-<text x="624.0" y="413.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">gh</text>
-<text x="624.0" y="429.0" text-anchor="middle" font-size="9.5" fill="#6b7280">GitHub 操作</text>
-<rect x="715" y="392" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#5eead4" stroke-width="1.5"/>
-<text x="794.0" y="413.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">defuddle</text>
-<text x="794.0" y="429.0" text-anchor="middle" font-size="9.5" fill="#6b7280">网页正文提取</text>
-<rect x="30" y="468.0" width="150" height="60" rx="10" ry="10" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
-<text x="105.0" y="490.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">开发流程</text>
-<text x="105.0" y="509.0" text-anchor="middle" font-size="10" fill="#6b7280">需求到收尾</text>
-<line x1="180" y1="498.0" x2="197" y2="498.0" stroke="#d8b4fe" stroke-width="1.5"/>
-<rect x="205" y="474" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#d8b4fe" stroke-width="1.5"/>
-<text x="284.0" y="495.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">superpowers</text>
-<text x="284.0" y="511.0" text-anchor="middle" font-size="9.5" fill="#6b7280">brainstorm→finish</text>
-<rect x="375" y="474" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#d8b4fe" stroke-width="1.5"/>
-<text x="454.0" y="495.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">git-commit</text>
-<text x="454.0" y="511.0" text-anchor="middle" font-size="9.5" fill="#6b7280">提交规范</text>
-<rect x="545" y="474" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#d8b4fe" stroke-width="1.5"/>
-<text x="624.0" y="495.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">worktrunk</text>
-<text x="624.0" y="511.0" text-anchor="middle" font-size="9.5" fill="#6b7280">worktree 管理</text>
-<rect x="715" y="474" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#d8b4fe" stroke-width="1.5"/>
-<text x="794.0" y="495.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">hunk-review</text>
-<text x="794.0" y="511.0" text-anchor="middle" font-size="9.5" fill="#6b7280">diff 审阅</text>
-<rect x="30" y="550.0" width="150" height="60" rx="10" ry="10" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
-<text x="105.0" y="572.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">记忆上下文</text>
-<text x="105.0" y="591.0" text-anchor="middle" font-size="10" fill="#6b7280">记住与回顾</text>
-<line x1="180" y1="580.0" x2="197" y2="580.0" stroke="#fca5a5" stroke-width="1.5"/>
-<rect x="205" y="556" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#fca5a5" stroke-width="1.5"/>
-<text x="284.0" y="577.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">engram-mem</text>
-<text x="284.0" y="593.0" text-anchor="middle" font-size="9.5" fill="#6b7280">持久记忆</text>
-<rect x="375" y="556" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#fca5a5" stroke-width="1.5"/>
-<text x="454.0" y="577.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">agentsview-cli</text>
-<text x="454.0" y="593.0" text-anchor="middle" font-size="9.5" fill="#6b7280">会话历史</text>
-<rect x="545" y="556" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#fca5a5" stroke-width="1.5"/>
-<text x="624.0" y="577.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">obsidian</text>
-<text x="624.0" y="593.0" text-anchor="middle" font-size="9.5" fill="#6b7280">笔记生态</text>
-<rect x="30" y="632.0" width="150" height="60" rx="10" ry="10" fill="#eef2ff" stroke="#a5b4fc" stroke-width="1.5"/>
-<text x="105.0" y="654.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">操作驱动</text>
-<text x="105.0" y="673.0" text-anchor="middle" font-size="10" fill="#6b7280">控制外部</text>
-<line x1="180" y1="662.0" x2="197" y2="662.0" stroke="#a5b4fc" stroke-width="1.5"/>
-<rect x="205" y="638" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#a5b4fc" stroke-width="1.5"/>
-<text x="284.0" y="659.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">tmux</text>
-<text x="284.0" y="675.0" text-anchor="middle" font-size="9.5" fill="#6b7280">终端多路</text>
-<rect x="375" y="638" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#a5b4fc" stroke-width="1.5"/>
-<text x="454.0" y="659.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">herdr</text>
-<text x="454.0" y="675.0" text-anchor="middle" font-size="9.5" fill="#6b7280">agent 终端</text>
-<rect x="545" y="638" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#a5b4fc" stroke-width="1.5"/>
-<text x="624.0" y="659.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">opencli</text>
-<text x="624.0" y="675.0" text-anchor="middle" font-size="9.5" fill="#6b7280">驱动网站/App</text>
-<rect x="715" y="638" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#a5b4fc" stroke-width="1.5"/>
-<text x="794.0" y="659.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">mcp2cli</text>
-<text x="794.0" y="675.0" text-anchor="middle" font-size="9.5" fill="#6b7280">MCP/API 转 CLI</text>
-<rect x="30" y="714.0" width="150" height="60" rx="10" ry="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
-<text x="105.0" y="736.0" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">官方示例</text>
-<text x="105.0" y="755.0" text-anchor="middle" font-size="10" fill="#6b7280">即取即用</text>
-<line x1="180" y1="744.0" x2="197" y2="744.0" stroke="#cbd5e1" stroke-width="1.5"/>
-<rect x="205" y="720" width="158" height="48" rx="8" ry="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
-<text x="284.0" y="741.0" text-anchor="middle" font-size="11.5" font-weight="600" fill="#111827">anthropics</text>
-<text x="284.0" y="757.0" text-anchor="middle" font-size="9.5" fill="#6b7280">文档/设计/前端/办公 18 个</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif">
+<rect width="1000" height="560" fill="#f8f6f3"/>
+<text x="500" y="44" text-anchor="middle" font-size="22" font-weight="700" fill="#1a1a1a">核心技能：讲解 + 绘图</text>
+<text x="500" y="70" text-anchor="middle" font-size="13" fill="#6a6a6a">左侧讲解编排 · 中间渲染产出 · 右侧打磨交付 —— 其余工具技能见下方索引</text>
+<rect x="40" y="100" width="280" height="420" rx="12" fill="#dbeafe"/>
+<text x="180.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">讲解编排 · 让人懂</text>
+<rect x="60" y="140" width="240" height="64" rx="10" ry="10" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2"/>
+<text x="180.0" y="171.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">eli5</text>
+<text x="180.0" y="188.0" text-anchor="middle" font-size="10" fill="#4a4a4a">给完全不懂的人<br/>HTML 大图少字</text>
+<rect x="60" y="220" width="240" height="64" rx="10" ry="10" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2"/>
+<text x="180.0" y="251.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">show-me</text>
+<text x="180.0" y="268.0" text-anchor="middle" font-size="10" fill="#4a4a4a">技术向图文编排<br/>选最小视图讲清</text>
+<text x="180" y="330" text-anchor="middle" font-size="11" fill="#4a4a4a">编排层：决定讲什么、用什么形式</text>
+<rect x="360" y="100" width="280" height="420" rx="12" fill="#fdeecd"/>
+<text x="500.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">渲染产出 · 画图</text>
+<rect x="380" y="140" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="162.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-mermaid</text>
+<text x="500.0" y="179.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">嵌入基础图</text>
+<rect x="380" y="194" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="216.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-plantuml</text>
+<text x="500.0" y="233.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">UML/云架构</text>
+<rect x="380" y="248" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="270.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-graphviz</text>
+<text x="500.0" y="287.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">依赖调用图</text>
+<rect x="380" y="302" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="324.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-html</text>
+<text x="500.0" y="341.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">可分享成品</text>
+<rect x="380" y="356" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="378.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-image</text>
+<text x="500.0" y="395.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">CI 批量产图</text>
+<rect x="380" y="410" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="432.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-infocard</text>
+<text x="500.0" y="449.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">信息卡片</text>
+<rect x="380" y="464" width="240" height="46" rx="10" ry="10" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2"/>
+<text x="500.0" y="486.0" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">diagram-infographic</text>
+<text x="500.0" y="503.0" text-anchor="middle" font-size="9.5" fill="#4a4a4a">看板对比</text>
+<text x="500" y="530" text-anchor="middle" font-size="11" fill="#4a4a4a">渲染层：自带图不够时按格式取</text>
+<rect x="680" y="100" width="280" height="420" rx="12" fill="#d4f0e8"/>
+<text x="820.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">打磨交付 · 做扎实</text>
+<rect x="700" y="140" width="240" height="64" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
+<text x="820.0" y="171.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">falsify</text>
+<text x="820.0" y="188.0" text-anchor="middle" font-size="10" fill="#4a4a4a">验伪：反例+失效机制+边界</text>
+<rect x="700" y="220" width="240" height="64" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
+<text x="820.0" y="251.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">clarify</text>
+<text x="820.0" y="268.0" text-anchor="middle" font-size="10" fill="#4a4a4a">要精确 · ASD-STE100 受控语言</text>
+<rect x="700" y="300" width="240" height="64" rx="10" ry="10" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2"/>
+<text x="820.0" y="331.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">deslop-bi</text>
+<text x="820.0" y="348.0" text-anchor="middle" font-size="10" fill="#4a4a4a">要自然 · 去 AI 味</text>
+<text x="820" y="400" text-anchor="middle" font-size="11" fill="#4a4a4a">质量 + 语言：验伪 → 定风格</text>
 </svg>
