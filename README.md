@@ -145,6 +145,8 @@ npx skills add https://github.com/Spoon94/skill-vault
 | [clarify](./clarify) | 中英双语受控语言重写：英文按 ASD-STE100、中文按受控中文，一词一义、主动语态、短句；**约束只作用于最终输出层**；支持 80% 力度（新建；英文规则素材借自 `kv0906/cc-skills/asd-ste100`，MIT） |
 | [falsify](./falsify) | 证伪任意产物：强制生成具体反例/失效案例与修正边界，防「精致讲解兜售错的心智模型」（新建，落实 @sarjeets_x 的警告） |
 
+> 分工原则：**人看的交付物用 HTML/图**（eli5、show-me、diagram-\*），**模型读的文档用 Markdown**（各 SKILL.md、handoff、memory）。依据 Karpathy 推文评论 @jdbhojani 的实践。
+
 ## 安装方式
 
 将需要的 skill 目录复制到对应平台的 skills 目录：

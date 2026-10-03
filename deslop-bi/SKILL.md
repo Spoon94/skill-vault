@@ -28,9 +28,9 @@ underlying tells exist in both languages — pumped-up significance, rule of
 three, formulaic structures, dead rhythm — but the surface vocabulary differs.
 Detect by principle; rewrite in the source language.
 
-> **Not for controlled language.** If the goal is unambiguous, machine-parseable
-> output (controlled English / 受控中文), use `clarify` instead — that skill
-> flattens voice on purpose; this one restores it.
+> **Not for controlled language — both serve humans.** This skill makes text
+> **read naturally**; `clarify` makes text **read precisely** (controlled,
+> unambiguous). 要精确无歧义用 `clarify`；要自然用人味用本 skill。
 
 ---
 
