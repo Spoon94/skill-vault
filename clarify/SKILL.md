@@ -1,6 +1,6 @@
 ---
 name: clarify
-description: Rewrite deliverable text into controlled language — English (ASD-STE100) or Chinese (受控中文) — one meaning per word, active voice, short sentences, one instruction per sentence. Use when asked to clarify / simplify text/wording / disambiguate output, apply STE / STE100 / controlled English, make text safe for downstream agents, or non-native readers; or 消除歧义 / 受控中文 / 精简交付文本 / 重写 / 改写 / 术语统一 / 规范化用词.
+description: Rewrite deliverable text into controlled language per ASD-STE100 principles — in English (the standard itself) and in Chinese (the same principles adapted) — one meaning per word, active voice, short sentences, one instruction per sentence. Use when asked to clarify / simplify text/wording / disambiguate output, apply STE / STE100 / controlled English, make text safe for downstream agents, or non-native readers; or 消除歧义 / 受控中文 / 精简交付文本 / 重写 / 改写 / 术语统一 / 规范化用词.
 license: MIT
 allowed-tools: Read Grep Glob
 metadata:
@@ -10,7 +10,7 @@ metadata:
 
 # clarify — Controlled-Language Rewriting (EN/ZH)
 
-Rewrite the **final deliverable text** into a controlled language: **ASD-STE100** for English, **受控中文 (controlled Chinese)** for Chinese. The rules apply **only to the output layer** — never let them leak into your reasoning, analysis, or drafting.
+Rewrite the **final deliverable text** into a controlled language per **ASD-STE100** principles — in English (the standard itself) and in Chinese (the same principles adapted to Chinese grammar). The rules apply **only to the output layer** — never let them leak into your reasoning, analysis, or drafting.
 
 > **Hard rule — constraint placement.** Do all thinking, exploring, and drafting in normal full language first. Apply the controlled rewrite **only as the last transformation**, right before presenting text the user will consume or hand to another agent. Do not "write simply while you think" — enforced at the thought level it measurably degrades reasoning quality. Think freely, then constrain the surface.
 
@@ -29,8 +29,8 @@ Use when the text will be **read by a human who needs unambiguous content** — 
 
 ## Language selection
 
-- Input is English → rewrite to **STE** (rules below).
-- Input is Chinese → rewrite to **受控中文** (rules below).
+- Input is English → rewrite to **STE** (the ASD-STE100 standard itself).
+- Input is Chinese → rewrite per **the same ASD-STE100 principles adapted to Chinese** (rules below).
 - Mixed input → follow the dominant language; preserve code, commands, paths, API names, and identifiers **exactly** in both modes.
 
 ## Shared principles (both languages)
@@ -57,7 +57,7 @@ Use when the text will be **read by a human who needs unambiguous content** — 
 
 Common replacements: `prior to`→`before`, `utilize`→`use`, `commence`→`start`, `ensure`→`make sure`, `replenish`→`fill`, `approximately`→`about`, `in order to`→`to`.
 
-## 中文规则（受控中文）
+## 中文规则（ASD-STE100 中文适配）
 
 | 规则 | 要求 | 反例 |
 |---|---|---|
