@@ -27,7 +27,7 @@ For the given artifact or claim, output a **counterexample block** with these pa
 1. **The model as stated, and its load-bearing assumptions** — 产物断言什么，以及它依赖哪些关键假设。输出应展示假设本身，以及哪个假设一旦改变会翻转结论。
 2. **A concrete counterexample** — a specific, named case (input, input shape, environment, ordering, boundary value, adversarial example) where that assertion fails. Not "sometimes it breaks" — a concrete instance you can state exactly.
 3. **Why it breaks** — the mechanism: which assumption in the model the counterexample violates.
-4. **What it reveals** — the corrected or tightened claim: what is now true, the boundary of where the model actually holds, and **which assumption, if changed, flips the conclusion**.
+4. **What it reveals** — the corrected or tightened claim: what is now true, and the boundary of where the model actually holds.
 5. **Falsification test** — a check the user can run to see the failure (a command, a query, a small experiment).
 6. 分析过程中区分**已验证事实**与**未验证假设**：反例本身必须是事实（实跑或可复现推理链），模型断言的假设状态要逐项标明（verified / unverified）。
 
@@ -58,7 +58,7 @@ There is no mechanism that automatically runs one skill as a hook after another 
 **Model as stated + load-bearing assumptions:** <one sentence; the assumptions it rests on>
 **Counterexample:** <concrete case>
 **Why it breaks:** <mechanism / violated assumption>
-**What it reveals:** <corrected / bounded claim + which assumption, if changed, flips the conclusion>
+**What it reveals:** <corrected / bounded claim>
 **Falsification test:** <how to observe the failure>
 **Assumption status:** verified fact / unverified hypothesis（逐项）
 ```
