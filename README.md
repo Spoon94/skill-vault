@@ -147,6 +147,56 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 > 分工原则：**人看的交付物用 HTML/图**（eli5、show-me、diagram-\*），**模型读的文档用 Markdown**（各 SKILL.md、handoff、memory）。依据 Karpathy 推文评论 @jdbhojani 的实践。
 
+## 技能组合使用
+
+### 场景决策：要做什么 → 用哪个
+
+```mermaid
+flowchart TD
+    Q["要做什么？"] --> EX["讲清话题"]
+    Q --> DR["画图"]
+    Q --> CK["验证产物"]
+    Q --> TX["打磨交付文本"]
+
+    EX --> E1["给完全不懂的人 → <b>eli5</b><br/>HTML 大图少字"]
+    EX --> E2["给技术人 → <b>show-me</b><br/>编排图文组合"]
+
+    DR --> D1["基础图 → <b>diagram-mermaid</b>"]
+    DR --> D2["专业图 → <b>diagram-plantuml</b>"]
+    DR --> D3["依赖调用图 → <b>diagram-graphviz</b>"]
+    DR --> D4["可分享成品 → <b>diagram-html</b>"]
+    DR --> D5["CI 批量 → <b>diagram-image</b>"]
+    DR --> D6["单主题卡片 → <b>diagram-infocard</b>"]
+    DR --> D7["看板对比 → <b>diagram-infographic</b>"]
+
+    CK --> FA["<b>falsify</b><br/>强制反例 + 失效机制 + 边界"]
+
+    TX --> T1["要精确无歧义 → <b>clarify</b><br/>受控语言"]
+    TX --> T2["要自然人味 → <b>deslop-bi</b><br/>去 AI 味"]
+```
+
+### 组合流水线：编排 → 渲染 → 质量 → 语言
+
+```mermaid
+flowchart LR
+    NEED["理解 / 交付需求"] --> ORCH["<b>编排层</b><br/>show-me · eli5<br/>选定讲解形式"]
+    ORCH --> RENDER["<b>渲染层</b><br/>diagram-*<br/>自带图不够时按需取图"]
+    RENDER --> QUALITY["<b>质量层</b><br/>falsify<br/>验伪：反例 + 边界"]
+    QUALITY --> LANG{"交付文本<br/>要什么风格？"}
+    LANG -->|精确无歧义| CL["<b>语言层</b><br/>clarify 受控语言"]
+    LANG -->|自然人味| DL["deslop-bi 去 AI 味"]
+    CL --> OUT["交付"]
+    DL --> OUT
+    QUALITY -->|图 / 讲解可直接用| OUT
+
+    TOOLS["<b>独立工具技能</b><br/>gh · tavily · semble · tmux · herdr<br/>worktrunk · engram-mem · git-commit<br/>hunk-review · opencli · agentsview-cli · mcp2cli"] -.按需穿插.-> ORCH
+```
+
+**关键点**：
+- `show-me` 自带内联 Mermaid 与聚焦 HTML——自带图够用时**不要**再叠 `diagram-*`；只有要 UML/云架构/DOT 边路由/成品文件时才升级。
+- `eli5` 的产物**不要**再过 `clarify`（eli5 要生动、clarify 要平实，方向冲突）；`clarify` 与 `deslop-bi` 互斥（一个压平人味、一个恢复人味）。
+- `falsify` 的对象是**论断/讲解/计划**，不是纯渲染产物（diagram-* 只是按描述画图，没什么可证伪的）。
+
 ## 安装方式
 
 将需要的 skill 目录复制到对应平台的 skills 目录：
