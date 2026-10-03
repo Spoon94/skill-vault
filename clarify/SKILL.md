@@ -16,15 +16,16 @@ Rewrite the **final deliverable text** into a controlled language: **ASD-STE100*
 
 ## Scope
 
-Use when the text will be **parsed by a machine or a non-native reader with no human to ask a follow-up question**:
+Use when the text will be **read by a human who needs unambiguous content** — or consumed by a downstream machine / non-native reader with no one to ask a follow-up question:
 
+- Deliverables a person must act on correctly: instructions, reports, explanations, documentation. (STE's original purpose and Karpathy's use: "a lot more readable" for humans.)
 - Agent-to-agent messages, tool / function descriptions, error messages, system prompts
 - Instructions handed to another agent, a translation pipeline, or a downstream system
-- Any output where a misread carries real cost — in either language
+- Any output where a misread carries real cost — for a human or a machine
 
 **Do not use** for creative writing, marketing copy, persuasive text, or anything where voice and nuance are the point. Controlled language is deliberately flat and literal.
 
-> **Not for humanizing.** If the goal is to remove AI-flavored prose and make text sound more human, use `deslop-bi` instead — that skill restores voice; this one removes it. 要让文本更像人写的，用 `deslop-bi`；本 skill 方向相反。
+> **Not for humanizing — both serve humans.** `deslop-bi` makes text **read naturally** (de-AI-flavored, restores human voice); this skill makes text **read precisely** (controlled, unambiguous). 要人性化用 `deslop-bi`；要精确无歧义用本 skill。
 
 ## Language selection
 
