@@ -42,7 +42,7 @@ Use when the text will be **parsed by a machine or a non-native reader with no h
 | One instruction per sentence | Split compound instructions | Chain actions with "and then" / 「然后」「并」 |
 | Short sentences | ≤20 words (EN instructions), ≤25 (EN descriptions); ≤30 字 (中文指令), ≤40 字 (中文描述) | Long compound sentences |
 | Lists for sequences | Numbered/bulleted list for 3+ steps | Bury a sequence in one prose sentence |
-| Preserve precision | Keep every fact, condition, exception, number, **and degree of certainty**（可能/大概/也许 原样保留） | Simplify away a safety condition or scope limit |
+| Preserve precision | Keep every fact, condition, exception, number, **and degree of certainty**（可能/大概/也许/一定 原样保留） | Simplify away a safety condition or scope limit |
 
 ## English rules (ASD-STE100)
 
