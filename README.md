@@ -7,21 +7,7 @@
 
 > 个人收藏并整理的 AI 编程助手 **Agent Skills** 集合，按来源/主题分类组织，开箱即用。
 
-每个 skill 都是一个独立目录，包含 `SKILL.md` 与相关资源，遵循 [Agent Skills 规范](https://agentskills.io/specification)，可被 Claude Code、Codex CLI、Copilot CLI、Gemini CLI、OpenCode 等任何兼容 skills 的 AI 编程助手加载和调用。
-
-## 目录
-
-- [快速开始](#快速开始)
-- [技能分类](#技能分类)
-  - [superpowers/](#superpowers)
-  - [anthropics/](#anthropics)
-  - [obsidian/](#obsidian)
-  - [diagram/](#diagram)
-  - [独立技能](#独立技能)
-- [安装方式](#安装方式)
-- [与上游项目的差异](#与上游项目的差异)
-- [贡献](#贡献)
-- [License](#license)
+每个 skill 都是一个独立目录，包含 `SKILL.md` 与相关资源。它遵循 [Agent Skills 规范](https://agentskills.io/specification)。Claude Code、Codex CLI、Copilot CLI、Gemini CLI、OpenCode 等任何兼容 skills 的 AI 编程助手都能加载和调用它。
 
 ## 快速开始
 
@@ -46,156 +32,32 @@ cp -r superpowers/test-driven-development ~/.claude/skills/
 npx skills add https://github.com/Spoon94/skill-vault
 ```
 
-## 技能分类
+## 技能全景
 
-### [superpowers/](./superpowers)
+![技能全景](docs/images/skill-map.svg)
 
-基于 [obra/superpowers](https://github.com/obra/superpowers) 拆分的开发流程类技能，覆盖从需求探索到分支收尾的完整研发链路。
+8 个场景分组，63 个技能——**从场景出发找技能**：要讲清话题、要画图、要打磨文本、要检索信息……先看图定位场景，再进对应目录看 `SKILL.md`。
 
-| 技能 | 描述 |
-|------|------|
-| [brainstorming](./superpowers/brainstorming) | 创建前的设计探索和需求澄清 |
-| [systematic-debugging](./superpowers/systematic-debugging) | 系统化调试方法 |
-| [test-driven-development](./superpowers/test-driven-development) | 测试驱动开发 |
-| [writing-skills](./superpowers/writing-skills) | 编写 skills 的最佳实践 |
-| [writing-plans](./superpowers/writing-plans) | 编写实施计划 |
-| [executing-plans](./superpowers/executing-plans) | 执行计划 |
-| [requesting-code-review](./superpowers/requesting-code-review) | 请求代码审查 |
-| [receiving-code-review](./superpowers/receiving-code-review) | 接收代码审查反馈 |
-| [finishing-a-development-branch](./superpowers/finishing-a-development-branch) | 完成开发分支 |
-| [dispatching-parallel-agents](./superpowers/dispatching-parallel-agents) | 分发并行代理 |
-| [subagent-driven-development](./superpowers/subagent-driven-development) | 子代理驱动开发 |
-| [using-git-worktrees](./superpowers/using-git-worktrees) | 使用 Git worktrees |
-| [using-superpowers](./superpowers/using-superpowers) | superpowers 使用简介 |
-| [verification-before-completion](./superpowers/verification-before-completion) | 完成前验证 |
-| [diagnosing-superpowers](./superpowers/diagnosing-superpowers) | 复盘诊断出问题的 superpowers 会话：重复劳动、忽略计划、效果差、成本高，并生成给维护者的 bug report |
+## 组合使用
 
-### [anthropics/](./anthropics)
+![组合流程](docs/images/skill-pipeline.svg)
 
-来自 [anthropics/skills](https://github.com/anthropics/skills) 官方仓库的示例技能，覆盖创意设计、开发工具、企业沟通和文档处理。
-
-| 技能 | 描述 |
-|------|------|
-| [algorithmic-art](./anthropics/skills/algorithmic-art) | 算法艺术创作 |
-| [brand-guidelines](./anthropics/skills/brand-guidelines) | 品牌指南应用 |
-| [canvas-design](./anthropics/skills/canvas-design) | Canvas 设计 |
-| [claude-api](./anthropics/skills/claude-api) | 构建、调试和优化 Claude API / Anthropic SDK 应用 |
-| [doc-coauthoring](./anthropics/skills/doc-coauthoring) | 文档协同写作 |
-| [docx](./anthropics/skills/docx) / [pdf](./anthropics/skills/pdf) / [pptx](./anthropics/skills/pptx) / [xlsx](./anthropics/skills/xlsx) | Office 文档（Word/PDF/PPT/Excel）的创建与编辑 |
-| [frontend-design](./anthropics/skills/frontend-design) | 前端设计 |
-| [internal-comms](./anthropics/skills/internal-comms) | 企业内部沟通 |
-| [mcp-builder](./anthropics/skills/mcp-builder) | MCP 服务器构建 |
-| [skill-creator](./anthropics/skills/skill-creator) | 技能创建助手 |
-| [slack-gif-creator](./anthropics/skills/slack-gif-creator) | Slack GIF 制作 |
-| [theme-factory](./anthropics/skills/theme-factory) | 主题生成 |
-| [web-artifacts-builder](./anthropics/skills/web-artifacts-builder) | Web Artifacts 构建 |
-| [webapp-testing](./anthropics/skills/webapp-testing) | Web 应用测试 |
-
-### [obsidian/](./obsidian)
-
-来自 [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) 的 Obsidian 相关技能。
-
-| 技能 | 描述 |
-|------|------|
-| [obsidian-markdown](./obsidian/obsidian-markdown) | 创建和编辑 Obsidian Flavored Markdown（wikilinks、嵌入、callouts、properties 等） |
-| [obsidian-bases](./obsidian/obsidian-bases) | 创建和编辑 Obsidian Bases（`.base`）：视图、过滤器、公式、汇总 |
-| [json-canvas](./obsidian/json-canvas) | 创建和编辑 JSON Canvas（`.canvas`）文件：节点、连线、分组 |
-| [obsidian-cli](./obsidian/obsidian-cli) | 通过 Obsidian CLI 操作 vault，包括插件和主题开发 |
-| [defuddle](./obsidian/defuddle) | 使用 Defuddle 从网页提取干净 Markdown，节省 token |
-| [knap](./obsidian/knap) | 用 Knap CLI 从模板和结构化数据（JSON/CSV）渲染 Markdown，批量生成笔记或格式化 Defuddle 输出 |
-
-### [diagram/](./diagram)
-
-绘图技能家族，按输出格式分工，覆盖产品/技术画图全场景。详见 [diagram/README.md](./diagram/README.md)。
-
-| 技能 | 输出形态 | 主用途 |
-|------|---------|--------|
-| [diagram-mermaid](./diagram/diagram-mermaid) | Mermaid 代码块（内联 Markdown） | GitHub README/issue/PR 嵌入，零依赖，GitHub 直接渲染 |
-| [diagram-plantuml](./diagram/diagram-plantuml) | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道等专业图（图标库 9500+） |
-| [diagram-html](./diagram/diagram-html) | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 一键导出 PNG/JPEG/WebP/SVG |
-| [diagram-image](./diagram/diagram-image) | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 |
-| [diagram-graphviz](./diagram/diagram-graphviz) | DOT 代码块（内联 Markdown） | 依赖树/调用图/包层级，需细粒度边路由的图，自动布局 |
-| [diagram-infocard](./diagram/diagram-infocard) | HTML/CSS 卡片（直接内嵌 Markdown） | 编辑风信息卡片：知识摘要/数据高亮/公告，杂志级排版 |
-| [diagram-infographic](./diagram/diagram-infographic) | 模板化信息图（空格分隔 KV 语法） | KPI 看板/时间线/路线图/SWOT/漏斗/对比/组织树，58 个内置模板 |
-
-### 独立技能
-
-| 技能 | 描述 |
-|------|------|
-| [git-commit](./git-commit) | 规范 Git 提交消息格式，便于自动化生成版本号和变更日志；macOS 下可自动 `pbcopy` 到剪贴板 |
-| [gh](./gh) | GitHub CLI（`gh`）调用模式：结构化输出、分页、仓库定位、搜索 vs 列表、`gh api` 兜底 |
-| [tmux](./tmux) | 以脚本方式驱动 tmux：后台会话、`send-keys`、`capture-pane`，自动化 REPL/SSH/调试器 |
-| [semble](./semble) | 用 `semble search` 替代 grep+read 做语义代码检索，省 ~98% token |
-| [mcp2cli](./mcp2cli) | 把任意 MCP 服务器、OpenAPI 规范或 GraphQL 端点变成 CLI，无需代码生成 |
-| [worktrunk](./worktrunk) | Worktrunk（`wt` CLI）使用指南：git worktree 管理、hooks 和配置 |
-| [engram-mem](./engram-mem) | 基于本地 engram CLI(SQLite + FTS5)的跨会话持久记忆,工作与生活通用,支持决策、偏好、计划等记忆的存取与检索 |
-| [deslop-bi](./deslop-bi) | 双语去 AI 味：识别并修复中英文文本中的 AI 生成痕迹——浮夸修辞、套路结构、机器翻译腔、"深入探讨/打造/赋能"等中文 AI 高频词 |
-| [tavily](./tavily) | 通过 Tavily CLI 做网页搜索、内容提取、站点爬取、URL 发现和带引用的深度研究，支持 context-isolated 模式过滤原始结果 |
-| [hunk-review](./hunk-review) | 通过 Hunk daemon 与交互式 diff 审阅会话协作：检查会话结构、跳转文件/hunk、重载 diff 内容、添加内联 review 注释 |
-| [opencli](./opencli) | 把任意网站/Electron 应用/外部 CLI 变成 `opencli <site> <command>` 的统一操作面，agent 可驱动真实浏览器、抓取页面、填表点击、维护站点适配器和 sitemap |
-| [agentsview-cli](./agentsview-cli) | 本地 AI 会话历史查询：`agentsview` CLI 同步/搜索/恢复 Claude Code、Codex、Cursor 等会话，用量成本报告、语义检索、pg/duckdb/MCP 镜像 |
-| [herdr](./herdr) | 通过 Herdr CLI 控制终端多路复用器：检查/操作 pane、tab、workspace，启动和协调 agent，读取输出，等待状态变化 |
-
-### 解释 / 讲解类（Karpathy 四档阶梯 + trq212 `/eli5` 学习）
-
-| 技能 | 描述 |
-|------|------|
-| [eli5](./eli5) | 用 HTML artifact「大图少字」给完全不懂的人讲清一个主题（vendored from `anthropics/claude-plugins-community`，Apache-2.0） |
-| [show-me](./show-me) | 把当前话题用简洁图/代码形状/HTML artifact 讲明白（vendored from `humanlayer/skills`，MIT） |
-| [clarify](./clarify) | 中英双语受控语言重写：英文按 ASD-STE100、中文按受控中文，一词一义、主动语态、短句；**约束只作用于最终输出层**；支持 80% 力度（新建；英文规则素材借自 `kv0906/cc-skills/asd-ste100`，MIT） |
-| [falsify](./falsify) | 证伪任意产物：强制生成具体反例/失效案例与修正边界，防「精致讲解兜售错的心智模型」（新建，落实 @sarjeets_x 的警告） |
-
-> 分工原则：**人看的交付物用 HTML/图**（eli5、show-me、diagram-\*），**模型读的文档用 Markdown**（各 SKILL.md、handoff、memory）。依据 Karpathy 推文评论 @jdbhojani 的实践。
-
-## 技能组合使用
-
-### 场景决策：要做什么 → 用哪个
-
-```mermaid
-flowchart TD
-    Q["要做什么？"] --> EX["讲清话题"]
-    Q --> DR["画图"]
-    Q --> CK["验证产物"]
-    Q --> TX["打磨交付文本"]
-
-    EX --> E1["给完全不懂的人 → <b>eli5</b><br/>HTML 大图少字"]
-    EX --> E2["给技术人 → <b>show-me</b><br/>编排图文组合"]
-
-    DR --> D1["基础图 → <b>diagram-mermaid</b>"]
-    DR --> D2["专业图 → <b>diagram-plantuml</b>"]
-    DR --> D3["依赖调用图 → <b>diagram-graphviz</b>"]
-    DR --> D4["可分享成品 → <b>diagram-html</b>"]
-    DR --> D5["CI 批量 → <b>diagram-image</b>"]
-    DR --> D6["单主题卡片 → <b>diagram-infocard</b>"]
-    DR --> D7["看板对比 → <b>diagram-infographic</b>"]
-
-    CK --> FA["<b>falsify</b><br/>强制反例 + 失效机制 + 边界"]
-
-    TX --> T1["要精确无歧义 → <b>clarify</b><br/>受控语言"]
-    TX --> T2["要自然人味 → <b>deslop-bi</b><br/>去 AI 味"]
-```
-
-### 组合流水线：编排 → 渲染 → 质量 → 语言
-
-```mermaid
-flowchart LR
-    NEED["理解 / 交付需求"] --> ORCH["<b>编排层</b><br/>show-me · eli5<br/>选定讲解形式"]
-    ORCH --> RENDER["<b>渲染层</b><br/>diagram-*<br/>自带图不够时按需取图"]
-    RENDER --> QUALITY["<b>质量层</b><br/>falsify<br/>验伪：反例 + 边界"]
-    QUALITY --> LANG{"交付文本<br/>要什么风格？"}
-    LANG -->|精确无歧义| CL["<b>语言层</b><br/>clarify 受控语言"]
-    LANG -->|自然人味| DL["deslop-bi 去 AI 味"]
-    CL --> OUT["交付"]
-    DL --> OUT
-    QUALITY -->|图 / 讲解可直接用| OUT
-
-    TOOLS["<b>独立工具技能</b><br/>gh · tavily · semble · tmux · herdr<br/>worktrunk · engram-mem · git-commit<br/>hunk-review · opencli · agentsview-cli · mcp2cli"] -.按需穿插.-> ORCH
-```
+流水线：**编排**（show-me / eli5 选讲解形式）→ **渲染**（diagram-\* 按需补图）→ **质量**（falsify 验伪）→ **语言**（clarify / deslop-bi 定风格）。独立工具技能（gh、tavily、tmux……）按需穿插任意环节。
 
 **关键点**：
+
 - `show-me` 自带内联 Mermaid 与聚焦 HTML——自带图够用时**不要**再叠 `diagram-*`；只有要 UML/云架构/DOT 边路由/成品文件时才升级。
 - `eli5` 的产物**不要**再过 `clarify`（eli5 要生动、clarify 要平实，方向冲突）；`clarify` 与 `deslop-bi` 互斥（一个压平人味、一个恢复人味）。
-- `falsify` 的对象是**论断/讲解/计划**，不是纯渲染产物（diagram-* 只是按描述画图，没什么可证伪的）。
+- `falsify` 的对象是**论断/讲解/计划**，不是纯渲染产物（diagram-\* 只是按描述画图，没什么可证伪的）。
+
+## 技能索引
+
+- **[superpowers/](./superpowers)**（15 个）：[brainstorming](./superpowers/brainstorming)、[systematic-debugging](./superpowers/systematic-debugging)、[test-driven-development](./superpowers/test-driven-development)、[writing-skills](./superpowers/writing-skills)、[writing-plans](./superpowers/writing-plans)、[executing-plans](./superpowers/executing-plans)、[requesting-code-review](./superpowers/requesting-code-review)、[receiving-code-review](./superpowers/receiving-code-review)、[finishing-a-development-branch](./superpowers/finishing-a-development-branch)、[dispatching-parallel-agents](./superpowers/dispatching-parallel-agents)、[subagent-driven-development](./superpowers/subagent-driven-development)、[using-git-worktrees](./superpowers/using-git-worktrees)、[using-superpowers](./superpowers/using-superpowers)、[verification-before-completion](./superpowers/verification-before-completion)、[diagnosing-superpowers](./superpowers/diagnosing-superpowers)
+- **[anthropics/](./anthropics)**（18 个）：[algorithmic-art](./anthropics/skills/algorithmic-art)、[brand-guidelines](./anthropics/skills/brand-guidelines)、[canvas-design](./anthropics/skills/canvas-design)、[claude-api](./anthropics/skills/claude-api)、[doc-coauthoring](./anthropics/skills/doc-coauthoring)、[docx](./anthropics/skills/docx)、[pdf](./anthropics/skills/pdf)、[pptx](./anthropics/skills/pptx)、[xlsx](./anthropics/skills/xlsx)、[frontend-design](./anthropics/skills/frontend-design)、[internal-comms](./anthropics/skills/internal-comms)、[mcp-builder](./anthropics/skills/mcp-builder)、[skill-creator](./anthropics/skills/skill-creator)、[slack-gif-creator](./anthropics/skills/slack-gif-creator)、[theme-factory](./anthropics/skills/theme-factory)、[web-artifacts-builder](./anthropics/skills/web-artifacts-builder)、[webapp-testing](./anthropics/skills/webapp-testing)
+- **[obsidian/](./obsidian)**（6 个）：[obsidian-markdown](./obsidian/obsidian-markdown)、[obsidian-bases](./obsidian/obsidian-bases)、[json-canvas](./obsidian/json-canvas)、[obsidian-cli](./obsidian/obsidian-cli)、[defuddle](./obsidian/defuddle)、[knap](./obsidian/knap)
+- **[diagram/](./diagram)**（7 个）：[diagram-mermaid](./diagram/diagram-mermaid)、[diagram-plantuml](./diagram/diagram-plantuml)、[diagram-html](./diagram/diagram-html)、[diagram-image](./diagram/diagram-image)、[diagram-graphviz](./diagram/diagram-graphviz)、[diagram-infocard](./diagram/diagram-infocard)、[diagram-infographic](./diagram/diagram-infographic)
+- **解释 / 讲解类**（4 个）：[eli5](./eli5)、[show-me](./show-me)、[clarify](./clarify)、[falsify](./falsify)
+- **独立技能**（13 个）：[git-commit](./git-commit)、[gh](./gh)、[tmux](./tmux)、[semble](./semble)、[mcp2cli](./mcp2cli)、[worktrunk](./worktrunk)、[engram-mem](./engram-mem)、[deslop-bi](./deslop-bi)、[tavily](./tavily)、[hunk-review](./hunk-review)、[opencli](./opencli)、[agentsview-cli](./agentsview-cli)、[herdr](./herdr)
 
 ## 安装方式
 
@@ -232,7 +94,7 @@ flowchart LR
 
 欢迎 PR 和 Issue：
 
-- 新增 skill：请放在对应分类目录下，并在本 README 表格中追加一行
+- 新增 skill：请放在对应分类目录下。在本 README 表格中追加一行
 - 修复/改进现有 skill：建议先在 Issue 中讨论后再提 PR
 - 提交规范：遵循 [Conventional Commits](./git-commit)
 
