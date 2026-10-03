@@ -11,26 +11,12 @@
 
 ## 快速开始
 
-以 Claude Code 为例，安装单个 skill：
-
 ```bash
-# 1. 克隆本仓库
 git clone https://github.com/Spoon94/skill-vault.git
-cd skill-vault
-
-# 2. 把需要的 skill 拷贝到 Claude Code 的 skills 目录
-mkdir -p ~/.claude/skills
-cp -r superpowers/test-driven-development ~/.claude/skills/
-
-# 3. 在 Claude Code 中即可通过 /test-driven-development 调用
+cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commit 为例
 ```
 
-批量安装（推荐）：
-
-```bash
-# 使用官方 skills CLI 从远程仓库安装
-npx skills add https://github.com/Spoon94/skill-vault
-```
+**完整安装步骤见 [INSTALL.md](./INSTALL.md)**（含各平台目录、软链方式、批量安装、嵌套路径）。
 
 ## 技能全景
 
@@ -148,17 +134,8 @@ npx skills add https://github.com/Spoon94/skill-vault
 
 ## 安装方式
 
-将需要的 skill 目录复制到对应平台的 skills 目录：
-
-| 平台 | 安装目录 |
-|------|----------|
-| Claude Code | `~/.claude/skills/` |
-| Codex CLI | `~/.codex/skills/` |
-| Copilot CLI | `~/.agents/skills/` |
-| OpenCode | `~/.opencode/skills/` |
-| Gemini CLI | 参考各 skill 目录下的 `GEMINI.md` 配置 |
-
-也可以使用 `npx skills add <repo-url>` 从远程仓库批量安装。
+**agent 读 [INSTALL.md](./INSTALL.md)** —— 里面有按平台分步的安装指令。
+人只需知道：把 skill 目录拷到平台的 skills 目录，或用 `npx skills add <repo-url>` 批量装。
 
 ## 与上游项目的差异
 
