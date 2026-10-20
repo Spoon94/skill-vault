@@ -6,14 +6,12 @@ Worktrunk ships a plugin for each supported agent CLI. What a plugin provides de
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | Configuration skill | ✓ | ✓ |  |  |  | ✓ |
 | Activity tracking (🤖/💬 in `wt list`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Worktree isolation | ✓ |  |  |  |  |  |
-| `/wt-switch-create` skill\* | ✓ |  |  |  |  |  |
+| Worktree isolation | ✓ |  | ✓ |  |  |  |
+| `/wt-switch-create` skill | ✓ |  |  |  |  |  |
 
 > **本仓库未收录此 skill**：`wt-switch-create` 不在 skill-vault 中，上文及下文关于它的描述仅说明上游 worktrunk 的能力。
 
-\* Codex and Gemini also load the `/wt-switch-create` skill from the shared skill set, but neither lets a skill change the session's working directory, so it does nothing there.
-
-The configuration skill is documentation the agent reads to help set up LLM commits, hooks, and troubleshooting. Activity tracking shows which worktrees have running sessions. Worktree isolation needs worktree-lifecycle hooks, which only Claude Code exposes, so Codex, OpenCode, Pi, oh-my-pi, and Gemini users invoke `wt switch --create` and `wt remove` directly. Codex tracks activity through its own `Stop` and `SessionEnd` hooks.
+The configuration skill is documentation the agent reads to help set up LLM commits, hooks, and troubleshooting. Activity tracking shows which worktrees have running sessions. Worktree isolation needs worktree-lifecycle hooks, which only Claude Code and OpenCode 2 expose, so Codex, Pi, oh-my-pi, and Gemini users invoke `wt switch --create` and `wt remove` directly. Codex tracks activity through its own `Stop` and `SessionEnd` hooks.
 
 ## Installation
 
@@ -53,7 +51,7 @@ codex plugin add worktrunk@worktrunk
 wt config plugins opencode install
 ```
 
-This writes the activity-tracking plugin to OpenCode's global plugins directory, `~/.config/opencode/plugins/worktrunk.ts` (honoring `$OPENCODE_CONFIG_DIR` and `$XDG_CONFIG_HOME`). `wt config plugins opencode uninstall` removes it.
+This writes the plugin to OpenCode's global plugins directory, `~/.config/opencode/plugins/worktrunk.ts` (honoring `$OPENCODE_CONFIG_DIR` and `$XDG_CONFIG_HOME`). `wt config plugins opencode uninstall` removes it.
 
 ### Pi
 
@@ -98,8 +96,8 @@ Every plugin tracks agent sessions with status markers in `wt list`:
 $ wt list
   Branch       Status      HEAD±     main↕    main…±    Remote⇅  Commit    Age  Message
 @ main             ^⇡                                    ⇡1      33323bc    1d  Initial commit
-+ feature-api      ↑ 🤖              ↑1        +1                70343f0    1d  Add REST API endp…
-+ review-ui      ? ↑ 💬    +1        ↑1        +1                a585d6e    1d  Add dashboard com…
++ feature-api      ↑ 🤖              ↑1        +1                70343f0    1d  Add REST API endpo…
++ review-ui      ? ↑ 💬    +1        ↑1        +1                a585d6e    1d  Add dashboard comp…
 + wip-docs       ? –       +1                                    33323bc    1d  Initial commit
 
 ○ Showing 4 worktrees, 2 with changes, 2 ahead, hidden: Path
@@ -130,9 +128,11 @@ Activity tracking is not plugin-specific. The plugins above only call `wt` on th
 | Agent finishes a turn and waits for input | `wt config state marker set "💬"` |
 | Session ends | `wt config state marker clear` |
 
-## Worktree isolation (Claude Code only)
+## Worktree isolation (Claude Code and OpenCode)
 
 Claude Code agents can run in isolated worktrees (`isolation: "worktree"`). By default, Claude Code creates these with `git worktree add`. The plugin's `WorktreeCreate` and `WorktreeRemove` hooks route this through `wt switch --create` and `wt remove` instead, so worktrees created by agents get worktrunk's naming conventions, hooks, and lifecycle management.
+
+Under OpenCode 2, the plugin registers a `worktrunk` worktree strategy, so worktrees OpenCode creates and removes go through the same commands. Each gets a branch named after the worktree name OpenCode chooses, at the path from `worktree-path`; OpenCode's `worktree.directory` setting no longer applies. A dirty worktree fails removal with worktrunk's message rather than an offer to force.
 
 ## `/wt-switch-create` skill (Claude Code only)
 
