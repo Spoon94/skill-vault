@@ -5,7 +5,7 @@ license: MIT
 allowed-tools: Read Grep Glob
 metadata:
   origin: derived
-  upstream: https://github.com/kv0906/cc-skills/tree/main/explain-to-me/skills/asd-ste100
+  upstream: https://github.com/kv0906/cc-skills/tree/main/bundles/explanation-skills/skills/asd-ste100
 ---
 
 # clarify — Controlled-Language Rewriting (EN/ZH)
