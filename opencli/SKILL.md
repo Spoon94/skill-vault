@@ -1,6 +1,6 @@
 ---
 name: opencli
-description: OpenCLI 全能助手 - 把任意网站/Electron 应用/外部 CLI 变成 `opencli <site> <command>` 的统一操作面。当 agent 要读写已登录网站、驱动真实浏览器、抓取页面、填表点击、修复失效适配器、给新站点写适配器、维护站点 sitemap、或把搜索/查询路由到最佳数据源时，都用这个 skill。这是合并了 7 个官方 opencli 子技能（usage/browser/adapter-author/sitemap-author/browser-sitemap/autofix/smart-search）的统一入口，按任务类型路由到对应章节或 reference。
+description: OpenCLI 全能助手 - 把任意网站/Electron 应用变成 `opencli <site> <command>` 的统一操作面。当 agent 要读写已登录网站、驱动真实浏览器、抓取页面、填表点击、修复失效适配器、给新站点写适配器、或把搜索/查询路由到最佳数据源时，都用这个 skill。这是合并了 5 个官方 opencli 子技能（usage/browser/adapter-author/autofix/smart-search）的统一入口，按任务类型路由到对应章节或 reference。
 allowed-tools: Bash(opencli:*), Bash(gh:*), Read, Edit, Write, Grep
 ---
 
@@ -20,8 +20,6 @@ OpenCLI 把任意网站、Electron 桌面应用、或外部 CLI 变成统一的 
 | 驱动真实浏览器（点击/填表/抓取，无适配器或临时） | 下方「§浏览器原语核心」 | `references/browser.md` |
 | 适配器命令失败了要修 | 下方「§适配器失效自动修复」 | `references/autofix.md` |
 | 给新站点写适配器 / 给现有站点加命令 | `references/adapter-author.md` | `references/adapter/` |
-| 用 sitemap 驱动多步站点流程 | `references/browser-sitemap.md` | - |
-| 创建/维护站点 sitemap | `references/sitemap-author.md` | `references/sitemap/sitemap-schema.md` |
 | 把搜索/查询路由到最佳数据源 | 下方「§智能搜索路由」 | `references/search/` |
 
 ---
@@ -33,7 +31,6 @@ OpenCLI 把任意网站、Electron 桌面应用、或外部 CLI 变成统一的 
 - **适配器命令** - `opencli <site> <command> [...]`。内置适配器在 `clis/`，用户私有适配器在 `~/.opencli/clis/`。每个命令有 strategy 标签（`public | cookie | intercept | ui | local`，`opencli list -f json` 输出小写），告诉你是否需要 Chrome。
 - **浏览器驱动** - `opencli browser *`（`open`/`state`/`click`/`type`/`select`/`find`/`extract`/`network`…），适配器没覆盖时临时用。
 - **当前标签绑定** - `opencli browser <session> bind` 把用户已经打开并登录的标签绑到会话，后续用 `opencli browser <session> ...` 操作。详见 `references/browser.md`。
-- **外部 CLI 透传** - `opencli gh`、`opencli docker` 等，用 `opencli external install <name>` 管理。
 
 ### 安装与体检
 
@@ -82,13 +79,13 @@ opencli convention-audit [target]     # 扫描适配器是否符合 agent-native
 | `ui` | 同 cookie，完整 DOM 交互 |
 | `local` | 无浏览器，连本地/dev 端点 |
 
-**术语对照**：`references/` 里的文档用上游文档层术语（大写 6 元组），运行时 `opencli list -f json` 实际输出小写 tag，二者对应关系如下：
+**术语对照**：`references/` 里的文档混用三种写法——大写文档术语（`PUBLIC_API` 等）、代码里的 `Strategy.<NAME>` 枚举、以及运行时 `opencli list -f json` 输出的小写 tag。对应关系如下：
 
-| references 里的术语 | 运行时 `list -f json` 的 strategy 值 |
+| references 里的写法 | 运行时 `list -f json` 的 strategy 值 |
 |---|---|
-| PUBLIC_API | `public` |
-| COOKIE_API | `cookie` |
-| INTERCEPT | `intercept` |
+| PUBLIC_API / `Strategy.PUBLIC` | `public` |
+| COOKIE_API / `Strategy.COOKIE` | `cookie` |
+| INTERCEPT / `Strategy.INTERCEPT` | `intercept` |
 | UI_SELECTOR | `ui` |
 | LOCAL | `local` |
 | PAGE_FETCH / DOM_STATE | （文档层概念，运行时无对应 tag） |
@@ -357,30 +354,15 @@ opencli browser verify <site>/<name> # 在浏览器桥里端到端冒烟（init/
 
 ---
 
-## §用 sitemap 驱动 / 写 sitemap
-
-`opencli browser <session> open` 或 `analyze` 报 `sitemap.available: true` 时，读 `references/browser-sitemap.md` 用 sitemap 指导多步流程。sitemap 是**先验知识不是真相**，浏览器实状态和 sitemap 冲突时信浏览器。
-
-要创建/维护站点 sitemap，读 `references/sitemap-author.md`（schema 细节见 `references/sitemap/sitemap-schema.md`）。
-
----
-
-## §外部 CLI 透传 / 插件
+## §插件
 
 ```bash
-opencli external install gh                           # 按 external-clis.yaml 自动装
-opencli external register my-tool --binary my-tool --install "npm i -g my-tool" --desc "..."
-opencli external list [-f json]                       # 看已注册的外部 CLI
-opencli gh pr list --limit 5                          # 透传，stdio 继承，exit code 透传
-
 opencli plugin install github:user/repo    # 装插件
 opencli plugin list [-f json]              # 看已装
 opencli plugin update [name] | --all       # 更新
 opencli plugin uninstall <name>            # 卸载
 opencli plugin create <name>               # 脚手架生成新插件
 ```
-
-内置 external 在 `src/external-clis.yaml`，用户覆盖在 `~/.opencli/external-clis.yaml`。常见内置：`gh`、`docker`、`vercel`、`lark-cli`、`longbridge`、`dws`、`wecom-cli`、`obsidian`、`ntn`、`tg`、`discord`、`wx`。无 `install` 配置的条目（如 `ntn`，官方用 shell 安装器）需先手动装好才能透传。
 
 ---
 
