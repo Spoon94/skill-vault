@@ -25,7 +25,7 @@ Usage: $0 [OPTIONS]
 
 Options:
     -t, --type TYPE        Diagram type ($VALID_TYPES)
-    -s, --style STYLE      Style number (1-7, default: 1)
+    -s, --style STYLE      Style number (1-12, default: 1)
     -o, --output PATH      Output path (default: current directory)
     -w, --width WIDTH      PNG width in pixels (default: 1920)
     --no-validate          Skip validation
@@ -98,6 +98,11 @@ if [ "$VALID_TYPE" = false ]; then
     exit 1
 fi
 
+if ! [[ "$WIDTH" =~ ^[1-9][0-9]*$ ]]; then
+    echo -e "${RED}Error: Width must be a positive integer${NC}"
+    exit 1
+fi
+
 # Determine output path
 if [ -z "${OUTPUT_PATH:-}" ]; then
     BASENAME="${TYPE}-style${STYLE}"
@@ -108,7 +113,7 @@ else
     PNG_FILE="${OUTPUT_PATH%.svg}.png"
 fi
 
-echo -e "${BLUE}Generating ${TYPE} diagram (style ${STYLE})...${NC}"
+echo -e "${BLUE}Processing ${TYPE} diagram (style ${STYLE})...${NC}"
 echo "Output: $SVG_FILE"
 
 # Load style reference
@@ -117,14 +122,14 @@ STYLE_FILE=$(find "${SKILL_DIR}/references" -maxdepth 1 -type f -name "style-${S
 
 if [ -z "${STYLE_FILE:-}" ] || [ ! -f "$STYLE_FILE" ]; then
     echo -e "${RED}Error: Style file not found: ${STYLE_FILE}${NC}"
-    echo "Available styles: 1-7"
+    echo "Available styles: 1-12"
     exit 1
 fi
 
-# Note: Actual SVG generation is done by Claude Code
+# Note: Actual SVG generation is done by the invoking AI coding agent
 # This script provides validation and export only
 
-echo -e "${YELLOW}Note: SVG content generation requires Claude Code${NC}"
+echo -e "${YELLOW}Note: SVG content generation is handled by Codex or Claude Code${NC}"
 echo -e "${YELLOW}This script provides validation and export only${NC}"
 
 # Validate if SVG exists
@@ -142,43 +147,10 @@ if [ -f "$SVG_FILE" ]; then
     # Export PNG
     echo -e "\n${BLUE}Exporting PNG (width: ${WIDTH}px)...${NC}"
 
-    # Compute scale for cairosvg (default scale=2 ≈ 1920px wide for 960 viewBox)
-    SCALE=$(python3 -c "import sys; print(round(float(sys.argv[1])/960, 2))" "$WIDTH" 2>/dev/null || echo "2")
+    python3 "${SKILL_DIR}/scripts/fireworks.py" export-png "$SVG_FILE" "$PNG_FILE" --width "$WIDTH"
 
-    PNG_OK=false
-
-    # Method 1 (preferred): cairosvg — best CSS support, good fidelity
-    if python3 -c "import cairosvg" 2>/dev/null; then
-        echo -e "${BLUE}Using cairosvg (recommended)...${NC}"
-        if python3 -c "import sys, cairosvg; cairosvg.svg2png(url=sys.argv[1], write_to=sys.argv[2], scale=float(sys.argv[3]))" "$SVG_FILE" "$PNG_FILE" "$SCALE" 2>/dev/null; then
-            PNG_OK=true
-        else
-            echo -e "${YELLOW}cairosvg failed, falling back...${NC}"
-        fi
-    fi
-
-    # Method 2 (fallback): rsvg-convert — may drop CSS / foreignObject
-    if [ "$PNG_OK" = false ] && command -v rsvg-convert &> /dev/null; then
-        echo -e "${BLUE}Using rsvg-convert (fallback)...${NC}"
-        echo -e "${YELLOW}Warning: rsvg-convert may drop CSS styles or <foreignObject> — install cairosvg for better fidelity${NC}"
-        echo -e "${YELLOW}  pip install cairosvg${NC}"
-        if rsvg-convert -w "$WIDTH" "$SVG_FILE" -o "$PNG_FILE" 2>/dev/null; then
-            PNG_OK=true
-        fi
-    fi
-
-    if [ "$PNG_OK" = true ]; then
-        PNG_SIZE=$(du -h "$PNG_FILE" | cut -f1)
-        echo -e "${GREEN}PNG exported: $PNG_FILE (${PNG_SIZE})${NC}"
-    else
-        echo -e "${RED}PNG export failed${NC}"
-        echo -e "${YELLOW}Install one of:${NC}"
-        echo -e "  ${YELLOW}pip install cairosvg${NC}        (recommended)"
-        echo -e "  ${YELLOW}brew install librsvg${NC}        (macOS)  /  apt install librsvg2-bin (Debian)"
-        exit 1
-    fi
 else
-    echo -e "${YELLOW}SVG file not found. Generate it first with Claude Code.${NC}"
+    echo -e "${YELLOW}SVG file not found. Generate it first with Codex or Claude Code.${NC}"
     exit 1
 fi
 

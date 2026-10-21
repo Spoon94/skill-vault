@@ -23,7 +23,7 @@ Accent (subtle, used sparingly):
 ## Design Principles
 
 - **No decorative icons** — use geometric shapes only (rect, circle, diamond)
-- **Generous whitespace** — 24px+ padding between elements  
+- **Generous whitespace** — 24px+ padding between elements
 - **Single arrow color** — blue (#3b82f6) for all connections
 - **Labels in ALL CAPS** — section headers and node type labels
 - **No drop shadows** — flat only
@@ -46,11 +46,11 @@ font-weight: 400 normal, 500 medium for node labels
 <text fill="#111827" font-size="14" font-weight="500"/>
 
 <!-- Type label (inside or above box) -->
-<text fill="#9ca3af" font-size="11" 
+<text fill="#9ca3af" font-size="11"
       font-weight="500" letter-spacing="0.08em">DATABASE</text>
 
 <!-- Section grouping (dashed container) -->
-<rect rx="4" fill="none" stroke="#e5e7eb" stroke-width="1" 
+<rect rx="4" fill="none" stroke="#e5e7eb" stroke-width="1"
       stroke-dasharray="4,3"/>
 ```
 
@@ -63,10 +63,10 @@ font-weight: 400 normal, 500 medium for node labels
     <polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/>
   </marker>
 </defs>
-<line stroke="#3b82f6" stroke-width="1.5" 
+<line stroke="#3b82f6" stroke-width="1.5"
       marker-end="url(#arrow-blue)"/>
 <!-- Optional: gray arrow for secondary flows -->
-<line stroke="#d1d5db" stroke-width="1" 
+<line stroke="#d1d5db" stroke-width="1"
       stroke-dasharray="4,3" marker-end="url(#arrow-gray)"/>
 ```
 

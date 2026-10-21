@@ -9,7 +9,7 @@
 | [`diagram-mermaid`](diagram-mermaid/) | Mermaid 代码块（内联 Markdown） | GitHub README/issue/PR 嵌入，零依赖 | 无 |
 | [`diagram-plantuml`](diagram-plantuml/) | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道/IoT 等专业图 | 无（Java + plantuml.jar 可选） |
 | [`diagram-html`](diagram-html/) | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 浏览器导出菜单 | 无（Node.js 可选） |
-| [`diagram-image`](diagram-image/) | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 | Python 3（cairosvg/rsvg/puppeteer 可选） |
+| [`diagram-image`](diagram-image/) | SVG + PNG + 离线 HTML + GIF | 命令行直接产出图片/动图，适合 CI/批处理/嵌入不支持 SVG 的环境 | Python 3（PNG/GIF 需可选渲染器） |
 | [`diagram-graphviz`](diagram-graphviz/) | DOT 代码块（内联 Markdown） | 依赖树/调用图/包层级/模块关系，需细粒度边路由的图 | 无（Graphviz 可选） |
 | [`diagram-infocard`](diagram-infocard/) | HTML/CSS 卡片（直接内嵌 Markdown） | 编辑风信息卡片：知识摘要/数据高亮/公告，杂志级排版 | 无 |
 | [`diagram-infographic`](diagram-infographic/) | 模板化信息图（空格分隔 KV 语法，非 YAML） | KPI 看板/时间线/路线图/SWOT/漏斗/对比/组织树 | 无 |
@@ -81,12 +81,12 @@
 
 ### diagram-image
 
-10 种图模板：architecture / sequence / flowchart / ER / state / use-case / data-flow / timeline / comparison / agent-architecture。
+**12 种视觉风格**：1–7 通用（flat-icon / dark-terminal / blueprint / notion-clean / glassmorphism / claude-official / openai）、8 dark-luxury（AI 手写 SVG）、9–12 工程专用（C4 Review Canvas / Cloud Fabric / Event Transit / Ops Pulse，各带可执行语义契约）。
 
-- **8 种视觉风格**：flat-icon / dark-terminal / blueprint / notion-clean / glassmorphism / claude-official / openai / dark-luxury
-- **命令行产出**：`scripts/generate-from-template.py` + `validate-svg.sh` + `cairosvg` 导出 PNG
-- **结构**：`SKILL.md` + `scripts/` (4 个) + `templates/` (10 个 SVG 模板) + `references/` (8 种风格 + icons + 布局最佳实践) + `assets/samples/` + `fixtures/`
-- **来源**：导入自 fireworks-tech-graph v1.0.4
+- **命令行产出**：`scripts/fireworks.py`（`validate` / `render` / `check` / `export-png` / `export-html` / `animate`）
+- **输出形态**：SVG（权威产物）、PNG、离线 HTML（pan/zoom + 下载）、GIF 动图
+- **结构**：`SKILL.md` + `scripts/`（20 个）+ `templates/`（10 个 SVG 模板）+ `references/`（20 个）+ `schemas/`（输入契约）+ `assets/samples/` + `fixtures/`
+- **来源**：导入自 fireworks-tech-graph
 
 ### diagram-graphviz
 

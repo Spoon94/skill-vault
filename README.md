@@ -48,7 +48,7 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 | [diagram-plantuml](./diagram/diagram-plantuml) | 专业图：UML/云架构/网络/安全/BPMN（图标库 9500+） |
 | [diagram-graphviz](./diagram/diagram-graphviz) | 依赖树/调用图/包层级，细粒度边路由 |
 | [diagram-html](./diagram/diagram-html) | 可分享的 HTML 成品图，双主题 + 一键导出 |
-| [diagram-image](./diagram/diagram-image) | 命令行产 SVG/PNG，适合 CI/批处理 |
+| [diagram-image](./diagram/diagram-image) | 产 SVG / PNG / 离线 HTML / GIF 动图，命令行适合 CI/批处理 |
 | [diagram-infocard](./diagram/diagram-infocard) | 单主题信息卡片，杂志级排版 |
 | [diagram-infographic](./diagram/diagram-infographic) | KPI 看板/时间线/SWOT/漏斗/对比 |
 | [falsify](./falsify) | 验伪：给产物强制加反例 + 失效机制 + 边界 |
