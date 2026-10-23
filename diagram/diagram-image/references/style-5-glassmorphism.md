@@ -63,7 +63,7 @@ SVG cannot do real backdrop-filter, so simulate with:
 <!-- 1. Subtle inner shadow -->
 <rect rx="12" fill="rgba(255,255,255,0.03)" stroke="none"/>
 <!-- 2. Glass body -->
-<rect rx="12" fill="rgba(255,255,255,0.06)" 
+<rect rx="12" fill="rgba(255,255,255,0.06)"
       stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
 <!-- 3. Top highlight line -->
 <line stroke="rgba(255,255,255,0.25)" stroke-width="1"/>

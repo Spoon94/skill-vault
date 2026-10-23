@@ -48,7 +48,7 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 | [diagram-plantuml](./diagram/diagram-plantuml) | 专业图：UML/云架构/网络/安全/BPMN（图标库 9500+） |
 | [diagram-graphviz](./diagram/diagram-graphviz) | 依赖树/调用图/包层级，细粒度边路由 |
 | [diagram-html](./diagram/diagram-html) | 可分享的 HTML 成品图，双主题 + 一键导出 |
-| [diagram-image](./diagram/diagram-image) | 命令行产 SVG/PNG，适合 CI/批处理 |
+| [diagram-image](./diagram/diagram-image) | 产 SVG / PNG / 离线 HTML / GIF 动图，命令行适合 CI/批处理 |
 | [diagram-infocard](./diagram/diagram-infocard) | 单主题信息卡片，杂志级排版 |
 | [diagram-infographic](./diagram/diagram-infographic) | KPI 看板/时间线/SWOT/漏斗/对比 |
 | [falsify](./falsify) | 验伪：给产物强制加反例 + 失效机制 + 边界 |
@@ -145,8 +145,8 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 |---|--------|------|----------|
 | I1 | `description` ≤ 1024 字符，超长时存裁剪版 | pi harness 硬限制，超出报 `description exceeds 1024 characters` | `diagram/diagram-{html,mermaid,plantuml}`（上游 1219/1159/1452 字符，本地为合规裁剪版） |
 | I2 | `description` 含 `:` / 引号等 YAML 特殊字符时必须加引号 | 否则 YAML 解析报 `Nested mappings are not allowed in compact mappings` | `semble/SKILL.md`（上游未加引号，本地加了） |
-| I3 | 引用仓库内相对路径扁平化 | 上游用仓库内相对路径，本地目录结构扁平 | `superpowers/brainstorming/SKILL.md` 中 `skills/brainstorming/visual-companion.md` → `visual-companion.md` |
-| I4 | opencli 结构不同：上游 `OpenCLI/skills/` 下 7 个子技能（opencli-usage / opencli-browser / opencli-adapter-author / opencli-sitemap-author / opencli-browser-sitemap / opencli-autofix / smart-search）合并为单个 `opencli/SKILL.md` + `opencli/references/` | 统一入口，按任务类型路由，避免 7 个 skill 全部进上下文 | `opencli/` 全目录：去掉子技能 frontmatter，`references/` 路径前缀重写为本地布局（`adapter/`、`sitemap/`、`search/`） |
+| I3 | ~~引用仓库内相对路径扁平化~~ **已由上游修复** | 上游 2026-10 起改用扁平路径，本地无需再打补丁 | —（原 `superpowers/brainstorming/SKILL.md`） |
+| I4 | opencli 结构不同：上游 `OpenCLI/skills/` 下 5 个子技能（opencli-usage / opencli-browser / opencli-adapter-author / opencli-autofix / smart-search）合并为单个 `opencli/SKILL.md` + `opencli/references/` | 统一入口，按任务类型路由，避免 5 个 skill 全部进上下文 | `opencli/` 全目录：去掉子技能 frontmatter，`references/` 路径前缀重写为本地布局（`adapter/`、`search/`） |
 | I5 | opencli 的 strategy 术语有两套（references 的上游文档层大写术语 vs 运行时的小写 tag），`SKILL.md` 需维护映射表 | 上游文档与自家 CLI 输出脱节；本地需要让 agent 能把 references 术语和 `list -f json` 实际输出对上 | `opencli/SKILL.md`「术语对照」表 |
 | I6 | `diagram/` 家族跨两个上游集合：`arch-diagram/diagram/` 的 4 个 `diagram-*` + `arch-diagram/skills/`（即 markdown-viewer/skills）的 3 个改名为 `diagram-*` 的目录（`diagram-graphviz` / `diagram-infocard` / `diagram-infographic`，上游裸名 graphviz / infocard / infographic） | 同属绘图技能集中放置便于路由与发现 | `diagram/diagram-{graphviz,infocard,infographic}/` |
 | I7 | diagram 家族统一用 `diagram-*` 前缀命名，与上游 `markdown-viewer/skills` 的裸名（graphviz/infocard/infographic）不同 | 家族内命名一致性优先于上游保真；便于按名字定位 | `diagram/diagram-{graphviz,infocard,infographic}/`；下次同步这 3 个时需重做改名 + 改 `name` 字段补丁 |
