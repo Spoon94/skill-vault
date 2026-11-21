@@ -1,309 +1,151 @@
 ---
 name: diagram-html
-description: Create professional architecture, workflow, sequence, data-flow, and lifecycle/state diagrams as standalone HTML files with inline SVG, dark/light theme toggle, and one-click export to PNG/JPEG/WebP/SVG. Accepts plain-language descriptions or pasted Mermaid code and lays the diagram out from scratch in archify style. Use for system architecture diagrams, infrastructure diagrams, cloud architecture visualizations, security diagrams, network topology, technical workflows, approval flows, runbooks, CI/CD flows, process diagrams, API call sequences, request lifecycles, data pipelines, ETL/ELT maps, PII boundaries, data lineage, state machines, lifecycle diagrams, status transitions, converting Mermaid to polished artifact, or shareable standalone HTML diagram files with theme toggle and export menu. Part of the diagram skill family (diagram-mermaid / diagram-plantuml / diagram-html / diagram-image) — pick this skill for HTML output with browser-interactive theme switching.
-
-license: MIT
+description: "Create validated architecture, workflow, sequence, data-flow, lifecycle/state, ERD, class, tree, timeline, and waterfall diagrams as explorable standalone HTML with inline SVG, dark/light theme toggle and image/SVG/WebM export. Accept plain-language requirements or pasted Mermaid; inspect repository evidence for code-backed diagrams. Use for system architecture, infrastructure, cloud/network topology, technical workflows, approval flows, runbooks, CI/CD, API call sequences, request lifecycles, data pipelines, ETL/ELT, data lineage, state machines, status transitions, ERD/schema, class diagrams, timelines, timing/waterfall charts, converting Mermaid, or shareable standalone HTML diagrams with theme toggle and export menu. Also turns an answer into a one-page explainer when the user asks for a page (做成一页, 用页面讲). Not for dashboards. Part of the diagram skill family (diagram-mermaid / diagram-plantuml / diagram-html / diagram-image) — pick this skill for HTML output with browser-interactive theme switching."
+license: Apache-2.0
 metadata:
-  version: "2.10"
+  version: "3.2"
   author: tt-a1i
   based_on: Cocoon-AI/architecture-diagram-generator (MIT, v1.0)
 ---
 
 # diagram-html (based on Archify)
 
-Create professional technical diagrams as self-contained HTML files with inline SVG, a theme toggle, and a built-in image/SVG export menu.
+Create checked standalone HTML as a native diagram or a one-page explainer that answers a question.
 
-Every diagram ships with a **dark/light theme toggle** (persists in `localStorage`, respects `prefers-color-scheme`), an **export menu** (copy PNG to clipboard; download PNG/JPEG/WebP rasterized natively at up to 4× resolution; download a **dual-theme SVG** that follows the embedding host's `prefers-color-scheme` — ideal for GitHub READMEs), and a **CSS-variable color system** that keeps both themes consistent.
+Run commands from your working directory. Unless the user names another location, give each new artifact request its own folder `.archify/<type>-<slug>-<YYYYMMDD-HHMMSS>/` there (local time, chosen once): keep the candidate and `<slug>.html` in it and reuse it for repairs. Native diagrams use `candidate.json` with `meta.output` relative to the working directory; explainers may use `candidate.archify.md` and a portable output filename. A later request gets a new folder. Replace `bin/archify.mjs` in every command with the installed package's absolute path, or its path relative to your working directory; CLI input and output paths resolve from that directory.
 
-## Setup (one-time, renderer modes only)
+For a native diagram of a real codebase, read [Repository authoring](references/repository-authoring.md) while tracing the requested behavior. A system description uses the native steps below; a frozen candidate uses the handoff path.
 
-The five typed renderers validate JSON against schemas via `ajv`. From this skill's folder:
+## Choose the artifact
 
-```bash
-npm install
-```
+- When the user asks to draw or visualize a system, flow, schema or history, use a native diagram and the Type router.
+- Use `explainer` when the user asks for the answer as a page: a page, one page, an explainer, something to share (“做成一页”, “用页面讲”, “answer with a page”). Without such a request, answer in text or draw the requested diagram. A page made on request ends its reply with the one-line mode offer under Output.
+- A rules line in context changes this. `[archify explainer: proactive]`: also make a page, unasked, for an explanation, comparison, trade-off, decision, diagnosis, review or plan that needs a table, steps or several sections. `[archify explainer: always-on]`: every reply that reaches a conclusion also gets a compact page of at most four panels, delivered without opening it, its link closing the reply. `[archify explainer: on-demand]`: only when asked, and never offer a mode.
+- In every mode a page needs a conclusion with some structure behind it: chat, one-line answers, raw command output and text-only requests get none.
+- For `explainer`, read [Explainer authoring](references/explainer-authoring.md) for its conclusion, reasons, scope, board layout and optional native diagrams. Write the complete draft, then run `finalize explainer` for validation, atomic delivery and artifact checks. Use panel patch for local content revisions.
 
-Without it the renderers still run — they print a warning and skip schema validation, keeping their own layout checks. The **generated HTML never has dependencies**; only the renderers do.
+## Existing candidate handoff
 
-If you have no shell access at all (e.g. the skill was added as project knowledge), fall back to architecture mode for every request: hand-place SVG into `assets/template.html` following the Design System below, and run the self-review checklist before delivering.
+When the user supplies a frozen candidate, run `finalize` first as one CLI invocation. Its passing receipt completes the automated gates; follow any visual review recommendation under Delivery before claiming visual quality. For repair, follow step 5.
 
-## Choosing a Diagram Type
+`finalize` includes a bounded update check in its delivery receipt; see Update awareness.
 
-| Type | Use for | How |
-|------|---------|-----|
-| `architecture` | System components, cloud resources, services, security boundaries, infrastructure | `renderers/architecture/render-architecture.mjs` + JSON (or hand-place SVG when renderers can't run) |
-| `workflow` | Technical flows, approval gates, tool calls, runbooks, CI/CD, incident response | `renderers/workflow/render-workflow.mjs` + JSON |
-| `sequence` | API call chains, request lifecycles, cache fallback, async traces, return paths | `renderers/sequence/render-sequence.mjs` + JSON |
-| `dataflow` | Pipelines, ETL/ELT, PII isolation, lineage, warehouse sync, consumers | `renderers/dataflow/render-dataflow.mjs` + JSON |
-| `lifecycle` | State machines, status transitions, wait states, retries, terminal states | `renderers/lifecycle/render-lifecycle.mjs` + JSON |
+## Native diagram authoring
 
-Trigger phrases: "architecture/system/cloud diagram" → `architecture` (unless clearly process-oriented). "workflow/flow/process/runbook/approval/CI-CD/incident" → `workflow`. "sequence/interaction/call chain/who calls whom" → `sequence`. "data flow/pipeline/ETL/lineage/PII/governance" → `dataflow`. "state/status/lifecycle/state machine/retry/terminal" → `lifecycle`.
+Use this path for ordinary generation. Read branch references only when their stated trigger applies.
 
-## Mermaid as an Input Dialect
+1. Choose `architecture`, `workflow`, `sequence`, `dataflow`, `lifecycle`, `erd`, `class`, `tree`, `timeline`, or `waterfall` from the question.
+2. Use the exact schema and example paths in the Type router without listing their directories. Read [Authoring defaults](references/authoring-defaults.md) and the mode's example in a bounded batch separate from project documents and complete schemas so neither is truncated; recover any missing section before writing. For Architecture, use the matching showcase example. For every mode except Architecture, also read the mode and common schemas. Read the relevant schema definition before choosing any new field, enum, or constrained text, especially boundary kinds. Examples teach shape, not facts. Use fresh IDs, wording, and layout. Go directly to the candidate without preliminary help, doctor, starter validation, temporary diagrams, or output-path listing. Query brands only for an explicitly requested mark; read [Brand marks](references/brand-marks.md) for an unknown mark with a user-provided URL.
+3. Once the requested scope and, for a real codebase, [source evidence](references/repository-authoring.md) are covered, write the complete candidate directly without planning coordinates in prose. Choose Architecture abstraction and connected placement using Authoring defaults before coordinates: show the main user journey and necessary branches, preserve control roles and behavior-changing conditions, and leave enough room for actual relationship labels. No node, relationship, source, view, card, or boundary count is a target or ceiling. Use automatic routes first; add explicit routing only for necessary branch, return, supplied geometry, or measured repair. Set `meta.quality_profile` to `"showcase"` unless the user requests dense `standard`. For ERD, use a table-first layout: show every physical column in `entities[].attributes`, keep its SQL type and source comment, state every key role a column carries (`key` takes a role or a list, so a junction column is `["pk", "fk"]`, and every `fk` column also needs `references` like `"orders.id"`), and never move columns into cards as a substitute for the table. Classify tables into functional domains before placement, give each domain a concise `tag`, and place its members in one solid rectangle of grid cells — a single row, a single column, or a filled rectangular block, not an L or diagonal. A tagged table always needs `row`/`col`, because absolute coordinates have no grid cells and a domain whose tables do not fill one rectangle cannot be drawn as a band: the renderer reports `erd/domain-not-drawn` instead of publishing a diagram that cannot name the domain. A multi-domain schema reads best as one domain per column — each `tag` a vertical run — because the reader scales a wide canvas up to the reader width and shrinks a tall one until the page fits, so the wide arrangement is the one that stays complete and legible inside a laptop viewport. A schema-first ERD over roughly 8 tables or 50 fields is itself a dense map: author its first complete-field pass at `standard` and upgrade only once the layout still reads.
+4. Once the complete first candidate is written, run `finalize` directly. Its first gate is showcase validation; successful first drafts need no separate pre-validation. Keep the candidate unchanged while the command runs:
 
-When the user pastes Mermaid code, do NOT try to render or parse it mechanically — read it for structure and **lay out from scratch** in the matching archify mode:
+   ```bash
+   node bin/archify.mjs finalize <type> <candidate.json> <output.html> --quality showcase --json
+   ```
 
-| Mermaid | Archify mode | Mapping |
-|---------|--------------|---------|
-| `flowchart` / `graph` | `workflow` (or `architecture` if it's a component map) | `subgraph` → lane or region boundary; node shape `{}` (diamond) → decision/security node; `-->` labels → edge labels (use sparingly); `classDef`/`style` → nearest semantic type |
-| `sequenceDiagram` | `sequence` | `participant` → participants (pick semantic `type` from the name); `->>` → message, `-->>` → `return` variant; `Note` → message `note`; `rect` blocks → segments |
-| `stateDiagram` | `lifecycle` | states → states (pick `start`/`active`/`waiting`/`success`/`failure` from names); `[*]` start/end → `start` type / `terminal` lane; transition labels → event-like labels |
+   For a repository-backed candidate, include evidence on the first draft and use the complete first command: `node bin/archify.mjs finalize <type> <candidate.json> <output.html> --repo-root <repo-root> --quality showcase --json`. Pass the `--quality` that matches `meta.quality_profile`, such as `standard` for a dense first ERD pass.
 
-Drop Mermaid styling; keep only the topology and meaning. You choose grouping, lane order, and what deserves emphasis — that judgment is the product.
+   A passing receipt proves the included `validate`, `deliver`, strict `check`, and real-browser `browser-check` gates passed. Use its compact summary; run standalone commands only for a separate request or focused failure diagnosis.
 
-## Layout principles (read before placing)
+5. A non-zero exit is never success. Read compact stdout or `evidence.summaryReceipt`, then [repair the failed gate](references/delivery-contract.md#failed-finalize-and-candidate-repair), including its repair limit. Preserve requested meaning and source evidence. For several tangled Architecture routes, read [Architecture layout repair](references/architecture-layout-repair.md); for measured field or geometry failures, read [Authoring contract](references/authoring-contract.md). Edit the connected neighborhood and rerun the complete `finalize` command from step 4. Once a run has reached `browser-check`, the output path owns that evidence: give every later run its own `--out-dir <folder>/review-<n>`.
 
-Archify's readability comes from **spatial narrative**, not from drawing every dependency as an arrow. Before you write coordinates or edge lists, plan one clear story:
+## Update awareness
 
-1. **One main path** — left → right (architecture) or lane → column (workflow). The reader should trace the happy path without crossing lines.
-2. **Few labeled edges** — label only cross-boundary or non-obvious transitions on the main path. Adjacent steps stay unlabeled.
-3. **Short side branches** — permissions, storage, bots, CI: connect **up or down** from the nearest node on the main path. Never route a secondary edge diagonally across unrelated components.
-4. **Cards for detail** — policies, tech stack notes, and "also connects to X" belong in summary cards, not as extra arrows.
-5. **Mode fit** — process / approval / tool-call stories → `workflow` or `sequence`. Component maps with ≤12 nodes → `architecture`. If the diagram needs 20+ edges, remove edges until the main path is obvious.
+`finalize` and standalone `deliver` include `update` in their receipts. Do not run a separate check for the same delivery. If `update.noticeRequired` is true, read `references/update-awareness.md` and keep one compact update notice in your final response to the user, even after a quality gate fails. For a task with several diagrams, mention the update once in the final response. Snooze or ignore a reminder only when the user explicitly asks; never install or update on your own initiative.
 
-Worked examples on this pattern: `examples/archify-repo.architecture.json` (this repo) and `examples/maka-architecture.architecture.json` (third-party desktop app).
+Before the first candidate, use the authoring references and relevant repository source, not Archify implementation or tests. Inspect Archify implementation if diagnostics remain unactionable after focused repairs.
 
-When validation fails on label overlap, read the **Suggested fix** lines (coordinates / `labelAt` / `labelDy`) and apply them directly — do not guess offsets blindly.
 
-## Renderer Modes (architecture / workflow / sequence / dataflow / lifecycle)
+## Type router
 
-All five modes follow the same loop:
+| Type | Use for | Schema | Example |
+|---|---|---|---|
+| `architecture` | Components, services, cloud/security boundaries, infrastructure; what something everyday is made of | `schemas/architecture.schema.json` | System descriptions, services, libraries, and CLI repos: `examples/web-app.architecture.json`; deployment repos: `examples/production-deployment.architecture.json` |
+| `workflow` | Processes, approval gates, tool calls, runbooks, CI/CD; plans and step-by-step life processes | `schemas/workflow.schema.json` | `examples/agent-tool-call.workflow.json` |
+| `sequence` | API call chains, request lifecycles, async traces, returns; back-and-forth between people | `schemas/sequence.schema.json` | `examples/cache-miss-request.sequence.json` |
+| `dataflow` | Pipelines, ETL/ELT, lineage, governance, consumers; where money or documents go | `schemas/dataflow.schema.json` | `examples/product-analytics.dataflow.json` |
+| `lifecycle` | State/status transitions, retries, waiting and terminal states; where an application or order stands | `schemas/lifecycle.schema.json` | `examples/deployment-release.lifecycle.json` |
+| `erd` | Tables/entities, attributes, primary/foreign/unique keys, cardinality between them | `schemas/erd.schema.json` | `examples/orders.erd.json` |
+| `tree` | Single-parent containment: repository/module trees, capability or feature breakdowns, org-style decomposition | `schemas/tree.schema.json` | `examples/payment-platform.tree.json` |
+| `class` | Classes, interfaces, selected members, and dependency/association/inheritance/realization/composition between types | `schemas/class.schema.json` | `examples/payments.class.json` |
+| `timeline` | When things happened: incident reviews, release histories, timestamped events on a proportional clock with source lanes | `schemas/timeline.schema.json` | `examples/payment-incident.timeline.json` |
+| `waterfall` | Where the time went: span durations, overlap, and nesting of one request or agent run on a common time axis | `schemas/waterfall.schema.json` | `examples/checkout-request.waterfall.json` |
 
-1. **Read first**: the schema (`schemas/<type>.schema.json`) and the complete worked example (`examples/*.{architecture,workflow,sequence,dataflow,lifecycle}.json`) — copy its patterns instead of guessing field shapes.
-2. Write `<name>.<type>.json`.
-3. Render: `node bin/archify.mjs render <type> <input>.json <output>.html` (paths relative to this skill's folder).
-4. Validate the generated artifact: `node bin/archify.mjs validate <type> <input>.json --json`, or check an existing HTML file with `node bin/archify.mjs check <output>.html`. This catches malformed SVG output, non-finite SVG values, two-point diagonal arrows, and arrows crossing the legend.
-5. If either step fails, the error names the JSON path or the fix (thresholds, valid ranges, which knob to change). Fix the JSON and re-run; never edit the renderer.
+When choosing among native diagram types is ambiguous, run `node bin/archify.mjs guide "<scenario>" --json`. Scenario proof examples are structural references, not facts to copy.
 
-Schema violations exit non-zero with path-prefixed messages like `/nodes/3 (id/label: "router") must NOT have additional properties`. The renderers additionally fail fast on layout problems: node/state overlap (including cross-lane), labels colliding with nodes or other labels, labels wider than their node, out-of-range columns/rows, too-short edges, workflow edges crossing unrelated nodes, and legends outside the viewBox. CJK text is measured at double width automatically.
+For an everyday subject, keep the same diagram modes and semantic types, then name them for the reader: use everyday `icon` values and `meta.legend` labels as in [Node icons](references/authoring-contract.md#node-icons). Ask for missing personal facts instead of inventing dates, amounts, or rules.
 
-Set `meta.animation: "trace"` only when the user asks for motion or a presentation/demo view. It adds lightweight SVG/CSS trace animation to renderer-marked arrows and nodes, respects `prefers-reduced-motion`, and leaves the default static output unchanged.
+## Mermaid input
 
-### Workflow
+Read Mermaid for topology and meaning, then author fresh Archify JSON; do not mechanically render Mermaid styling.
 
-```json
-{
-  "schema_version": 1,
-  "diagram_type": "workflow",
-  "meta": { "title": "Release Workflow", "subtitle": "PR to production", "output": "release.html" },
-  "lanes": [ { "id": "dev", "label": "Developer" }, { "id": "ci", "label": "CI" }, { "id": "exceptions", "label": "Exception Handling", "variant": "exception" } ],
-  "phases": [ { "id": "intake", "label": "Intake", "fromCol": 0, "toCol": 1 } ],
-  "groups": [ { "id": "checks", "label": "Parallel checks", "lane": "ci", "fromCol": 1, "toCol": 3, "variant": "emphasis" } ],
-  "mainPath": ["pr", "build"],
-  "nodes": [
-    { "id": "pr", "lane": "dev", "col": 0, "type": "frontend", "label": "Open PR", "sublabel": "feature branch" },
-    { "id": "build", "lane": "ci", "col": 1, "type": "backend", "label": "Build", "sublabel": "lint + test", "tag": "blocking" }
-  ],
-  "edges": [
-    { "from": "pr", "to": "build", "label": "webhook", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop" }
-  ],
-  "cards": []
-}
-```
+- `flowchart` / `graph` → `workflow`, or `architecture` for a component map.
+- `sequenceDiagram` → `sequence`; participants become semantic participants and arrows become messages.
+- `stateDiagram` → `lifecycle`; states and transitions retain meaning, not Mermaid style.
+- `erDiagram` → `erd`; entity and relationship names, keys, and cardinality retain meaning, not Mermaid style.
+- `classDiagram` → `class`; type kinds, selected members, and relationship kinds retain meaning, not Mermaid style.
 
-**Layout budget**: 6 columns (`col` 0–5) at fixed x positions `[88, 220, 300, 430, 500, 625]` — columns 1↔2 and 3↔4 are only 70–80px apart, so default-width (92px) nodes in those adjacent columns of the same lane overlap; skip a column or shrink `width`. Lane content width is 640px. Omit `meta.viewBox` — the renderer sizes height to the lane count automatically. Use `phases` for top-of-diagram story beats, `groups` to frame parallel work or a branch inside one lane, and `lane.variant: "exception"` for error/retry/fallback lanes. `mainPath` is optional but recommended: list the happy-path node ids in order so the renderer can catch missing edges or accidental backward movement. Edge routes: `straight`, `drop` (bend between lanes; `bias` 0–1 picks where), `outside-right`, `return-left`, `bottom-channel`, `up-channel`, or explicit `via` points. Keep adjacent-step edges unlabeled; reserve labels for cross-lane transitions, approvals, async traces, and returns.
+## Delivery
 
-### Sequence
+Use the `finalize` command above for the first candidate and after a repair.
 
-```json
-{
-  "schema_version": 1,
-  "diagram_type": "sequence",
-  "meta": { "title": "Cache Miss Request", "subtitle": "auth and cache fallback", "output": "cache-miss.html" },
-  "participants": [
-    { "id": "web", "type": "frontend", "label": "Web App", "sublabel": "React UI" },
-    { "id": "api", "type": "backend", "label": "API", "sublabel": "handler" }
-  ],
-  "segments": [ { "from": 160, "to": 320, "label": "01 / AUTH" } ],
-  "messages": [
-    { "from": "web", "to": "api", "y": 200, "label": "GET /data", "variant": "emphasis" },
-    { "from": "api", "to": "web", "y": 290, "label": "200 JSON", "variant": "return" }
-  ],
-  "activations": [ { "participant": "api", "from": 190, "to": 300, "type": "backend" } ],
-  "cards": []
-}
-```
+`finalize` stops at the first non-passing gate. Its compact stdout and `<output-stem>.finalize-summary.json` are ordinary evidence. A passing run creates no screenshots and reports `visualReview: "not-requested"`.
 
-**Layout budget**: participants sit at x = 62 + index×108, so a 920-wide viewBox fits at most 8. Message `y` must stay within `[160, viewBox_height − 83]`; messages that share horizontal space need ≥28px vertical separation; arrows need ≥60px horizontal span. `segments[].from/to` and `activations[].from/to` are **y pixel coordinates**, not participant ids. A taller `meta.viewBox` (default `[920, 760]`) buys more timeline room. Keep labels short: "GET /path", "verify JWT", "cache miss", "200 JSON".
+When a passing Architecture receipt reports `visualReviewRecommendation.signals.resolvedCrossovers`, copy the candidate aside and apply the hints in one edit that changes only node positions and sizes: every node, relationship (including its `from` and `to`), label, and source stays as it was. Rerun the complete `finalize` once with `--out-dir <folder>/review-2`, because the previous HTML already owns its browser evidence. `--out-dir` relocates the new browser-check and default finalize receipts, not the HTML or its delivery receipt. Successful delivery rewrites that pair at the requested output path; earlier review evidence remains bound to its original artifact bytes. See [review evidence paths](references/delivery-contract.md#a-new-candidate-at-an-existing-output-path). If that run fails, reports more crossings, or reports the same crossings with more `signals.routesOverSuggestedBends`, restore the copy and finalize it with `--out-dir <folder>/review-3`. Do not start a second placement round. Hints about extra bends alone are optional.
 
-### Dataflow
+When `layoutReviewRecommendation.action` is `inspect-sequence-width`, follow [Sequence width review](references/delivery-contract.md#sequence-width-review) before handing off a newly authored Sequence.
 
-```json
-{
-  "schema_version": 1,
-  "diagram_type": "dataflow",
-  "meta": { "title": "Product Analytics", "subtitle": "events to consumers", "output": "analytics.html" },
-  "stages": [ { "label": "Sources" }, { "label": "Ingest" }, { "label": "Store" } ],
-  "nodes": [
-    { "id": "web", "type": "frontend", "label": "Web App", "stage": 0, "row": 0, "sublabel": "clickstream" },
-    { "id": "kafka", "type": "messagebus", "label": "Kafka", "stage": 1, "row": 0, "tag": "accepted events" }
-  ],
-  "flows": [
-    { "from": "web", "to": "kafka", "label": "events", "classification": "PII touch", "variant": "emphasis" }
-  ],
-  "cards": []
-}
-```
+Perceptual review is optional for ordinary generation, including a newly positioned Architecture. Use [Optional capture evidence](references/delivery-contract.md#optional-capture-evidence), with `--out-dir <folder>/visual-check`, when the user requests visual review, during development audits, or for a concrete route/browser concern. `visualReviewRecommendation` is advisory. Inspect captures before claiming visual quality; qualify any check claim as automated when perceptual review has not occurred.
 
-**Layout budget**: 2–5 stages at x = 100 + stage×215; 5 rows (`row` 0–4) at y `[128, 242, 356, 470, 584]`; default node 112×58. Default viewBox `[940, 720]`. Flow labels are mandatory and asset-like ("clickstream", "identity map", "feature vectors"); put sensitivity in `classification` ("PII touch", "approved only", "non-PII"). Variants: `emphasis` = primary path, `security` = PII/policy/consent, `dashed` = async/batch.
+Read [Delivery contract](references/delivery-contract.md) for failed gates, standalone commands, provenance/recovery, repeated delivery, exports, or opening. Native diagram recovery follows `deliver` → strict provenance `check` → `browser-check`; captures require strict provenance. Explainer delivery uses validate, deliver and check as described in its authoring guide.
 
-### Lifecycle
+For workflow viewport overflow, read [Workflow viewport repair](references/authoring-contract.md#workflow-viewport-repair) before the next layout edit.
 
-```json
-{
-  "schema_version": 1,
-  "diagram_type": "lifecycle",
-  "meta": { "title": "Agent Run Lifecycle", "subtitle": "states and terminal outcomes", "output": "agent-run.html" },
-  "lanes": [
-    { "id": "main", "label": "Lifecycle phases" },
-    { "id": "waiting", "label": "Interruptions" },
-    { "id": "terminal", "label": "Terminal exits" }
-  ],
-  "states": [
-    { "id": "queued", "type": "start", "label": "Queued", "lane": "main", "col": 0, "step": "01" },
-    { "id": "running", "type": "active", "label": "Executing", "lane": "main", "col": 2, "step": "02" },
-    { "id": "approval", "type": "waiting", "label": "Needs Approval", "lane": "waiting", "col": 0 },
-    { "id": "done", "type": "success", "label": "Completed", "lane": "terminal", "col": 2 }
-  ],
-  "transitions": [
-    { "from": "queued", "to": "running", "variant": "emphasis" },
-    { "from": "running", "to": "approval", "label": "needs approval", "variant": "security", "fromSide": "bottom", "toSide": "right" },
-    { "from": "running", "to": "done", "label": "success", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" }
-  ],
-  "cards": []
-}
-```
+When reporting verification details, distinguish artifact checks, browser evidence, captures, and actual perceptual review. For an explicitly requested immediate preview or active desktop loop, see [Optional opening](references/delivery-contract.md#optional-opening).
 
-**Layout budget — lane ids are semantic and reserved**: `main` is required and maps to the top phase band (cols 0–4); `terminal` maps to the bottom outcome band (cols 0–2); **every other lane id shares the single middle event band** (cols 0–2) — separate same-band states with different `col` or `yOffset`. Band headers render from your lane labels. Default viewBox `[980, 660]`. Keep transition labels event-like and sparse ("retry", "timeout", "cancel"); prefer state `tag`s, `step` numbers, and summary cards over label-heavy arrows. Put terminal states in the `terminal` lane so endings are unambiguous.
+## Optional viewer capabilities
 
-### Per-mode deep guidance
+Live motion is enabled by default for every rendered diagram; omit `meta.animation`. The Viewer’s Live/Still button controls playback.
 
-Each renderer has a README with its full design language (route presets, semantic types, story guidance): `renderers/workflow/README.md`, `renderers/sequence/README.md`, `renderers/dataflow/README.md`, `renderers/lifecycle/README.md`. Read the matching one before your first diagram of that mode in a session.
+Read `references/viewer-runtime.md` only when the user explicitly asks for Share Cards, Route/Reach cards, motion, deep links, presentation, search/focus, or another Viewer Runtime feature.
 
-## Architecture Mode
+## Setup and fallback
 
-Architecture has the same read-schema-then-render loop as the other modes — prefer it. Hand-placed SVG is the fallback for when renderers can't run.
-
-```json
-{
-  "schema_version": 1,
-  "diagram_type": "architecture",
-  "meta": { "title": "Sample Web App", "subtitle": "3-tier SaaS on AWS", "output": "web-app.html" },
-  "components": [
-    { "id": "users", "type": "external", "label": "Users", "sublabel": "Browser", "pos": [40, 300] },
-    { "id": "api", "type": "backend", "label": "API Server", "sublabel": "FastAPI :8000", "pos": [460, 300] },
-    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": ":5432", "pos": [680, 300] }
-  ],
-  "boundaries": [
-    { "kind": "region", "label": "AWS us-west-2", "wraps": ["api", "db"] }
-  ],
-  "connections": [
-    { "from": "users", "to": "api", "label": "HTTPS", "variant": "emphasis" },
-    { "from": "api", "to": "db", "label": "SQL" }
-  ],
-  "cards": []
-}
-```
-
-Render: `node bin/archify.mjs render architecture <input>.json <output>.html`.
-
-**Free placement** — `pos: [x, y]` is the component's top-left; `size: [w, h]` defaults to `[120, 60]`. Unlike typed modes there is no lane/stage grid — asymmetric placement is yours to choose. `meta.viewBox` is optional (auto-fitted).
-
-**Grid placement (#8)** — when manual coordinates are painful, set semantic cells instead of doing arithmetic:
-
-```json
-{
-  "layout": { "mode": "grid", "cols": 7, "origin": [40, 100], "gapX": 24, "gapY": 48, "cellW": 120, "cellH": 60 },
-  "components": [
-    { "id": "agents", "type": "frontend", "label": "Agent Hosts", "row": 1, "col": 1 },
-    { "id": "ir", "type": "messagebus", "label": "JSON IR", "row": 1, "col": 2 }
-  ]
-}
-```
-
-`pos` still wins when present (override one cell). This is **not** auto-layout — spacing is fixed cell math. Example: `examples/archify-repo-grid.architecture.json`.
-
-**Inspect layout (#9)** — after editing JSON, dump computed boxes without opening HTML:
+No install is required inside the skill package. For setup diagnosis, verify with:
 
 ```bash
-node bin/archify.mjs inspect architecture my.architecture.json
-# or: node bin/archify.mjs validate architecture my.architecture.json --layout-json
+node bin/archify.mjs doctor
+node bin/archify.mjs demo <output-directory>
 ```
 
-Output includes component rects, boundaries, connection point paths, and label positions.
-
-**The renderer does the mechanical work that used to be hand-tuned**, so you only choose coordinates and meaning:
-
-- **Free coordinates** — `pos: [x, y]` is the component's top-left; `size: [w, h]` defaults to `[120, 60]`. Unlike the typed modes there is no lane/stage grid — asymmetric placement is yours to choose. `meta.viewBox` is optional (auto-fitted to your components + a legend row).
-- **Grid placement** — optional `layout.mode: "grid"` with `row`/`col` per component (see above). Not dagre; fixed cell spacing only.
-- **Boundaries from `wraps`** — list the component ids a `region` (dashed amber) or `security-group` (dashed rose) encloses; the renderer computes the box with correct 30/50 padding automatically. Never hand-arithmetic a boundary again.
-- **Connections** route like edges (`variant`, `fromSide`/`toSide`, `route: straight|orthogonal-h|orthogonal-v|auto`, `via`, `labelDx/labelDy/labelAt`). For a vertical labeled connection, push the label into the gap with `labelDy` (the validator will tell you if it lands on a box).
-- The renderer auto-emits the two-rect `c-mask` pattern, draws arrows before boxes (z-order), builds the legend from the component types you used, and **fails fast on component overlap, off-canvas components/boundaries, unknown wraps/connection ids, label-vs-component collisions, and non-finite coordinates** — the same reliability the other four modes already had.
-
-### Hand-placed fallback (no renderer available)
-
-When Node/ajv can't run, copy `assets/template.html` and place SVG by hand. Study the worked diagram inside the template and `examples/web-app.html` for coordinate idioms, follow the Design System below, and run the self-review checklist before delivering.
-
-### The Cardinal Rule: CSS classes, not inline colors
-
-The theme toggle works by switching CSS custom properties. Hardcoded `fill="rgba(...)"` or `stroke="#22d3ee"` will NOT update on theme change. Always use the class system:
-
-```svg
-<rect x="X" y="Y" width="W" height="H" rx="6" class="c-mask"/>
-<rect x="X" y="Y" width="W" height="H" rx="6" class="c-backend" stroke-width="1.5"/>
-<text x="CX" y="CY" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">API Server</text>
-<text x="CX" y="CY+16" class="t-muted" font-size="9" text-anchor="middle">FastAPI :8000</text>
-```
-
-### Design system
-
-Component fills `c-frontend` (clients/UI), `c-backend` (services/APIs), `c-database` (stores/caches), `c-cloud` (managed infra), `c-security` (auth/secrets), `c-messagebus` (Kafka/queues), `c-external` (3rd parties); text accents `t-<same>` plus neutrals `t-primary` / `t-muted` / `t-dim`. Arrows `a-default`, `a-emphasis` (hot path), `a-security` (dashed), `a-dashed` (async) — always set `stroke-width` and pair `marker-end="url(#arrowhead[-variant])"` with the matching class. Boundaries: `c-security-group` (dashed rose), `c-region` (dashed amber), `c-lane` (swimlane).
-
-Typography inherits JetBrains Mono from the SVG root. Sizes: 11–12px component names, 9px sublabels, 8px annotations, 7px tiny labels.
-
-### Hard layout rules
-
-- **Two-rect pattern everywhere**: opaque `c-mask` rect first, styled `c-<type>` rect on top — semi-transparent fills otherwise let arrows bleed through.
-- **Arrows before components** in document order (SVG paints in order; arrows must sit behind boxes).
-- **Vertical stacking**: ≥40px gap between components; inline connectors (message buses, 20px tall) live inside the gap, never overlapping boxes.
-- **Boundary padding**: boundary `y` = inner `y` − 30, boundary `height` = inner `height` + 50, label baseline 18px below the boundary top.
-- **Legend placement**: outside ALL boundary boxes, ≥20px below the lowest one; grow the viewBox if needed.
-
-### Self-review checklist (run before delivering)
-
-1. `grep -E 'fill="(#|rgb)|stroke="(#|rgb)' out.html` inside the SVG returns nothing except the template's own defs (Cardinal Rule).
-2. Every `c-<type>` rect has an identical-geometry `c-mask` rect immediately before it.
-3. All `<line>`/`<path>` arrows appear before all component rects in document order.
-4. Compute max(y + height) over all SVG elements: viewBox height must exceed it by ≥20px; same for x/width.
-5. Legend y is below every boundary's y + height.
-6. The `.toolbar`, `<script>` blocks, and `:root` / `[data-theme]` CSS are untouched — they ARE the theme toggle and export menu.
+For native diagrams, when shell access is unavailable, hand-place architecture SVG into `assets/template.html`, use CSS semantic classes rather than inline colors, and follow the visual review contract in `references/delivery-contract.md`. Explainers require their renderer and real delivery gates; if those are unavailable, report the limitation and give a text answer when useful, without claiming HTML delivery.
 
 ## Output
 
-A single self-contained `.html`: embedded CSS (Google Fonts loads async and degrades to system monospace offline), inline SVG, ~19KB embedded JS for theme + export. It renders directly in any modern browser. Raster exports render natively at up to 4× the viewBox (large diagrams step down to 3×/2× to stay under canvas limits); the SVG download is dual-theme self-contained and follows the host's `prefers-color-scheme` (manual override via `svg[data-theme="..."]`).
+Reply in the user's language, as briefly as the result allows; the diagram carries the content, so a single diagram usually needs one line.
 
-## 依赖与降级
+- Lead with a clickable Markdown link to the HTML: a descriptive title, not the file name, and its absolute path, wrapped in `<...>` when it contains spaces.
+- When the user wants to understand a system or codebase rather than draw a described subject, add one or two sentences with the key takeaway. Skip sentences that only restate what the diagram obviously shows.
+- State anything that changes how the diagram should be read: the abstraction level or deliberately omitted parts when a reader might expect them, illustrative rather than measured values, missing source evidence, or requested content dropped or merged during repair.
+- For several diagrams, report completion once with a link to an existing overview or compact per-diagram links, not a directory path.
 
-| 依赖 | 必需性 | 缺失时行为 |
-|---|---|---|
-| 浏览器（任何现代浏览器） | 必需 | 无法打开 HTML — 但 HTML 文件本身仍可生成、可分享 |
-| Node.js + `npm install`（安装 ajv） | 可选 | 跳过 schema 校验，仅做 renderer 内置的布局检查（节点重叠、标签碰撞、坐标越界等），仍生成 HTML。控制台会打印一条警告 |
-| Shell 访问（运行 `node bin/archify.mjs`） | 可选 | 回退到「手写 SVG 到 `assets/template.html`」模式：参考上文 Design System + Self-review checklist，直接编辑 HTML 文件 |
+Do not recap commands, repair rounds, hashes, quality profiles, or check lists; they stay in the receipts. If asked whether the diagram was verified, answer in one line, such as “Automated checks passed; not visually reviewed.” Give receipt links and details only for reproducibility or troubleshooting. Disclose requested visual review that could not run, and claim visual inspection only when performed. Keep the required update notice under Update awareness.
 
-**关键：生成的 HTML 永远零依赖** — 嵌入式 CSS、内联 SVG、~19KB JS 全部打包在单个 `.html` 文件里。所有可选依赖只影响生成阶段的校验能力，不影响最终 HTML 的可用性。
+Example: `Created [Checkout request timing](/abs/path/checkout-timing.html). Durations are illustrative, not measured.`
+
+For an explainer, reply in two or three lines: the conclusion and the page link. Mention gates only when one failed or writing warnings remain; do not paste the draft.
+
+After an explainer made on request, when no `[archify explainer: ...]` line is in context, end the reply with one optional line offering the proactive mode, once per conversation, for example: “需要的话，以后遇到解释、对比、排查这类问题，我可以主动做成这样的页面，要开启吗？” If the user accepts, add `[archify explainer: proactive] Make an Archify explainer page, unasked, for explanations, comparisons, decisions, diagnoses, reviews and plans that need a table, steps or several sections.` to the global rules file of the current agent (such as `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` or `~/.config/devin/AGENTS.md`) and name the file; deleting the line turns it off. If the user declines, offer to add `[archify explainer: on-demand]` so the question does not return.
 
 ## 相关技能
 
-本 skill 是 diagram 技能家族的一员，按输出格式分工，4 个 skill 互补但不重叠：
+本 skill 是 diagram 技能家族的一员，按输出格式分工：
 
 | Skill | 输出形态 | 主用途 |
 |---|---|---|
-| `diagram-mermaid` | Mermaid 代码块（内联 Markdown） | GitHub README/issue/PR 嵌入，零依赖，GitHub 直接渲染 |
-| `diagram-plantuml` | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道/IoT 等专业图 |
-| `diagram-html`（本 skill） | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 浏览器导出菜单 |
-| `diagram-image` | SVG + PNG 文件 | 命令行直接产出图片文件，适合 CI/批处理/嵌入不支持 SVG 的环境 |
+| `diagram-mermaid` | Mermaid 代码块（内联 Markdown） | GitHub README/issue/PR 嵌入，零依赖 |
+| `diagram-plantuml` | PlantUML 代码块（内联 Markdown） | UML/云架构/网络/安全/BPMN（图标库 9500+） |
+| `diagram-html`（本 skill） | 独立 HTML 文件 | 可交互的成品图/一页讲解，双主题 + 浏览器导出 |
+| `diagram-image` | SVG + PNG + 离线 HTML + GIF | 命令行直接产出文件，适合 CI/批处理 |
 
-**选用决策**：
-- 在 Markdown 里嵌入图、要源码可读、可 diff → `diagram-mermaid` 或 `diagram-plantuml`
-- 要可交互的 HTML 成品、双主题切换、点按钮导出 → 本 skill（`diagram-html`）
-- 要命令行直接出 SVG/PNG 文件、CI/批处理 → `diagram-image`
+选用决策：在 Markdown 里嵌入 → `diagram-mermaid` / `diagram-plantuml`；要可交互的 HTML 成品 → 本 skill；要命令行出文件 → `diagram-image`。
