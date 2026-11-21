@@ -207,9 +207,9 @@ Valid built-in names:
 
 - `branch` — The branch name
 - `status` — Git status symbols, plus any user-defined status
-- `working-diff` — Uncommitted line changes against `HEAD`, including untracked files (header `HEAD±`)
-- `ahead-behind` — Commits ahead of and behind the default branch (header `main↕`)
-- `branch-diff` — Line changes against the default branch (header `main…±`)
+- `working-diff` — Uncommitted line changes against `HEAD`, including untracked files (header `@±`)
+- `ahead-behind` — Commits ahead of and behind the default branch (header `^↕`)
+- `branch-diff` — Line changes against the default branch (header `^…±`)
 - `summary` — An LLM-generated summary of the branch
 - `upstream` — Commits ahead of and behind the upstream tracking branch (header `Remote⇅`)
 - `ci` — CI status of the head commit
@@ -219,7 +219,7 @@ Valid built-in names:
 - `age` — Time since the last commit
 - `message` — The head commit's subject
 
-A selection mixes built-ins with [custom columns](#custom-columns), each named
+A selection mixes built-ins with [custom columns](#custom-columns-experimental), each named
 by its `[list.custom-columns]` header (`columns = ["branch", "Ticket", "ci"]`),
 and is exhaustive: only the listed columns render. Omit `columns` to keep the
 default set, where custom columns append automatically.
@@ -684,6 +684,10 @@ $ wt --config-set 'projects."github.com/owner/repo".worktree-path = "/tmp/scratc
 
 Hooks, aliases and `step.copy-ignored.exclude` accumulate rather than replace, so an env-set hook and a project's hook both run.
 
+## Editor schemas
+
+For validation and completion in editors that support TOML schemas (such as Taplo or Tombi), start the file with `#:schema https://worktrunk.dev/schema/user-config.json` (user config) or `#:schema https://worktrunk.dev/schema/project-config.json` (project config).
+
 ## Command reference
 
 ```
@@ -910,9 +914,7 @@ $ wt config shell uninstall --yes
 
 ### Version tolerance
 
-Uninstall removes every worktrunk-managed integration it finds, regardless of:
-- Binary name it was installed under (`wt`, `git-wt`, …)
-- Minor syntax variations between versions
+Uninstall recognizes the standalone setup lines written by Worktrunk or shown in `wt config shell init --help`, including older generated forms and custom binary names. Customized initialization lines must be removed manually.
 
 ### Command reference
 
@@ -1070,7 +1072,7 @@ $ wt config approvals list --format=json | jq -r .state
 
 Approved commands are saved to `~/.config/worktrunk/approvals.toml`. Re-approval is required when the command template changes or the project moves.
 
-`--yes` bypasses the prompt, and what it leaves behind depends on the command it is passed to. On a command that runs project commands it grants consent for that run alone and records nothing, so the next run asks again. On `wt config approvals add` the record is the whole point, so the approvals are written — which is how an unattended environment pre-approves a project it has just cloned.
+`--yes` approves project commands for the current run without saving approval. `wt config approvals add --yes` saves approvals for future runs.
 
 ### Reading approval state
 
@@ -1435,7 +1437,7 @@ Markers appear at the end of the Status column, after git symbols:
 
 ```console
 $ wt list
-  Branch       Status      HEAD±     main↕    main…±    Remote⇅  Commit    Age  Message
+  Branch       Status       @±        ^↕        ^…±     Remote⇅  Commit    Age  Message
 @ main             ^⇡                                    ⇡1      33323bc    1d  Initial commit
 + feature-api      ↑ 🤖              ↑1        +1                70343f0    1d  Add REST API endpo…
 + review-ui      ? ↑ 💬    +1        ↑1        +1                a585d6e    1d  Add dashboard comp…
@@ -1457,6 +1459,8 @@ Stored in git config as `worktrunk.state.<branch>.marker`. Set directly with:
 ```console
 $ git config worktrunk.state.feature.marker '{"marker":"🚧","set_at":0}'
 ```
+
+When `wt` deletes a branch or `wt switch --create` creates one, it clears that branch's marker. A branch deleted and recreated with plain `git` keeps its marker until `wt config state marker clear`.
 
 Without a subcommand, runs `get` for the current branch. For `--branch`, use `get --branch=NAME`.
 
@@ -1533,7 +1537,7 @@ dev = "npm start -- --port {{ vars.config.port }}"
 
 ### Storage format
 
-Stored in git config as `worktrunk.state.<branch>.vars.<key>`. Keys may contain only letters, digits, and hyphens.
+Stored in git config as `worktrunk.state.<branch>.vars.<key>`. Keys start with a lowercase letter and contain only lowercase letters, digits, and hyphens.
 
 ### Command reference
 
