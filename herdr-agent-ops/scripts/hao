@@ -441,11 +441,16 @@ def _token_matches(matched, token, sid, joined=False):
     if len(hexpart) > 16:
         return bool(bare) and len(bare) >= 16 \
             and hexpart[:8] == bare[:8] and hexpart[-8:] == bare[-8:]
-    if bare and re.fullmatch(r"[0-9a-f]{12}", bare) and hexpart.startswith(bare):
-        return True
-    if sid and hexpart[:12] == sid[:12]:
-        return True
-    return False
+    if len(hexpart) == 12:
+        # forge r14 exception: a bare 12-hex shortid sentinel is acceptable
+        if sid and hexpart == sid[:12]:
+            return True
+        return bool(bare) and hexpart == bare[:12]
+    # 13-16 hex (r14#2): require the full token — exact for 16, its prefix
+    # for 13-15 truncated renderings; a shortid anchor alone would accept
+    # sid+4 fabricated hex. Waits normally hold the full token (ledger
+    # upgrade each round); a bare-shortid wait prefers the miss.
+    return bool(bare) and len(bare) >= 16 and hexpart == bare[:len(hexpart)]
 
 
 def _sentinel_check(pane, token, sid, machine):
@@ -475,43 +480,46 @@ _HEX_CONT_RE = re.compile(
 
 
 def _join_wrapped_sentinels(lines):
-    """Rejoin sentinels split by narrow-pane wrapping (r8#1/r10/r11#1/r12).
+    """Rejoin sentinels split by narrow-pane wrapping (r8#1/r10-r14).
+
+    Returns a list of (line, joined) tuples — the joined flag explicitly
+    marks lines REASSEMBLED from fragments; callers must never infer it
+    from string identity (r14#1).
 
     Only a STANDALONE sentinel-prefix line may absorb a continuation —
     the same left anchor and decorations SENTINEL_RE accepts, so prompt
     echoes like "…打印：HAO_DONE" never join. Shapes:
     - keyword line already carrying hao- and/or <12 hex absorbs a bare-hex
       continuation while the joined token stays <=32 hex (chains across
-      multiple wraps); trailing decorations after the fragment are kept
-      and the continuation is inserted before them (r12#2);
+      multiple wraps); head decorations are stripped and trailing
+      decorations kept after the insertion point (r12#2/r13#2);
     - keyword-only line absorbs a following COMPLETE token line — >=16
-      hex with or without the hao- prefix (r12#1: shorter continuations
-      would ride the shortid anchor, which is not proof of a full token);
+      hex with or without the hao- prefix (r12#1);
     - a complete sentinel is never extended.
-    Rejoined candidates must still pass _token_matches."""
-    out = []
+    Rejoined candidates must still pass _token_matches(joined=True)."""
+    out = []  # [line, joined]
     for line in lines:
         if out:
-            pm = _PREFIX_LINE_RE.match(out[-1])
+            pm = _PREFIX_LINE_RE.match(out[-1][0])
             if pm:
                 c = _HEX_CONT_RE.match(line)
                 if c:
                     pre, cont = c.group(1), c.group(2)
                     if pm.group("pre") or pm.group("frag"):
                         if not pre and len(pm.group("frag")) + len(cont) <= 32:
-                            # r13#2: strip head decorations (。/** etc.) so the
-                            # reassembled line matches SENTINEL_RE
                             head = re.sub(r"[:\s.。!！│`*|]+$", "",
                                           pm.group("head").rstrip())
-                            out[-1] = (head + " " + (pm.group("pre") or "")
-                                       + pm.group("frag") + cont + pm.group("tail"))
+                            out[-1] = [head + " " + (pm.group("pre") or "")
+                                       + pm.group("frag") + cont
+                                       + pm.group("tail"), True]
                             continue
                     elif len(cont) >= 16:
-                        kw = re.sub(r"[:\s.。!！│`*|]+$", "", pm.group("head").rstrip())
-                        out[-1] = kw + " " + (pre or "") + cont
+                        kw = re.sub(r"[:\s.。!！│`*|]+$", "",
+                                    pm.group("head").rstrip())
+                        out[-1] = [kw + " " + (pre or "") + cont, True]
                         continue
-        out.append(line)
-    return out
+        out.append([line, False])
+    return [(l, j) for l, j in out]
 
 
 def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
@@ -524,13 +532,10 @@ def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
         txt = json.loads(out)["result"]["read"]["text"]
     except Exception:
         txt = out
-    raw_lines = txt.splitlines()
-    rawset = set(raw_lines)
     last = None
-    for line in _join_wrapped_sentinels(raw_lines):
+    for line, joined in _join_wrapped_sentinels(txt.splitlines()):
         m = SENTINEL_RE.match(line)
-        if m and _token_matches(m.group(1), token, sid,
-                                joined=line not in rawset):
+        if m and _token_matches(m.group(1), token, sid, joined=joined):
             last = line
     return last, None
 

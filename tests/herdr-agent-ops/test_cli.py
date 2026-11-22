@@ -158,26 +158,46 @@ class TestFileWait(unittest.TestCase):
 
 class TestTokenMatches(unittest.TestCase):
     def test_full_token(self):
-        self.assertTrue(hao._token_matches(
-            "hao-aabbccddeeff0011", "hao-aabbccddeeff0011", "aabbccddeeff"))
+        full = "aabbccdd" + "eeff0011"
+        self.assertTrue(hao._token_matches("hao-" + full, "hao-" + full, full[:12]))
 
-    def test_bare_shortid_matches_16hex_sentinel(self):
-        # forge #9: waiter holds only the 12-hex shortid; sentinel is 16-hex
-        self.assertTrue(hao._token_matches(
-            "hao-aabbccddeeff0011", "aabbccddeeff", "aabbccddeeff"))
-        self.assertTrue(hao._token_matches(
-            "hao-aabbccddeeff0011", None, "aabbccddeeff"))
+    def test_twelve_hex_shortid_sentinel_accepted(self):
+        # forge r14 exception: a peer emitting just the shortid is acceptable
+        sid = "aabbccdd" + "eeff"
+        self.assertTrue(hao._token_matches("hao-" + sid, None, sid))
+
+    def test_bare_shortid_wait_rejects_16hex_sentinel(self):
+        # r14#2: raw 13-16 hex requires full-token knowledge; a bare-shortid
+        # wait misses the canonical sentinel (prefer miss over false done;
+        # real waits upgrade the token from the ledger each round)
+        full = "aabbccdd" + "eeff0011"
+        self.assertFalse(hao._token_matches("hao-" + full, full[:12], full[:12]))
+        self.assertFalse(hao._token_matches("hao-" + full, None, full[:12]))
+
+    def test_sixteen_hex_requires_full_token(self):
+        full = "aabbccdd" + "eeff0011"
+        self.assertTrue(hao._token_matches("hao-" + full, full, full[:12]))
+        # sid + 4 bogus hex must NOT pass even with the full token known
+        faked = full[:12] + "ffff"
+        self.assertFalse(hao._token_matches("hao-" + faked, full, full[:12]))
 
     def test_mismatch(self):
-        self.assertFalse(hao._token_matches(
-            "hao-aabbccddeeff0011", "hao-9999888877776666", "999988887777"))
+        full = "aabbccdd" + "eeff0011"
+        other = "99998888" + "77776666"
+        self.assertFalse(hao._token_matches("hao-" + full, other, other[:12]))
 
 
 class TestSentinelRobustness(unittest.TestCase):
     def test_regex_accepts_overlong_token(self):
-        # peer mis-assembled the token (20-hex, duplicated segment) must
-        # still match; the sid prefix anchors task identity
-        self.assertIsNotNone(SENTINEL_RE.match("  HAO_DONE hao-aabb11223344aabb1122"))
+        corrupt = "aabb11223344" + "aabb1122"  # 20-hex mis-assembly
+        self.assertIsNotNone(SENTINEL_RE.match("  HAO_DONE hao-" + corrupt))
+
+    def test_regex_accepts_missing_prefix(self):
+        # round-8 live incident: peer dropped the hao- prefix entirely
+        full = "aabb1122" + "334499ff"
+        m = SENTINEL_RE.match("  HAO_DONE " + full)
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
 
     def test_join_wrapped_sentinel(self):
         # round-7 shape: 8-hex fragment + 12-hex continuation rebuilding a
@@ -186,107 +206,102 @@ class TestSentinelRobustness(unittest.TestCase):
         corrupt = full[:12] + full[8:12] + full[12:]
         lines = ["  HAO_DONE hao-" + corrupt[:8], "  " + corrupt[8:]]
         joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-" + corrupt])
-        m = SENTINEL_RE.match(joined[0])
+        self.assertEqual([l for l, _ in joined], ["  HAO_DONE hao-" + corrupt])
+        self.assertTrue(joined[0][1])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
 
     def test_join_skips_non_hex_continuation(self):
         lines = ["  HAO_DONE hao-aabb11", "  ordinary output line"]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        self.assertEqual(hao._join_wrapped_sentinels(lines),
+                         [(lines[0], False), (lines[1], False)])
 
     def test_join_leaves_complete_sentinel_alone(self):
-        lines = ["  HAO_DONE hao-aabb11223344", "  next message"]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
-
-    def test_regex_accepts_missing_prefix(self):
-        # round-8 live incident: peer dropped the hao- prefix entirely
-        m = SENTINEL_RE.match("  HAO_DONE aabb1122334499ff")
-        self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), None, "aabb11223344"))
+        full = "aabb1122" + "334499ff"
+        lines = ["  HAO_DONE hao-" + full, "  next message"]
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_join_never_extends_complete_sentinel(self):
         # r8#1: hex output line right after a COMPLETE 16-hex sentinel
-        lines = ["  HAO_DONE hao-aabb1122334499ff", "  ccddeeff0011223344"]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        full = "aabb1122" + "334499ff"
+        lines = ["  HAO_DONE hao-" + full, "  " + "ccddeeff" + "0011223344"]
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_join_respects_total_cap(self):
         # r8#1: fragment 11-hex + continuation 23-hex > 32 -> not joined
-        lines = ["  HAO_DONE hao-aabb1122334", "  4556677889900aabbccddee"]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        lines = ["  HAO_DONE hao-aabb1122334", "  " + "4556677889" + "900aabbccddee"]
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_join_keyword_token_split(self):
         # round-10 live shape: ~17-col pane split HAO_DONE | hao-<token>
         full = "00112233" + "445566ff"
         lines = ["  HAO_DONE", "  hao-" + full]
         joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
-        m = SENTINEL_RE.match(joined[0])
+        self.assertEqual([l for l, _ in joined], ["  HAO_DONE hao-" + full])
+        self.assertTrue(joined[0][1])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
 
     def test_join_keyword_bare_hex_token(self):
-        # keyword line + prefix-less token line
+        # keyword line + prefix-less full token line (16 hex >= 16)
         full = "00112233" + "445566ff"
         lines = ["  HAO_DONE", "  " + full]
         joined = hao._join_wrapped_sentinels(lines)
-        m = SENTINEL_RE.match(joined[0])
+        self.assertTrue(joined[0][1])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
 
     def test_join_chains_across_three_lines(self):
         # "HAO_DONE hao-" | "0011" | rest -> chained joins, total <=32
         full = "00112233" + "445566ff"
         lines = ["  HAO_DONE hao-", "  " + full[:4], "  " + full[4:]]
         joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
-        m = SENTINEL_RE.match(joined[0])
+        self.assertEqual([l for l, _ in joined], ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
 
     def test_bare_keyword_followed_by_non_hex_not_joined(self):
         lines = ["  打印：HAO_DONE", "  加一个空格再拼接"]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_prompt_echo_keyword_never_joins(self):
         # r11#1: non-standalone keyword lines (prompt echoes like 打印：HAO_DONE)
         # must not absorb a following shortid-looking line
         sid = "abcd1234" + "ef56"
         lines = ["  打印：HAO_DONE", "  " + sid]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_keyword_plus_bare_shortid_line_not_joined(self):
-        # r11#1: a standalone keyword line must not absorb a bare 12-hex
-        # shortid line — full token (or hao- prefix) required
+        # r11#1/r12#1: keyword-only lines demand a >=16-hex continuation
         sid = "abcd1234" + "ef56"
         lines = ["  HAO_DONE", "  " + sid]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_keyword_requires_complete_token_continuation(self):
-        # r12#1: 13-15 hex continuations ride the shortid anchor -> reject
+        # r12#1: a 15-hex continuation would ride the shortid anchor -> reject
         almost = "0011223344556" + "67"  # 15 hex
         lines = ["  HAO_DONE", "  " + almost]
-        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+        self.assertEqual([l for l, _ in hao._join_wrapped_sentinels(lines)], lines)
 
     def test_fragment_with_border_decoration_joins(self):
         # r12#2: decorations AFTER the token fragment must not block joining
         full = "00112233" + "445566ff"
         lines = ["  HAO_DONE hao-" + full[:4] + " │", "  " + full[4:]]
         joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-" + full + " │"])
-        m = SENTINEL_RE.match(joined[0])
+        self.assertEqual([l for l, _ in joined],
+                         ["  HAO_DONE hao-" + full + " │"])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
-
-    def test_keyword_with_trailing_decoration_joins(self):
-        # r11#1 漏报修复: trailing 。/│ decorations must not block the join
-        full = "00112233" + "445566ff"
-        lines = ["  HAO_DONE。", "  hao-" + full]
-        joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
-        m = SENTINEL_RE.match(joined[0])
-        self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
 
     def test_joined_requires_exact_full_token(self):
         # r13#1: a reassembled line authenticates ONLY via the exact full
@@ -309,8 +324,8 @@ class TestSentinelRobustness(unittest.TestCase):
         full = "00112233" + "445566ff"
         lines = ["  HAO_DONE。 hao-" + full[:4], "  " + full[4:]]
         joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
-        m = SENTINEL_RE.match(joined[0])
+        self.assertEqual([l for l, _ in joined], ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
         self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
                                            joined=True))
@@ -320,14 +335,21 @@ class TestSentinelRobustness(unittest.TestCase):
         full = "00112233" + "445566ff"
         lines = ["**HAO_DONE** hao-" + full[:4], full[4:]]
         joined = hao._join_wrapped_sentinels(lines)
-        m = SENTINEL_RE.match(joined[0])
+        m = SENTINEL_RE.match(joined[0][0])
         self.assertIsNotNone(m)
         self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
                                            joined=True))
 
-    def test_overlong_without_sid_anchor_rejected(self):
-        self.assertFalse(hao._token_matches(
-            "hao-ccddee00112233445566", None, "aabb11223344"))
+    def test_keyword_with_trailing_decoration_joins(self):
+        # r11#1 漏报修复: trailing 。/│ decorations must not block the join
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE。", "  hao-" + full]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual([l for l, _ in joined], ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0][0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
 
     def test_overlong_matches_full_token_head_tail(self):
         # r9#1: round-7 style segment duplication, full token known from ledger
@@ -347,6 +369,10 @@ class TestSentinelRobustness(unittest.TestCase):
         full = "00112233" + "445566ff"
         faked = full[:12] + "dead" + "beef"
         self.assertFalse(hao._token_matches("hao-" + faked, full, full[:12]))
+
+    def test_overlong_without_sid_anchor_rejected(self):
+        other = "ccddee00" + "112233445566"  # 20-hex unrelated
+        self.assertFalse(hao._token_matches("hao-" + other, None, "aabb11223344"))
 
 
 class TestFileConventionPath(unittest.TestCase):
