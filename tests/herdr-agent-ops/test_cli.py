@@ -120,11 +120,44 @@ class TestFileWait(unittest.TestCase):
                 # write content -> done
                 with open(rp, "w") as f:
                     f.write("result body")
-                r2 = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 2, None)
+                r2 = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 6, None)
                 self.assertEqual(r2["status"], "done")
                 self.assertEqual(r2["result_path"], rp)
             finally:
                 sys.path.pop(0)
+
+
+class TestTokenMatches(unittest.TestCase):
+    def test_full_token(self):
+        self.assertTrue(hao._token_matches(
+            "hao-aabbccddeeff0011", "hao-aabbccddeeff0011", "aabbccddeeff"))
+
+    def test_bare_shortid_matches_16hex_sentinel(self):
+        # forge #9: waiter holds only the 12-hex shortid; sentinel is 16-hex
+        self.assertTrue(hao._token_matches(
+            "hao-aabbccddeeff0011", "aabbccddeeff", "aabbccddeeff"))
+        self.assertTrue(hao._token_matches(
+            "hao-aabbccddeeff0011", None, "aabbccddeeff"))
+
+    def test_mismatch(self):
+        self.assertFalse(hao._token_matches(
+            "hao-aabbccddeeff0011", "hao-9999888877776666", "999988887777"))
+
+
+class TestParserFlags(unittest.TestCase):
+    def test_wait_token_flag(self):
+        a = build_parser().parse_args(["wait", "w2:p9", "--token", "hao-abc123"])
+        self.assertEqual(a.token_opt, "hao-abc123")
+        self.assertIsNone(a.token)
+
+    def test_done_token_flag(self):
+        a = build_parser().parse_args(["done", "--token", "hao-abc123"])
+        self.assertEqual(a.token_opt, "hao-abc123")
+
+    def test_restore_workspace_flag(self):
+        a = build_parser().parse_args(["restore", "--workspace", "w2", "--dry-run"])
+        self.assertEqual(a.workspace_opt, "w2")
+        self.assertTrue(a.dry_run)
 
 
 class TestCLI(unittest.TestCase):

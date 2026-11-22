@@ -17,9 +17,10 @@ import os
 
 class TestModes(unittest.TestCase):
     def test_lifecycle_gate_needs_seq_and_final(self):
-        self.assertFalse(lifecycle_gate(submit_seq=5, final="working"))
-        self.assertTrue(lifecycle_gate(submit_seq=6, final="idle"))
-        self.assertTrue(lifecycle_gate(submit_seq=6, final="done"))
+        self.assertFalse(lifecycle_gate(submit_seq=5, current_seq=5, final="idle"))
+        self.assertFalse(lifecycle_gate(submit_seq=5, current_seq=6, final="working"))
+        self.assertTrue(lifecycle_gate(submit_seq=5, current_seq=6, final="idle"))
+        self.assertTrue(lifecycle_gate(submit_seq=5, current_seq=6, final="done"))
 
     def test_file_partial_rejected(self):
         self.assertFalse(safe_result_path("abc", "/etc/passwd"))

@@ -33,7 +33,7 @@ herdr-agent-ops/
 
 短别名：`n` name · `r` restore · `a` ask · `w` wait · `d` done · `l` list · `s` suggest · `c` clear · `st` status · `sy` say · `rs` result
 
-等待模式：`sentinel`（默认，文本哨兵）· `lifecycle`（herdr agent wait 兜底）· `file`（结果文件）
+等待模式：`sentinel`（默认，文本哨兵；~30s 后自动切 herdr agent wait 兜底 + 大窗口重扫）· `lifecycle`（agent wait 短循环 + 活动门槛）· `file`（结果文件稳定即完成）
 
 ## 快速开始
 
@@ -61,7 +61,7 @@ hao restore                        # 从 label 恢复
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（54 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（64 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
