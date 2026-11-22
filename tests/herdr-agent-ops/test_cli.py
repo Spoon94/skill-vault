@@ -288,6 +288,43 @@ class TestSentinelRobustness(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
 
+    def test_joined_requires_exact_full_token(self):
+        # r13#1: a reassembled line authenticates ONLY via the exact full
+        # token (or over-long head8/tail8) — never via the shortid anchor
+        full = "00112233" + "445566ff"
+        faked = full[:12] + "ffff"  # sid + 4 bogus hex = 16-hex
+        self.assertFalse(hao._token_matches("hao-" + faked, full, full[:12],
+                                            joined=True))
+        self.assertTrue(hao._token_matches("hao-" + full, full, full[:12],
+                                           joined=True))
+        corrupt = full[:12] + full[8:12] + full[12:]  # segment duplication
+        self.assertTrue(hao._token_matches("hao-" + corrupt, full, full[:12],
+                                           joined=True))
+        # full token unknown (degraded ledger): joined never authenticates
+        self.assertFalse(hao._token_matches("hao-" + full, None, full[:12],
+                                            joined=True))
+
+    def test_fragment_branch_strips_head_decoration(self):
+        # r13#2: "HAO_DONE。 hao-0011" must reassemble into a matchable line
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE。 hao-" + full[:4], "  " + full[4:]]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
+
+    def test_fragment_branch_strips_bold_decoration(self):
+        # r13#2: **HAO_DONE** hao-0011 shape
+        full = "00112233" + "445566ff"
+        lines = ["**HAO_DONE** hao-" + full[:4], full[4:]]
+        joined = hao._join_wrapped_sentinels(lines)
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12],
+                                           joined=True))
+
     def test_overlong_without_sid_anchor_rejected(self):
         self.assertFalse(hao._token_matches(
             "hao-ccddee00112233445566", None, "aabb11223344"))

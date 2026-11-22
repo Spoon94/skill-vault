@@ -412,20 +412,32 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
     return None
 
 
-def _token_matches(matched, token, sid):
+def _token_matches(matched, token, sid, joined=False):
     """matched: token text from the pane; the hao- prefix is optional (a
     live peer dropped it once). Accept the exact token, or a bare 12-hex
     shortid prefix. Over-long (>16-hex) matches — the observed segment-
     duplication corruption — additionally require head-8 AND tail-8 of the
     KNOWN full token: a shortid anchor alone would let a truncated sentinel
     plus an unrelated hex line fake a completion (r9#1). Without the full
-    token (degraded ledger) over-long never matches: prefer the miss."""
+    token (degraded ledger) over-long never matches: prefer the miss.
+
+    joined=True marks a line REASSEMBLED from wrapped fragments (r13#1):
+    only the exact full token (or an over-long passing head-8/tail-8)
+    authenticates it — a shortid anchor is not proof for a line the pane
+    never contained verbatim."""
     hexpart = matched[4:] if matched.startswith("hao-") else matched
     bare = None
     if token:
         bare = token[4:] if token.startswith("hao-") else token
+    if joined:
+        if not bare or len(bare) < 16:
+            return False
         if hexpart == bare:
             return True
+        return (len(hexpart) > 16 and hexpart[:8] == bare[:8]
+                and hexpart[-8:] == bare[-8:])
+    if bare and hexpart == bare:
+        return True
     if len(hexpart) > 16:
         return bool(bare) and len(bare) >= 16 \
             and hexpart[:8] == bare[:8] and hexpart[-8:] == bare[-8:]
@@ -487,7 +499,11 @@ def _join_wrapped_sentinels(lines):
                     pre, cont = c.group(1), c.group(2)
                     if pm.group("pre") or pm.group("frag"):
                         if not pre and len(pm.group("frag")) + len(cont) <= 32:
-                            out[-1] = (pm.group("head") + (pm.group("pre") or "")
+                            # r13#2: strip head decorations (。/** etc.) so the
+                            # reassembled line matches SENTINEL_RE
+                            head = re.sub(r"[:\s.。!！│`*|]+$", "",
+                                          pm.group("head").rstrip())
+                            out[-1] = (head + " " + (pm.group("pre") or "")
                                        + pm.group("frag") + cont + pm.group("tail"))
                             continue
                     elif len(cont) >= 16:
@@ -508,10 +524,13 @@ def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
         txt = json.loads(out)["result"]["read"]["text"]
     except Exception:
         txt = out
+    raw_lines = txt.splitlines()
+    rawset = set(raw_lines)
     last = None
-    for line in _join_wrapped_sentinels(txt.splitlines()):
+    for line in _join_wrapped_sentinels(raw_lines):
         m = SENTINEL_RE.match(line)
-        if m and _token_matches(m.group(1), token, sid):
+        if m and _token_matches(m.group(1), token, sid,
+                                joined=line not in rawset):
             last = line
     return last, None
 
