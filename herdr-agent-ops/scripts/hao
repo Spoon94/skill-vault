@@ -105,3 +105,30 @@ def cmd_restore(workspace, all_, adopt, dry_run, pick):
             run_herdr(["pane", "rename", p["pane_id"], make_label(role)])
             run_herdr(["agent", "rename", p["pane_id"], role])
     return 0
+
+
+def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None):
+    from names import NAMES, RESERVED, GRAY
+    live = set(live_names or []) | set(label_roles or [])
+
+    def kw_score(info):
+        s = 0
+        for k in info.get("keywords_zh", []):
+            if k and k in task:
+                s += 1
+        for k in info.get("keywords_en", []):
+            if k and re.search(r"\b" + re.escape(k) + r"\b", task, re.IGNORECASE):
+                s += 1
+        return s
+
+    best, best_score = None, -1
+    for g, info in NAMES.items():
+        score = kw_score(info)
+        if score > best_score:
+            best, best_score = g, score
+    info = NAMES[best]
+    cands = [n for n in info["names"] if n not in live and n not in RESERVED and n not in GRAY]
+    out = {"group": best, "reason": f"keywords matched {best_score}", "candidates": cands[:3]}
+    if not json_out:
+        print(out["group"], out["candidates"])
+    return out

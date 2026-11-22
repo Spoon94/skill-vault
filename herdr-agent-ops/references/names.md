@@ -690,8 +690,8 @@
 
 ## 验证审阅
 主题：锐眼/量具/证明/守卫
-关键词（中文）：验证/审阅/检查/review/verify/audit/check
-关键词（英文）：验证/审阅/检查/review/verify/audit/check
+关键词（中文）：验证/审阅/审查/评审/检查/review/verify/audit/check
+关键词（英文）：验证/审阅/审查/评审/检查/review/verify/audit/check
 名字：
 - `hawk` — 鹰/锐眼
 - `lens` — 透镜/审视
