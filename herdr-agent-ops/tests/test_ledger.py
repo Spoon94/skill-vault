@@ -42,7 +42,8 @@ class TestLedger(unittest.TestCase):
             from ledger import _path
             rec = json.load(open(_path("done1")))
             rec["updated"] = time.time() - 5000
-            json.dump(rec, open(_path("done1"), "w"))
+            with open(_path("done1"), "w") as f:
+                json.dump(rec, f)
             l.write_running("run1")
             l.heartbeat("run1")  # fresh heartbeat -> active running
             l.cleanup(ttl_s=1000)
