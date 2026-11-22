@@ -225,9 +225,12 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
     token = f"hao-{os.urandom(8).hex()}"
     prompt = build_prompt(text, token)
     assert token not in prompt, "full token must not appear in prompt (echo guard)"
-    rc, _, _ = run_herdr(["agent", "prompt", target, prompt], machine)
+    rc, err_out, err_err = run_herdr(["agent", "prompt", target, prompt], machine)
     if rc != 0:
-        return 8
+        try:
+            return map_herdr_error(json.loads(err_err))
+        except Exception:
+            return 8
     Ledger().write_running(token, target=target, wake=wake)
     if wait:
         return cmd_wait(target, token, timeout, mode, machine)
@@ -254,7 +257,12 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None):
             return 5
         if st in ("exited", "closed"):
             return 3
-        rc, out, _ = run_herdr(["pane", "wait-output", resolve_target(target, machine), "--regex", SENTINEL_RE.pattern, "--timeout", "8000"], machine)
+        rc, out, err_err = run_herdr(["pane", "wait-output", resolve_target(target, machine), "--regex", SENTINEL_RE.pattern, "--timeout", "8000"], machine)
+        if rc != 0:
+            try:
+                return map_herdr_error(json.loads(err_err))
+            except Exception:
+                return 8
         m = SENTINEL_RE.search(out)
         if m and m.group(1) == token:
             l.write_done(token, matched_line=out)
@@ -263,12 +271,16 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None):
     return 4
 
 
-def cmd_done(token, summary):
+def cmd_done(token, summary, final=False):
     from ledger import Ledger
     l = Ledger()
     rec = l.get(token)
     if rec and rec.get("status") == "cancelled":
         return 6
+    if final:
+        target = rec.get("target") if rec else None
+        if target and current_state(target) not in ("idle", "done"):
+            return 5
     l.write_done(token, summary=summary)
     if summary:
         print(summary, flush=True)
@@ -406,7 +418,7 @@ def lifecycle_wait(target, token, machine=None):
         if current_seq(target, machine) > submit_seq and current_state(target, machine) in ("idle", "done"):
             l.write_done(token)
             return l.get(token)
-        run_herdr(["agent", "wait", target, "--until", "idle/done/blocked", "--timeout", "8000"], machine)
+        run_herdr(["agent", "wait", target, "--until", "idle", "--until", "done", "--until", "blocked", "--timeout", "8000"], machine)
         time.sleep(0.5)
 
 
@@ -423,10 +435,12 @@ def cmd_status(target):
     return 0
 
 
-def cmd_say(target, text):
+def cmd_say(target, text, strict=False):
     pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
     if not pane:
         return 3
+    if strict and current_state(pane) == "working":
+        return 6
     rc, _, _ = run_herdr(["agent", "prompt", pane, text])
     return 0 if rc == 0 else 5
 
@@ -511,12 +525,11 @@ def main():
     s.add_argument("--scope"); s.add_argument("--force", action="store_true")
     s.add_argument("--dry-run", action="store_true"); s.add_argument("--machine")
 
-    add("clear", lambda a: cmd_clear(a.target, a.force, a.dry_run, a.machine))
-    s = sub.choices[-1] if False else None
-    s2 = sub.add_parser("clear")
-    s2.set_defaults(func=lambda a: cmd_clear(a.target, a.force, a.dry_run, a.machine))
-    s2.add_argument("target"); s2.add_argument("--force", action="store_true")
-    s2.add_argument("--dry-run", action="store_true"); s2.add_argument("--machine")
+    sp = add("clear", lambda a: cmd_clear(a.target, a.force, a.dry_run, a.machine))
+    sp.add_argument("target")
+    sp.add_argument("--force", action="store_true")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--machine")
 
     s = add("restore", lambda a: cmd_restore(a.workspace, a.all, a.adopt, a.dry_run, a.pick, a.machine))
     s.add_argument("workspace"); s.add_argument("--all", action="store_true")
@@ -532,8 +545,8 @@ def main():
     s.add_argument("target"); s.add_argument("token")
     s.add_argument("--timeout", type=int, default=1800); s.add_argument("--mode", default="sentinel"); s.add_argument("--machine")
 
-    s = add("done", lambda a: cmd_done(a.token, a.summary))
-    s.add_argument("token"); s.add_argument("--summary")
+    s = add("done", lambda a: cmd_done(a.token, a.summary, a.final))
+    s.add_argument("token"); s.add_argument("--summary"); s.add_argument("--final", action="store_true")
 
     s = add("cancel", lambda a: cmd_cancel(a.shortid))
     s.add_argument("shortid")
@@ -551,18 +564,21 @@ def main():
     s = add("status", lambda a: cmd_status(a.target))
     s.add_argument("target", nargs="?")
 
-    s = add("say", lambda a: cmd_say(a.target, a.text))
-    s.add_argument("target", nargs="?"); s.add_argument("text")
+    s = add("say", lambda a: cmd_say(a.target, a.text, a.strict))
+    s.add_argument("target", nargs="?"); s.add_argument("text"); s.add_argument("--strict", action="store_true")
 
     s = add("result", lambda a: cmd_result(a.shortid, a.target, a.file))
     s.add_argument("shortid"); s.add_argument("--target"); s.add_argument("--file")
 
-    add("doctor", lambda a: cmd_doctor(a.machine))
-    sub.choices[-1].add_argument("--machine")
+    sp = add("doctor", lambda a: cmd_doctor(a.machine))
+    sp.add_argument("--machine")
 
     args = p.parse_args()
-    rc = args.func(args)
-    raise SystemExit(rc if isinstance(rc, int) else 0)
+    result = args.func(args)
+    if isinstance(result, dict):
+        print(json.dumps(result, ensure_ascii=False))
+        raise SystemExit(0)
+    raise SystemExit(result if isinstance(result, int) else 0)
 
 
 if __name__ == "__main__":

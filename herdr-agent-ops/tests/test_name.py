@@ -32,7 +32,7 @@ class TestName(unittest.TestCase):
         self.assertEqual(cmd_name("w2:p9", "hawk", "api", False, True), 0)
 
     def test_clear_dry_run(self):
-        self.assertEqual(cmd_clear("w2:p9", False), 0)
+        self.assertEqual(cmd_clear("w2:p9", False, True), 0)  # dry_run=True, no real clear
 
 
 if __name__ == "__main__":
