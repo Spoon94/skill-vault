@@ -303,13 +303,13 @@ def build_prompt(task, token, result_path=None):
         f"[TASK {shortid}]",
         task,
         "",
-        f"完成时，将令牌的两段拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}。",
-        "在最终消息最后一行打印：HAO_DONE 加一个空格，再拼接这两段"
-        "（格式：HAO_DONE + 空格 + hao- + 第一段 + 第二段）。",
-        "若改用 hao done 上报：先输出全部正文，最后才调用——台账 done 会让等待方立即返回。",
+        f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
+        "首选完成上报：输出完最终答复的全部正文后，调用 hao done 并传入完整令牌"
+        "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
+        "同时在最终消息最后一行打印作为备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
     ]
     if result_path:
-        lines.append(f"请先把最终结果完整写入文件 {result_path}，写完后再打印完成行。")
+        lines.append(f"请先把最终结果完整写入文件 {result_path}，写完后再做完成上报。")
     return "\n".join(lines)
 
 
@@ -455,39 +455,44 @@ def _sentinel_check(pane, token, sid, machine):
     return (ml, None) if _token_matches(m.group(1), token, sid) else (None, None)
 
 
-_PARTIAL_SENTINEL_RE = re.compile(r"HAO_DONE:?\s+(?:hao-)?([0-9a-f]{0,11})$")
-_BARE_DONE_RE = re.compile(r"HAO_DONE:?\s*$")
+_PREFIX_LINE_RE = re.compile(
+    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE[:\s.。!！│`*|]*(hao-)?([0-9a-f]{0,11})$")
 _HEX_CONT_RE = re.compile(
     r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*(hao-)?([0-9a-f]{1,32})[\s.。!！│`*|]*$")
 
 
 def _join_wrapped_sentinels(lines):
-    """Rejoin sentinels split by narrow-pane wrapping, with r8#1/r10 guards.
+    """Rejoin sentinels split by narrow-pane wrapping (r8#1/r10/r11#1).
 
-    Live-observed split shapes: mid-token (r7), keyword|token on separate
-    lines (r10, ~17-col pane). Rules:
-    - a tail token fragment (<12 hex) absorbs a following BARE-hex line
-      while the joined token stays <=32 hex (chains across multiple wraps);
-    - a line ending at the bare keyword HAO_DONE absorbs a following
-      complete-token line (optional hao- prefix), joined with one space;
-    - a COMPLETE sentinel is never extended, so an unrelated hex output
-      line after it cannot corrupt the match.
-    False-positive bound: any rejoined candidate must still pass
-    _token_matches (exact / full-token head-8+tail-8 / shortid anchor)."""
+    Only a STANDALONE sentinel-prefix line may absorb a continuation —
+    the same left anchor and decorations SENTINEL_RE accepts, so prompt
+    echoes like "…打印：HAO_DONE" never join. Shapes:
+    - keyword line already carrying hao- and/or <12 hex absorbs a bare-hex
+      continuation while the joined token stays <=32 hex (chains across
+      multiple wraps; live r7 mid-token split);
+    - keyword-only line absorbs a following COMPLETE token line — hao-
+      prefixed, or bare with >12 hex; a bare 12-hex shortid line alone is
+      NOT enough (r11#1: prefer miss over false done);
+    - keyword line trailing decorations (。│ etc.) are stripped on join;
+    - a complete sentinel is never extended.
+    Rejoined candidates must still pass _token_matches."""
     out = []
     for line in lines:
         if out:
-            prev = out[-1]
-            c = _HEX_CONT_RE.match(line)
-            if c:
-                pre, cont = c.group(1), c.group(2)
-                pm = _PARTIAL_SENTINEL_RE.search(prev)
-                if pm and not pre and len(pm.group(1)) + len(cont) <= 32:
-                    out[-1] = prev + cont
-                    continue
-                if _BARE_DONE_RE.search(prev) and len(cont) <= 32:
-                    out[-1] = prev.rstrip() + " " + (pre or "") + cont
-                    continue
+            pm = _PREFIX_LINE_RE.match(out[-1])
+            if pm:
+                c = _HEX_CONT_RE.match(line)
+                if c:
+                    pre, cont = c.group(1), c.group(2)
+                    if pm.group(1) or pm.group(2):
+                        # token already begun: bare-hex continuation only
+                        if not pre and len(pm.group(2)) + len(cont) <= 32:
+                            out[-1] = out[-1] + cont
+                            continue
+                    elif pre or len(cont) > 12:
+                        kw = re.sub(r"[:\s.。!！│`*|]+$", "", out[-1].rstrip())
+                        out[-1] = kw + " " + (pre or "") + cont
+                        continue
         out.append(line)
     return out
 

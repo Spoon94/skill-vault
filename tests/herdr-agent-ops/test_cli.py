@@ -248,6 +248,30 @@ class TestSentinelRobustness(unittest.TestCase):
         lines = ["  打印：HAO_DONE", "  加一个空格再拼接"]
         self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
 
+    def test_prompt_echo_keyword_never_joins(self):
+        # r11#1: non-standalone keyword lines (prompt echoes like 打印：HAO_DONE)
+        # must not absorb a following shortid-looking line
+        sid = "abcd1234" + "ef56"
+        lines = ["  打印：HAO_DONE", "  " + sid]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_keyword_plus_bare_shortid_line_not_joined(self):
+        # r11#1: a standalone keyword line must not absorb a bare 12-hex
+        # shortid line — full token (or hao- prefix) required
+        sid = "abcd1234" + "ef56"
+        lines = ["  HAO_DONE", "  " + sid]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_keyword_with_trailing_decoration_joins(self):
+        # r11#1 漏报修复: trailing 。/│ decorations must not block the join
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE。", "  hao-" + full]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+
     def test_overlong_without_sid_anchor_rejected(self):
         self.assertFalse(hao._token_matches(
             "hao-ccddee00112233445566", None, "aabb11223344"))
