@@ -21,6 +21,13 @@ def run_herdr(args, machine=None):
     return p.returncode, p.stdout, p.stderr
 
 
+def _herdr_err_code(stderr):
+    try:
+        return json.loads(stderr).get("error", {}).get("code")
+    except Exception:
+        return None
+
+
 def herdr_error_rc(stderr, fallback=8):
     try:
         return map_herdr_error(json.loads(stderr))
@@ -162,14 +169,21 @@ def preflight(panes, agents, workspace):
 def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None, machine=None):
     _led = _load_module("hao_ledger", "ledger.py")
     ws = workspace or default_workspace()
-    rc, out, _ = run_herdr(["agent", "list"], machine)
-    agents = json.loads(out)["result"]["agents"] if out else []
-    # names are per-machine unique: conflict check scans ALL workspaces
-    rca, outa, _ = run_herdr(["pane", "list"], machine)
-    all_panes = json.loads(outa)["result"]["panes"] if rca == 0 and outa else []
+    rc, out, err = run_herdr(["agent", "list"], machine)
+    if rc != 0:
+        return herdr_error_rc(err, 8)
+    agents = json.loads(out)["result"]["agents"]
+    # names are per-machine unique: conflict/ambiguity check scans ALL workspaces
+    rca, outa, erra = run_herdr(["pane", "list"], machine)
+    if rca != 0:
+        return herdr_error_rc(erra, 8)
+    all_panes = json.loads(outa)["result"]["panes"]
     full = preflight(all_panes, agents, ws)
     if full["conflicts"]:
         print("name conflicts (per-machine):", full["conflicts"])
+        return 6
+    if full["ambiguous"] and not pick:
+        print("ambiguous roles across workspaces; rerun with --pick <pane>")
         return 6
     if all_:
         panes = all_panes
@@ -319,8 +333,8 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
     if rc != 0:
         return herdr_error_rc(err)
     l = _led.Ledger()
-    l.write_running(shortid, token=token, target=pane, wake=wake, mode=mode,
-                    result_path=result_path,
+    l.write_running(shortid, token=token, target=pane, machine=machine,
+                    wake=wake, mode=mode, result_path=result_path,
                     submit_seq=current_seq(pane, machine),
                     submit_state=current_state(pane, machine))
     if wait:
@@ -377,11 +391,7 @@ def _sentinel_check(pane, token, sid, machine):
         ["pane", "wait-output", pane, "--regex", SENTINEL_RE.pattern, "--timeout", "1000"],
         machine)
     if rc != 0:
-        try:
-            code = json.loads(err).get("error", {}).get("code")
-        except Exception:
-            code = None
-        if code == "timeout":
+        if _herdr_err_code(err) == "timeout":
             return None, None  # normal "not yet"
         return None, herdr_error_rc(err, 8)
     try:
@@ -413,18 +423,24 @@ def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
 
 
 def _confirm_sentinel(pane, token, sid, machine, no_agent):
-    """forge #2: agent must not be working; 2s stability window; matched line
-    must still be the last one for this task. Returns the line or None."""
-    if not no_agent:
+    """Hit confirmation: agent must not be working/blocked before AND after
+    the 2s stability window (r5#2), and the matched line must still be the
+    last HAO_DONE for this task. Returns the line or None."""
+    def _st():
+        if no_agent:
+            return None
         rc, out, _ = run_herdr(["agent", "get", pane], machine)
-        if rc == 0:
-            try:
-                st = json.loads(out)["result"]["agent"].get("agent_status")
-            except Exception:
-                st = None
-            if st == "working":
-                return None
+        if rc != 0:
+            return None
+        try:
+            return json.loads(out)["result"]["agent"].get("agent_status")
+        except Exception:
+            return None
+    if _st() in ("working", "blocked"):
+        return None
     time.sleep(2)
+    if _st() in ("working", "blocked"):
+        return None
     last, _err = _sentinel_scan_tail(pane, token, sid, machine)
     return last
 
@@ -518,21 +534,27 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             return 3
         if seq > submit_seq or st == "working":
             saw_activity = True
-        if not saw_activity and time.time() - start > 5:
-            return 9  # no activity observed for this task
+        # task-level evidence is checked BEFORE the no-activity exit9 (r5#3):
+        # a late sentinel wins over the activity gate
         ml, errc = _sentinel_check(pane, token, sid, machine)
         if errc is not None:
             return errc
         if ml:
-            return _finish_done(l, sid, ml)
-        run_herdr(["agent", "wait", pane,
-                   "--until", "idle", "--until", "done", "--until", "blocked",
-                   "--timeout", "8000"], machine)
+            conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
+            if conf:
+                return _finish_done(l, sid, conf)
         last, errc2 = _sentinel_scan_tail(pane, token, sid, machine)
         if errc2 is not None:
             return errc2
         if last:
-            return _finish_done(l, sid, last)
+            conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
+            if conf:
+                return _finish_done(l, sid, conf)
+        if not saw_activity and time.time() - start > 5:
+            return 9  # no activity observed for this task
+        run_herdr(["agent", "wait", pane,
+                   "--until", "idle", "--until", "done", "--until", "blocked",
+                   "--timeout", "8000"], machine)
     return 4
 
 
@@ -550,8 +572,13 @@ def _wait_file(pane, sid, token, timeout, machine):
             return payload
         if kind == "cancelled":
             return 10
-        rc, out, _ = run_herdr(["agent", "get", pane], machine)
-        if rc == 0:
+        rc, out, err = run_herdr(["agent", "get", pane], machine)
+        if rc != 0:
+            # agent_not_found = shell pane without agent: skip the gate;
+            # anything else (pane gone -> 3, server error -> 8) stops the wait
+            if _herdr_err_code(err) != "agent_not_found":
+                return herdr_error_rc(err, 8)
+        else:
             try:
                 st = json.loads(out)["result"]["agent"].get("agent_status")
             except Exception:
@@ -676,8 +703,9 @@ def cmd_abort(shortid, interrupt):
         return rc
     if not target:
         return 3
-    run_herdr(["agent", "send-keys", target, "esc"])
-    run_herdr(["agent", "send-keys", target, "ctrl+c"])
+    mach = rec.get("machine")
+    run_herdr(["agent", "send-keys", target, "esc"], mach)
+    run_herdr(["agent", "send-keys", target, "ctrl+c"], mach)
     return 0
 
 
@@ -946,8 +974,9 @@ def build_parser():
     sp.add_argument("--live-names", nargs="*"); sp.add_argument("--label-roles", nargs="*")
     sp.add_argument("--machine")
 
-    sp = add("list", lambda a: cmd_list(a.workspace, a.machine, a.json), ["l"])
+    sp = add("list", lambda a: cmd_list(a.workspace or a.workspace_opt, a.machine, a.json), ["l"])
     sp.add_argument("workspace", nargs="?", default=None)
+    sp.add_argument("--workspace", dest="workspace_opt", default=None)
     sp.add_argument("--machine"); sp.add_argument("--json", dest="json", action="store_true")
 
     sp = add("status", lambda a: cmd_status(a.target), ["st"])

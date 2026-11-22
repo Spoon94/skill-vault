@@ -154,6 +154,10 @@ class TestParserFlags(unittest.TestCase):
         a = build_parser().parse_args(["done", "--token", "hao-abc123"])
         self.assertEqual(a.token_opt, "hao-abc123")
 
+    def test_list_workspace_flag(self):
+        a = build_parser().parse_args(["list", "--workspace", "w2"])
+        self.assertEqual(a.workspace_opt, "w2")
+
     def test_restore_workspace_flag(self):
         a = build_parser().parse_args(["restore", "--workspace", "w2", "--dry-run"])
         self.assertEqual(a.workspace_opt, "w2")

@@ -30,6 +30,11 @@ class TestMisc(unittest.TestCase):
 
 
 class TestGuards(unittest.TestCase):
+    def test_herdr_err_code(self):
+        self.assertEqual(hao._herdr_err_code('{"error": {"code": "agent_not_found"}}'),
+                         "agent_not_found")
+        self.assertIsNone(hao._herdr_err_code("not json"))
+
     def test_done_invalid_token_exit2(self):
         self.assertEqual(hao.cmd_done("hao-ZZZZ!!", None), 2)
 
