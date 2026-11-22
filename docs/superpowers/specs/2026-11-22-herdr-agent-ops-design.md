@@ -1,230 +1,176 @@
-# herdr-agent-ops 设计稿 v2
+# herdr-agent-ops 设计稿 v3
 
 > 状态：待 forge 复审 → 用户授权 · 日期：2026-11-22 · 分支：docs/herdr-agent-team-design
-> v2 变更：改名 herdr-agent-team→herdr-agent-ops（CLI hat→hao，label 前缀 hat-→hao-）；修复 forge 审核 16 条问题；新增功能/性能/容灾/扩展性/易用性五维优化；纳入编排者实测发现。
+> v3：修复 forge round-2 全部问题（新 P0 匹配器 false-negative、restore adopt、per-machine 唯一、clear 顺序、baseline 可执行序列、task marker、锁降级、过度设计裁剪、词表 round-3）；新增「等待方式/长等待唤醒/终止」回应用户。
 
 ## 1. 背景与痛点
-
-herdr 多 agent 协作三痛点：
-1. **任务级等待缺失**：`herdr agent wait`/`agent prompt --wait` 只看生命周期（idle/done/blocked），不是任务完成信号；跨机器更难。
-2. **名字不持久**：agent name 在 agent 退出/被替换时清除；重启窗口内 live name 丢失，label 才是稳定句柄。
-3. **取名难**：要短、有意义、贴合分工。
+herdr 多 agent 协作：任务级等待缺失、名字不持久、取名难。详见 v1/v2。
 
 ## 2. 命名与调用
+- skill `herdr-agent-ops`；CLI `hao`；受管 label 前缀 `hao-`。
+- 调用：`${CLAUDE_SKILL_DIR}/scripts/hao`（Claude Code）或 PATH 安装；远端无 python3/hao 退化为手动打印哨兵。`hao doctor` 查 python3≥3.9 / herdr 版本 / HERDR_ENV / machine profile / resume 配置。
+- 所有命令 `--json`（agent 解析）+ 人读默认；**`--progress`/日志走 stderr，不污染 --json**；`hao done` 例外：哨兵走 stdout 最后一行，JSON 走 stderr。
 
-- skill 名：`herdr-agent-ops`；CLI：`hao`（herdr agent ops）；受管 pane label 前缀：`hao-`。
-- 调用路径（SKILL.md 必须写明）：Claude Code 用 `${CLAUDE_SKILL_DIR}/scripts/hao`；或安装到 PATH 后直接 `hao`。远端无 python3/hao 时退化为“agent 手动打印哨兵”。
-- `hao doctor` 检查：python3≥3.9、herdr 版本、`HERDR_ENV=1`、machine profile、`resume_agents_on_restore` 配置。
-- 所有命令支持 `--json`（供 agent 解析）与人读默认输出。
-
-## 3. 已确认决定
-
+## 3. 关键决定
 | 维度 | 决定 |
 |---|---|
-| 跨机器 | 封装 `herdr --machine <label>`；**本机实测 machine list=[]，跨机器仅 stub 验证，spec 明确标注未端到端验证** |
-| 持久化载体 | 零注册表：`hao-` 前缀 pane label 是我们控制的、与 agent 生命周期解耦的角色槽位；herdr 自身 agent_name/resume 是 best-effort，不作契约 |
-| 持久化范围 | server/客户端重启 + agent 退出重开 + unsupported kind + resume 失败 |
-| 命名 | 优雅代号，`^[a-z]{4,6}$`，**per-machine 唯一**（herdr live name 按 server 唯一，跨机器可同名）|
-| name vs label | agent name=裸代号；label=`hao-<代号>[-<scope>]`；**scope 仅标签注解，不参与 agent name** |
-| 冲突模型 | 一代号一 agent；同 role 多 pane 必须用不同代号 |
-| 等待 | 哨兵 token（拆分防回显）+ 行首锚定正则 + 基线比对；blocked/exited 立即返回 |
-| 恢复时机 | 仅 skill 入口 `hao restore`；可选 SessionStart hook（扩展项）|
-| 词表 | 40 组×40=1600，全部 `^[a-z]{4,6}$`、全局唯一、无保留字、无灰色词 |
+| 名字持久化 | 零注册表：`hao-` label 是我们控制的解耦角色槽位；herdr agent_name/resume 是 best-effort 非契约 |
+| 任务协调状态 | **临时任务台账** `$XDG_STATE_HOME/hao/tasks/<shortid>.json`（token/target/caller/status），完成或取消即清理；**非名字注册表**，best-effort 单机，非分布式锁 |
+| 命名 | `^[a-z]{4,6}$`，**per-machine 唯一**；一代号一 agent；scope 仅 label 注解 |
+| 等待 | 默认哨兵（拆分令牌防回显 + 容忍 TUI 前缀 + 尾部校验 + 旧 token 预检）；另有生命周期/结果文件模式 |
+| 长等待 | ask 默认异步；唤醒=回调注入 prompt / 宿主 scheduler / 可选 watch(experimental) |
+| 终止 | cancel(幂等) / abort(--interrupt 用 send-keys esc/ctrl+c)；不关 pane 不停 server |
+| 恢复时机 | 仅 skill 入口 restore；**不装 hook**（移除 SessionStart 选项）|
+| 跨机器 | 封装 --machine；本机 machine list=[] 仅 stub，标注未端到端验证 |
 
 ## 4. 目录结构
-
 ```
 herdr-agent-ops/
 ├── SKILL.md
-├── scripts/hao              # Python3 单文件，stdlib only
-├── references/
-│   ├── names.md             # 1600 名 + 含义 + 分组 + 中英文关键词别名
-│   ├── names.local.md       # 可选：用户自定义组/名（扩展，不改 vendored 池）
-│   ├── protocol.md          # 哨兵协议/跨机器/错误映射
-│   └── restore.md           # label 解析 + pre-flight 算法
-└── tests/
-    ├── test_hao.py          # 单元 + herdr stub 错误拼装
-    ├── test_names.py        # 词表完整性 + 保留字 + 敏感词脚本化检查
-    └── integration/         # named test session 真实集成测试
+├── scripts/hao
+├── references/{names.md,protocol.md,restore.md}
+└── tests/{test_hao.py,test_names.py,integration/}
 ```
+（移除 names.local.md：自定义仅走 `--custom`，且 --custom 名同样过保留字/敏感校验。）
 
-## 5. Target 解析（forge #9 + 实测）
+## 5. Target 解析
+- `hao-...`→label；`w<N>:p<M>`→pane id（兼容 `w<N>:t<K>:p<M>` 归一化）；其他→live agent name。先解析到唯一 pane；零匹配 exit 3，多匹配 exit 6 需 `--pick`。
+- 解析在目标机器做；ask 回显下一步用稳定 target（label/pane id）。
+- **pane id 字母后缀与迁移**：herdr pane id 可含字母（w3:pB/pM），move 后 id 变；hao 不假设纯数字，迁移后用返回的新 id 或 label。
 
-`hao` 的 `<target>` 语法，先解析到**唯一 pane**：
-- `hao-...` → 按 label 查（支持 `hao-<role>-<scope>` 与裸 `hao-<role>`）
-- `w<N>:p<M>` → pane id；**兼容 `w<N>:t<K>:p<M>`，归一化为 `w<N>:p<M>`**（实测用户写 w2:t1:p9，真实 id 是 w2:p9）
-- 其他 → live agent name
-- 零匹配→exit 3；多匹配→exit 6（歧义），需 `--pick <pane>`
-- 解析在目标机器上做（`--machine` 时用远端 list）
-- `hao ask` 打印的下一步命令用**稳定 target（label 或 pane id）**，不用会变的 agent name
-- 实测：`herdr agent get <label>` 返回 agent_not_found——label 不是 herdr agent target，必须由 hao 先解析成 pane id 再调 herdr
+## 6. 命名模型
+- agent name `^[a-z]{4,6}$` per-machine live 唯一；label `^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$`，scope 1–12 仅小写/数字/连字符，label≤23。
+- 一代号一 agent；scope 不进 name。`hao name` 预检**整台 machine** 所有 live names + 所有 workspace label role + stale 占位；冲突 exit 6。
+- `hao name <target> <name> [--scope S]`：name **必填**（agent CLI 非 TTY，不做 input() 交互）；`--suggest` 自动选一个并打印。shell-only pane 只设 label；非 hao- label 需 --force。**先 label 后 agent name**；rename 失败留 label 交 restore。
+- `hao clear <target>`：**先清 label 再清 name**（修正：避免 name 清成功 label 失败后被 restore 复活）；不动非 hao- label（除非 --force）；doctor 提示残留 name。
 
-## 6. 命名模型（forge #2/#3/#16）
+## 7. 持久化与 restore
+口径：session.json 存 label+agent_name；`resume_agents_on_restore=true` 会恢复受支持 agent。label 是解耦槽位，herdr resume 是 best-effort。兜底场景：agent 退出/被替换、unsupported kind、resume=false/失败。
 
-- agent name：`^[a-z]{4,6}$`，per-machine live 唯一。
-- label：`^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$`；scope 仅小写字母/数字/连字符，1–12 字符（**修正：不含 . _，长度上限 12 而非 13**）；label 总长≤23。
-- **一代号一 agent**：scope 只进 label，不进 agent name。`hao name` 预检所有 live agent names + 所有 label 解析出的 role + stale label 占位；冲突 exit 6。同 role 多 pane 必须换不同代号（如 hawk/lynx）。
-- `hao name <target> <name> [--scope S]`：两个位置参数。target 为 shell-only pane 时只设 label（允许）；target 已有非 hao- label 时需 `--force`。**原子性：先设 label 再改 agent name；agent rename 失败则保留 label 交给 restore**。
-- `hao clear <target>`：先清 agent name 再清 hao- label；**不动非 hao- label**（除非 --force）。
-- 示例统一用合法代号：`hao name w2:p9 hawk --scope api` → agent `hawk` + label `hao-hawk-api`。
+restore：
+1. **scope 只决定恢复哪些 label**：默认当前 HERDR_WORKSPACE_ID，`--workspace`/`--all` 扩大。
+2. **name 占用检查扫整台 machine**：所有 live agents + 所有 workspace 的 label role（per-machine 唯一）。跨 workspace 同名 → exit 6。
+3. pre-flight plan：label→role/scope→pane→agent；检测 role 冲突/name 占用/startup pending/stale/非法。
+4. **不自动选 winner**：同 role 多 pane 全部报歧义 exit 6 + 候选，`--pick <pane>` 只恢复被选者，其余保留 label 由 doctor 报冲突。自然序仅展示。
+5. **默认 adopt 模式**：对 scope 内 hao- pane，把非空但不等价的 agent name 改为 label role（解决“agent start NAME 必填、用别名启动后 restore 跳过”的矛盾）；`--no-adopt` 回到只填无名；`--dry-run` 预览；非 hao- label 需 --force。
+6. 幂等 + 部分失败报告（成功/失败/跳过）；处理 startup pending（等待/重试/报告）。
+7. doctor 列 stale/invalid/dup label + 读 resume 配置；repurpose pane 前先 hao clear。真实 restart 测试用隔离 named session。
 
-## 7. 持久化与 restore（forge #4/#5/#10）
+## 8. 等待协议（修 forge round-2 P0/P1）
 
-**口径修正**：session.json 同时存 label 和 agent_name；config `[session] resume_agents_on_restore=true` 会在 server restart 后恢复受支持 agent（如 Claude）的会话。所以“重启必丢名”不准确。label 是我们控制的解耦槽位；herdr 的 agent_name/resume 是 best-effort。真正需要 label 兜底：agent 退出/被替换、unsupported kind、resume=false、resume 失败。
+### 8.1 哨兵防回显 + 防 false-negative
+- token=`hao-<12–16hex>`；**task marker 用独立短 id** `[TASK <short8hex>]`，不含完整 token。prompt 把 token 拆两段，指令要求 peer 拼接后把 `HAO_DONE <token>` 作为最后一行打印。`hao ask` 扫描**整个最终 prompt**（任务文本+marker+哨兵指令）若含完整 token 则拒绝/改写。
+- **匹配器容忍 TUI 前缀/缩进**（新 P0：Claude Code 续行缩进两空格、首行可能 ⏺/⎿）：默认 `pane wait-output --match "<full token>"`（token 唯一且预检不在 prompt/baseline），命中后校验位于快照尾部 N 行且与 HAO_DONE 相邻；回退正则 `^\s*(?:[⏺●✻│⎿]\s*)?HAO_DONE\s+<token>\s*$`。**必须用真实 agent 最终消息做正例测试**，不能只用列首合成 stdout。
+- **baseline 可执行序列**（forge #4：wait-output 无 offset/seq，baseline 定位为“旧 token 预检”）：①生成 token→读快照确认完整 token 不存在，存在则重生成；②发拆分 token prompt；③可选等 [TASK shortid] 出现再读 baseline 确认 token 仍不存在；④--match 等待；⑤命中校验在尾部 N 行且不在发送前快照；若命中 baseline 旧 token→协议错误，不循环 wait。
 
-restore 算法：
-1. **默认只扫当前 `HERDR_WORKSPACE_ID`**；`--workspace W`/`--all` 才扩大。绝不默认全局（本机 8 个 workspace，防误伤）。
-2. **pre-flight plan**：枚举范围内 hao- label→解析 role/scope→映射 pane→当前 agent；检测 role 冲突、live name 已被占、startup pending、stale label（无 agent）、非法 label。
-3. **不自动选 winner**：歧义报 exit 6 + 候选列表，要求 `--pick <pane>` 或换代号/scope。workspace/tab/pane 自然序仅用于展示，不决定身份（pane_id 是 opaque，字符串排序 w2:p10<w2:p9 不可靠）。
-4. 只对无歧义匹配 apply；**不覆盖已有非空 agent name**（只填无名或已匹配者），降低 repurpose 劫持。shell-only pane 跳过。
-5. **幂等 + 部分失败报告**：列出成功/失败/跳过，不留静默半恢复态。
-6. `--dry-run` 打印 plan；变更前输出 machine/workspace/tab/pane/cwd/agent。
-7. 处理 “agent name cannot change while startup pending”：等待/重试/报告。
-8. `hao doctor` 列 stale/invalid/重复 label，读 resume 配置并提示；文档写明 repurpose pane 前先 `hao clear`。
-9. 真实 server restart 测试在**隔离 named session**做，不停默认 server。
+### 8.2 等待方式（回应用户：不止哨兵）
+`--mode`：
+- `sentinel`（默认）：文本哨兵，协作信号非安全边界。
+- `lifecycle`：`herdr agent wait --until idle/done/blocked`，server 侧高效，适合单轮任务；完成后按需读内容。
+- `file`：peer 把结果写安全临时目录文件、只回路径；`hao result` 读取；等待=轮询文件存在。适合大输出。**跨机器默认 local-only**；--machine 下让 agent cat 到 pane 再读，路径限制在安全临时目录防任意读。
+- （experimental，非核心）pane metadata 旁路：`herdr pane report-metadata --token hao_done=<token>` + 轮询 `pane get .tokens`；需 --source 集成，远端未必可用，列为未来选项。
+- 不做“可插拔框架”抽象，就这三种文档化模式。
 
-## 8. 派活与等待协议（forge #1/#6/#13 + 实测）
+### 8.3 长等待与唤醒（回应用户）
+- `hao ask` **默认异步**：立即返回 token+shortid，不阻塞；`--wait` 才内联等。
+- 长任务不阻塞调用方。唤醒三选一：①**完成回调**：`hao ask --wake <caller-target>` 记入台账，peer 完成后由完成步骤向调用方 pane 注入 `herdr agent prompt <caller> "[HAO_WAKE] <shortid> done ..."` 唤醒；②**宿主 scheduler**：调用方（如 Claude Code ScheduleWakeup）定时复查 `hao wait --timeout <短>`，token 稳定可重复 wait；③`hao watch`（experimental，v3 可选）后台轮询台账并注入唤醒。
+- 默认超时放宽（30m），`--timeout 0` 无限；`--progress` 心跳走 stderr。
 
-**哨兵防回显（P0，forge 已复现）**：prompt 里不出现完整哨兵。token=`hao-<12–16hex>`；prompt 把 token 拆两段展示，指令要求 agent 拼接后把 `HAO_DONE <token>` 作为**最后一行**打印。`hao ask` 构造完 prompt 后扫描，若含完整哨兵则拒绝/改写。
+### 8.4 终止与超时（回应用户）
+- `hao cancel <token|shortid>`：台账标记 cancelled（幂等）；waiter 停止；**迟到哨兵忽略**。
+- `hao abort <token> [--interrupt]`：cancel + 可选中断对端 `herdr agent send-keys <target> esc` 再 `ctrl+c`（中断当前轮）。**不关 pane、不停 server**。
+- 超时 exit 4 + agent 状态 + 尾部 → 编排者决定重试/cancel/abort；blocked exit 5 → 交用户审批或 abort，绝不自动点审批；exited/pane closed exit 3。
+- **一 pane 一 outstanding task 降级为 best-effort**：台账记 per-pane busy 供检查，但无分布式锁，调用方需自行避免并发；**移除 --queue**（无队列状态）。
+- `hao done --token T [--summary]`：先 summary 后哨兵（stdout 最后一行）；须在 peer 自己 pane 运行；远端无 hao 按 prompt 手动打印。
 
-`hao wait`：
-- `--source recent-unwrapped`；用 `--regex '^HAO_DONE <token>\s*$'` 行首锚定；**ask 时捕获输出基线，只认基线之后新出现、且位于快照尾部 N 行内的命中**（杜绝 prompt 回显/预置哨兵假命中）。
-- **并行轮询 `agent get`**：blocked→立即 exit 5 + 状态 + 尾部；exited/pane closed→exit 3；绝不自动点审批。
-- 超时→exit 4 + `agent get` 状态 + 尾部输出。**默认超时放宽（如 30m）且可 `--timeout 0` 无限/更大**（实测 forge 深度审核 14m52s，旧 10m 默认扛不住）。token 稳定，可重复 wait 不必重发。
-- **进度可见**：`--progress` 周期打印 agent 状态 + 最后一行心跳；`hao status <target>` 随时查。
-- **一个 pane 同时只有一个 outstanding task**：`hao ask` 要求 target idle，否则 exit 6，除非 `--queue`。防并发交错。
-- `hao ask` 即使发送失败也返回/打印 token；**不自动重试**（herdr：连接失败≠未送达）。
-- `hao done --token T [--summary]`：先打 summary 再打哨兵（最后一行）；须在 agent 自己 pane 里运行才会被 wait-output 看到；远端无 hao 时按 prompt 手动打印。
-- 文档写明：**哨兵是协作信号，不是安全边界**。
-- 大输出回退：请 agent 把结果写成 Markdown 文件、只回路径，`hao result` 读取（herdr 文档推荐的 fallback）。
+## 9. 错误码映射
+hao：0 成功/2 用法/3 target 不存在·exited·closed/4 超时/5 blocked/6 冲突·歧义·name taken/7 machine 不可用/8 herdr·server 错误/9 协议错误（baseline 旧 token 命中等）。
+解析 herdr JSON error.code/stderr，不透传退出码。映射：agent_name_taken·agent_target_ambiguous→6；pane_not_found·agent_not_found→3；timeout→4；agent_blocked→5；unknown machine·no profile→7；agent_prompt_stalled·remote connection failure·**startup pending·invalid_agent_name**·其他 server error→8（startup pending 可重试等待）。mutating 不盲重试，区分没发出/可能已发出。
 
-## 9. 错误码映射（forge #7）
+## 10. 跨机器
+本机 machine list=[]，仅 stub，标注未端到端验证。--machine 不与 --session/--remote 组合；不传 --current/本地 ID。name/clear/suggest/list/restore/ask/wait/cancel/abort/result 均支持 --machine，target 解析在远端。doctor --machine 用 machine status 查 enabled/reachable/version；无/未知 profile→exit 7。远端 server 须运行且 API 兼容；连接失败≠mutation 未发生。**新命令 machine 语义**：台账按 machine 分键；cancel/abort/result 的 --machine 指向任务所在机器。
 
-hao 退出码：0 成功 / 2 用法 / 3 target 不存在·exited·pane closed / 4 超时 / 5 blocked / 6 冲突·歧义·name taken / 7 machine·profile 不可用 / 8 herdr·server 错误。
+## 11. suggest
+names.md 每组中英文关键词别名 + 确定性打分；任务文本→组；组耗尽→相邻组 fallback 或 --custom。“未占用”=**per-machine** 所有 live names + 所有 label role + stale 占位。**排除保留字**（§14 扩充集）；`--suggest` 非交互自动选一并打印；`hao suggest --json` 输出候选/组/理由；验收 3–5 中英文 task。
 
-必须解析 herdr 的 JSON `error.code`/stderr，**不透传 herdr 退出码**。映射表：
-
-| herdr | hao |
-|---|---|
-| agent_name_taken / agent_target_ambiguous | 6 |
-| pane_not_found / agent_not_found | 3 |
-| timeout（wait-output）| 4 |
-| agent_blocked | 5 |
-| unknown machine / no profile | 7 |
-| agent_prompt_stalled / remote connection failure / 其他 server error | 8 |
-
-mutating 命令（ask/name/clear/restore）**不盲目重试**；区分“没发出/可能已发出”。
-
-## 10. 跨机器（forge #8）
-
-- 本机 `machine list --json=[]`，跨机器**未端到端验证**，仅 stub；spec/doctor 明确标注。
-- `--machine` 不能与 `--session`/`--remote` 组合；hao 不把 `--current`/本地 ID 传给 `--machine`。
-- name/clear/suggest/list/restore/ask/wait 均支持 `--machine`；target 解析在远端。
-- `hao doctor --machine M` 用 `machine status M --json` 查 enabled/reachable/version；`machine list --json` 只查存在性；无/未知 profile→exit 7。
-- 远端 server 须已运行且 API 兼容；forwarding 不启动 server；连接失败≠mutation 未发生。
-
-## 11. suggest（forge #11）
-
-- names.md 每组写**中英文关键词别名** + 确定性打分；任务文本→组。
-- “未占用”=所有 live agent names + 所有 label 解析 role + stale label 占位（per-machine）。
-- **排除保留字**（hao 子命令 + herdr 命令/状态 + 领域词，见 §14）；组耗尽→相邻组 fallback 或 `--custom`。
-- `hao suggest --json` 输出候选/组/理由；验收用 3–5 个中英文 task。
-
-## 12. 五维优化
-
-### 功能
-- 核心：name/restore/ask/wait/done/list/suggest/clear/doctor。
-- 新增：`hao status`（进度）、`hao say`（fire-and-forget 无哨兵）、`hao broadcast`（多 target）、`hao result`（读结果文件）、`hao export/import`（label 快照备份/恢复，容灾用，非 live 注册表）。
-- target 归一化（w:t:p→w:p）、`--json`、稳定 target 回显。
-### 性能
-- 等待用 server 侧 `pane wait-output`，非忙轮询；回退轮询间隔可调。
-- `--lines` 限界，避免读全量 scrollback；restore 单遍 pre-flight；suggest 按组索引；批量 rename。
-### 容灾
-- 哨兵防回显 + 基线比对；blocked/exited/closed 立即返回；超时给状态+尾部。
-- mutating 不盲重试；一 pane 一 outstanding task；restore 幂等 + 部分失败报告。
-- `hao export/import` 手动快照应对 label 丢失；doctor 检 stale/invalid/dup + resume 配置；远端连接失败先查远端态再决定。
-### 扩展性
-- `names.local.md` 自定义组/名（不改 vendored 池）；`--custom`；保留字过滤可配置。
-- 等待后端可插拔（哨兵默认 / 文件结果 / 纯生命周期）；多 machine；可选 SessionStart hook；agent-kind 无关。
-### 易用性
-- `hao` 无参=帮助+当前 roster 仪表盘；`hao name` 省略 name 时交互式 suggest。
-- 短别名（n/r/a/w/d/l/s）；错误带下一步提示；mutating 全支持 `--dry-run`；doctor 给可执行修复建议。
+## 12. 五维优化（裁剪过度设计）
+**功能**：name/restore/ask/wait/done/list/suggest/clear/doctor/status/say/result/cancel/abort；target 归一化、稳定 target 回显、--json。**移除/延后**：broadcast（多 target token/部分失败/聚合未定义，v3 范围外）、export/import（人工快照会 reintroduce stale state，延后到 v4 或定义 schema/preflight/冲突后再做）、可插拔等待框架（改三模式）、names.local.md（仅 --custom）、SessionStart hook（与仅入口冲突）、--queue、交互式 input() 取名。
+**性能**：server 侧 wait-output 非忙轮询；--lines 限界；restore 单遍 pre-flight；suggest 静态索引。**rename 是循环非 batch API，不宣称批量优化**。
+**容灾**：哨兵防回显+防 false-negative+旧 token 预检；blocked/exited/closed 立即返回；超时给状态+尾部；mutating 不盲重试；restore 幂等+部分失败报告；cancel 幂等忽略迟到哨兵；台账完成即清理；doctor 检 stale/invalid/dup+resume。
+**扩展性**：--custom（过校验）；三等待模式；多 machine；agent-kind 无关；保留字过滤可配置。watch/metadata 旁路标 experimental。
+**易用性**：hao 无参=帮助+roster 仪表盘；name 必填+--suggest；短别名；错误带下一步提示；mutating 全 --dry-run；doctor 可执行修复；--progress 走 stderr。
 
 ## 13. 安全性
+不碰 server stop、不主动关 pane；只改 hao- label 与显式 target name；restore 默认当前 workspace + adopt 可控；非 hao- label 需 --force；跨机器先校验 profile 不猜 SSH host；不自动点审批；result 路径限安全临时目录。
 
-- 不碰 `herdr server stop`、不主动关 pane；只改 hao- label 与显式 target 的 agent name。
-- restore 默认当前 workspace；非 hao- label 需 --force；不覆盖已有 agent name。
-- 跨机器先校验 profile；不猜 SSH host；不自动点审批。
+## 14. 敏感审查（脚本化 + 具体政策）
+deny/allow 落成规则 + `tests/test_names.py` **只断言可判定集合**（完整性 + 显式 deny + 保留字），不宣称“无灰色词”全覆盖。
+- **保留字 deny（扩充）**：wait done list read test agent name ask clear doctor suggest status export import restore pane idle working blocked unknown hat hao herdr task token scope label role machine session tab workspace terminal send prompt focus split close attach config input layout move resize server start swap update open report view。
+- **灰色 deny**：宗教/神秘 corona coven chapel censer bless karma creed faith oath angel spirit grace mercy pardon lamb dove revere saint fairy genie magic spell；暴力 combat bruise attack harm hurt abuse evil vice cull clash claw crack cringe crook crush；身体 diet beard brawn；族群/语言 greek roman latin kanji hanzi pinyin hangul kana hira hebrew arabic cyril thai hindi urdu farsi tamil telugu zulu maori。
+- **allow-list（ documented 例外）**：文学/叙事 myth saga fable tale verse prose story lyric sonnet rhyme stanza；自然/动物/工具/颜色/材质/食物类中性词。理由：文学/自然术语非 occult/暴力/族群。
+- round-3 替换 25 词（10 命令词 + open/report/view + 灰色 clash/claw/crack/cringe/crook/crush/beard/brawn/fairy/genie/magic/spell）。数据完整性：40×40=1600 唯一、全 4–6 小写、无保留字、无显式灰色词（脚本断言）。
+- **round-1 表标注为历史**（其 target 在 round-2/3 已被再替换），不用于重建最终词表。
 
-## 14. 敏感审查（forge #15，脚本化可复现）
-
-政策落成 deny/allow 规则 + `tests/test_names.py` 脚本化检查，不再只写“已审查”。
-- **deny**：政治/宗教/暴力/伤害/身体/族群/性/毒品/金融/PII/凭证，以及 **hao/herdr 保留字**。
-- **保留字 deny 集**：wait done list read test agent name ask clear doctor suggest status export import restore pane idle working blocked unknown hat hao herdr task token scope label role machine session tab workspace terminal send prompt focus split close。
-- **灰色词处理（round-2，40 个）**：宗教 corona/coven/chapel/censer/bless/karma、暴力 combat/bruise、身体 diet、语言/族群 greek/roman/latin/kanji/hanzi/pinyin/hangul/kana/hira（与已替换的 thai/hindi/maori 标准对齐，全部替换）、保留字 agent/clear/doctor/done/export/idle/import/label/list/pane/read/role/scope/status/task/test/wait/send/prompt/focus/split/close。
-- 数据完整性：40 组×40、1600 唯一、全 `^[a-z]{4,6}$`、无保留字、无灰色词（脚本断言）。
-
-## 15. 验收（forge #12，可测）
-
-单元（stub）+ 集成（named test session，真实 split/set label/start agent/restore/ask/wait，含 echo 反例；server restart 用隔离 session）。修正示例：
+## 15. 验收（可测，修矛盾）
+单元 stub + 集成 named test session（真实 split/set label/start agent/restore/ask/wait/cancel/abort，含 echo 与 TUI 缩进正例）。
 1. `hao name w2:p9 hawk --scope api` → agent hawk + label hao-hawk-api
-2. agent 退出后 `herdr agent start <NAME>`（NAME 必填）重开 → restore 从 label 恢复 hawk
+2. agent 退出后用**别名** `herdr agent start temp ...` 重开 → `hao restore`（默认 adopt）把 temp 改回 hawk；`--no-adopt` 则跳过
 3. label=yaml 的 pane 不被 restore 触碰
-4. 两 pane 都标 hao-hawk → 第一个恢复 hawk，第二个 exit 6，不产生 hawk2
-5. 两 pane hao-hawk-api / hao-hawk-web → 因 agent name hawk 冲突 exit 6（一代号一 agent）
-6. ask/wait：预置哨兵或 prompt 回显时 wait **不得**成功；仅任务完成后新打印的哨兵才算
-7. machine：fixture 覆盖 machine list 两种 shape、unknown profile、remote down、machine+session 组合；本机无 profile 标注未验证
-8. suggest：3–5 中英文 task；“live 重名”=扫 agent names + all labels + stale labels
-9. test_names.py：完整性 + 保留字 + 敏感词断言
+4. 两 pane 都标 hao-hawk → **都报歧义 exit 6 不 rename**；`--pick <pane>` 只恢复被选者
+5. 两 pane hao-hawk-api / hao-hawk-web → agent name hawk 冲突 exit 6（一代号一 agent）
+6. **另一 workspace 已有 live agent hawk** → 本 workspace restore/name exit 6（per-machine 唯一）
+7. ask/wait：预置哨兵或 prompt 回显时 wait 不得成功；**真实 agent 最终消息（含 TUI 缩进/⏺ 前缀）能被匹配**（正例）；仅新打印哨兵算完成
+8. machine：fixture 覆盖 list 两 shape/unknown profile/remote down/machine+session；本机无 profile 标注未验证
+9. suggest：3–5 中英文 task；live 重名=扫 agent names+all labels+stale
+10. cancel 幂等、迟到哨兵忽略；abort --interrupt 发 esc/ctrl+c 不关 pane；超时 exit 4 带状态+尾部；blocked exit 5
+11. test_names.py：完整性+保留字+显式 deny 断言
 
-## 16. 名字词表（40 组×40，round-2 后）
-
-| # | 分工 | 主题 | 40 个候选 |
+## 16. 名字词表（40×40，round-3 后）
+| # | 分工 | 主题 | 40 候选 |
 |---|---|---|---|
 | 1 | 规划编排 | 地图/方向/星光/秩序 | `atlas` `north` `lumen` `vega` `orion` `polar` `lyra` `aegis` `ethos` `prime` `alba` `alto` `amber` `axis` `order` `logic` `arch` `amble` `nova` `aurora` `vision` `intent` `arbor` `ardor` `vista` `rudder` `tack` `spire` `apex` `summit` `zenith` `peak` `crest` `cycle` `phase` `stage` `step` `scheme` `tactic` `method` |
 | 2 | 需求产品 | 价值/用户/市场/目标 | `value` `worth` `lily` `brief` `pitch` `angle` `lotus` `demand` `offer` `solve` `case` `aria` `listen` `market` `growth` `trend` `goal` `core` `first` `seed` `need` `want` `wish` `must` `armor` `aroma` `aspen` `survey` `niche` `epic` `maple` `ticket` `beta` `pilot` `launch` `deck` `deal` `query` `agile` `sprint` |
 | 3 | 用户研究 | 观察/倾听/行为/群体 | `study` `learn` `sense` `feel` `mood` `quote` `heat` `funnel` `drop` `churn` `retain` `habit` `aura` `cohort` `panel` `poll` `group` `circle` `avian` `azure` `field` `shadow` `notice` `meadow` `talk` `chat` `reply` `depth` `broad` `narrow` `babel` `bail` `spot` `bale` `bark` `barn` `baron` `basil` `basin` `mind` |
 | 4 | 架构接口 | 结构/边界/契约/骨架 | `frame` `shell` `layer` `bayou` `proto` `module` `plugin` `spine` `base` `form` `shape` `span` `dome` `vault` `keel` `mast` `pillar` `column` `scale` `plane` `beam` `girder` `joist` `rafter` `lintel` `corbel` `plinth` `atrium` `facade` `link` `schema` `driver` `model` `object` `entity` `bean` `tree` `heap` `myrtle` `trie` |
-| 5 | 设计体验 | 色彩/形态/笔触/韵律 | `muse` `iris` `opal` `forma` `motif` `verve` `poise` `glint` `bloom` `tint` `tone` `shade` `brush` `easel` `craft` `sculpt` `chisel` `etude` `lyric` `sonnet` `draft` `wire` `layout` `space` `align` `margin` `border` `radius` `ombre` `glow` `matte` `glass` `frost` `noise` `grain` `stripe` `color` `chroma` `swatch` `icon` |
-| 6 | 视觉品牌 | 标识/排版/质感/风格 | `brand` `logo` `mark` `emblem` `badge` `sigil` `banner` `poster` `flyer` `cover` `spread` `type` `serif` `sans` `font` `weight` `italic` `bold` `light` `heavy` `gothic` `rhythm` `photo` `crop` `blur` `sharp` `beard` `filter` `gloss` `satin` `linen` `paper` `paint` `stroke` `beast` `deco` `retro` `modern` `clean` `subtle` |
-| 7 | 前端体验 | 交互/动效/组件/界面 | `cursor` `click` `touch` `swipe` `motion` `anim` `ease` `flow` `fluid` `smooth` `crisp` `nettle` `glide` `slide` `shift` `hover` `canvas` `sketch` `menu` `theme` `render` `reflow` `bundle` `chunk` `beech` `fetch` `state` `store` `props` `hook` `input` `toggle` `slider` `picker` `modal` `toast` `card` `drawer` `sheet` `dialog` |
-| 8 | 后端服务 | 服务/队列/协议/并发 | `serve` `route` `queue` `beetle` `cron` `beige` `socket` `stream` `buffer` `pipe` `broker` `router` `server` `engine` `retry` `batch` `async` `event` `shard` `raft` `topic` `pubsub` `fanout` `rest` `grpc` `soap` `http` `cookie` `header` `body` `orchid` `code` `view` `join` `berry` `offset` `commit` `bevel` `lease` `atomic` |
-| 9 | 移动桌面 | 触控/设备/离线/同步 | `mobile` `birch` `hybrid` `tablet` `bison` `wear` `haptic` `vibe` `shake` `tilt` `rotate` `orient` `screen` `palm` `tray` `widget` `hotkey` `pull` `stash` `online` `sync` `local` `remote` `push` `notify` `power` `drain` `sleep` `wake` `resume` `pause` `play` `retina` `inset` `notch` `keypad` `share` `petal` `blade` `start` |
+| 5 | 设计体验 | 色彩/形态/笔触/韵律 | `muse` `iris` `opal` `forma` `motif` `verve` `poise` `glint` `bloom` `tint` `tone` `shade` `brush` `easel` `craft` `sculpt` `chisel` `etude` `lyric` `sonnet` `draft` `wire` `hornet` `space` `align` `margin` `border` `radius` `ombre` `glow` `matte` `glass` `frost` `noise` `grain` `stripe` `color` `chroma` `swatch` `icon` |
+| 6 | 视觉品牌 | 标识/排版/质感/风格 | `brand` `logo` `mark` `emblem` `badge` `sigil` `banner` `poster` `flyer` `cover` `spread` `type` `serif` `sans` `font` `weight` `italic` `bold` `light` `heavy` `gothic` `rhythm` `photo` `crop` `blur` `sharp` `horse` `filter` `gloss` `satin` `linen` `paper` `paint` `stroke` `beast` `deco` `retro` `modern` `clean` `subtle` |
+| 7 | 前端体验 | 交互/动效/组件/界面 | `cursor` `click` `touch` `swipe` `motion` `anim` `ease` `flow` `fluid` `smooth` `crisp` `nettle` `glide` `slide` `shift` `hover` `canvas` `sketch` `menu` `theme` `render` `reflow` `bundle` `chunk` `beech` `fetch` `state` `store` `props` `hook` `jackal` `toggle` `slider` `picker` `modal` `toast` `card` `drawer` `sheet` `dialog` |
+| 8 | 后端服务 | 服务/队列/协议/并发 | `serve` `route` `queue` `beetle` `cron` `beige` `socket` `stream` `buffer` `pipe` `broker` `router` `kitten` `engine` `retry` `batch` `async` `event` `shard` `raft` `topic` `pubsub` `fanout` `rest` `grpc` `soap` `http` `cookie` `header` `body` `orchid` `code` `koala` `join` `berry` `offset` `commit` `bevel` `lease` `atomic` |
+| 9 | 移动桌面 | 触控/设备/离线/同步 | `mobile` `birch` `hybrid` `tablet` `bison` `wear` `haptic` `vibe` `shake` `tilt` `rotate` `orient` `screen` `palm` `tray` `widget` `hotkey` `pull` `stash` `online` `sync` `local` `remote` `push` `notify` `power` `drain` `sleep` `wake` `resume` `pause` `play` `retina` `inset` `notch` `keypad` `share` `petal` `blade` `lemur` |
 | 10 | 实现构建 | 锻造/金属/结构/火 | `forge` `flint` `ember` `anvil` `cedar` `kiln` `steel` `iron` `bolt` `gear` `lever` `pylon` `truss` `brick` `mortar` `weld` `solder` `alloy` `smelt` `hearth` `cast` `mold` `mint` `carve` `lathe` `mill` `blaze` `clamp` `vise` `file` `rasp` `bleak` `wrench` `pliers` `ruler` `tape` `glue` `epoxy` `resin` `clay` |
 | 11 | 数据工程 | 管道/存储/格式/血缘 | `ingest` `dedupe` `enrich` `merge` `pine` `arrow` `avro` `json` `yaml` `lake` `pond` `mart` `cube` `fact` `star` `snow` `origin` `source` `target` `sink` `spigot` `faucet` `valve` `null` `blank` `empty` `dupe` `stale` `fresh` `late` `drift` `skew` `sched` `poplar` `backup` `save` `loader` `parser` `mapper` `sorter` |
-| 12 | 数据科学 | 统计/推断/图表/概率 | `stats` `blimp` `median` `range` `quart` `season` `factor` `latent` `poppy` `train` `score` `rank` `topk` `report` `infer` `causal` `effect` `impact` `lift` `uplift` `pivot` `slice` `dice` `rollup` `plot` `legend` `tick` `bins` `blitz` `bluff` `prior` `bayes` `markov` `blurb` `blush` `random` `resid` `ridge` `lasso` `gini` |
+| 12 | 数据科学 | 统计/推断/图表/概率 | `stats` `blimp` `median` `range` `quart` `season` `factor` `latent` `poppy` `train` `score` `rank` `topk` `lizard` `infer` `causal` `effect` `impact` `lift` `uplift` `pivot` `slice` `dice` `rollup` `plot` `legend` `tick` `bins` `blitz` `bluff` `prior` `bayes` `markov` `blurb` `blush` `random` `resid` `ridge` `lasso` `gini` |
 | 13 | 机器学习 | 模型/训练/推理/神经 | `neuron` `neural` `boat` `epoch` `embed` `reed` `window` `rose` `reward` `action` `head` `norm` `relu` `tanh` `gelu` `lstm` `unet` `lora` `qlora` `peft` `rlhf` `search` `grad` `bobbin` `warmup` `prune` `sparse` `dense` `tune` `steer` `logit` `spike` `micro` `macro` `fold` `expert` `small` `large` `tiny` `giant` |
 | 14 | 测试实验 | 试验/基准/模糊/金丝雀 | `trial` `sample` `bench` `bough` `assert` `expect` `bourn` `stub` `suite` `golden` `bower` `canary` `chaos` `stress` `load` `surge` `burst` `quota` `metric` `grade` `shrub` `verify` `plan` `setup` `before` `after` `unit` `brace` `brass` `brave` `happy` `corner` `flaky` `line` `branch` `soak` `perf` `blue` `green` `check` |
-| 15 | 调试修复 | 追踪/探针/疗愈/修补 | `hound` `trace` `probe` `spark` `rivet` `mend` `heal` `cure` `balm` `salve` `suture` `splint` `remedy` `tinker` `patch` `clue` `trail` `track` `brawn` `ferret` `bisect` `repro` `bread` `breeze` `brew` `warn` `root` `cause` `reason` `hotfix` `reduce` `shrink` `attach` `briar` `brim` `brine` `brisk` `brook` `loop` `broom` |
+| 15 | 调试修复 | 追踪/探针/疗愈/修补 | `hound` `trace` `probe` `spark` `rivet` `mend` `heal` `cure` `balm` `salve` `suture` `splint` `remedy` `tinker` `patch` `clue` `trail` `track` `llama` `ferret` `bisect` `repro` `bread` `breeze` `brew` `warn` `root` `cause` `reason` `hotfix` `reduce` `shrink` `marten` `briar` `brim` `brine` `brisk` `brook` `loop` `broom` |
 | 16 | 验证审阅 | 锐眼/量具/证明/守卫 | `hawk` `lens` `prism` `ward` `proof` `verity` `broth` `edge` `sift` `trust` `gauge` `plumb` `level` `square` `assay` `valid` `scan` `sweep` `shield` `lynx` `glance` `peer` `skim` `sprig` `bubble` `spec` `canon` `stamp` `pass` `buckle` `veto` `assent` `ruling` `appeal` `patrol` `scout` `ranger` `vigil` `look` `rule` |
 | 17 | 安全隐私 | 锁/密钥/防护/威胁 | `guard` `lock` `crypt` `buff` `bulb` `permit` `policy` `safe` `secure` `seal` `sign` `auth` `login` `access` `grant` `deny` `threat` `bumper` `sentry` `moat` `hash` `salt` `nonce` `hmac` `vuln` `bunch` `burl` `bush` `bustle` `butte` `button` `cabin` `zero` `least` `purple` `cactus` `cadet` `cage` `cairn` `cake` |
-| 18 | 基础设施 | 云/网络/存储/平台 | `cloud` `infra` `deploy` `subnet` `switch` `tunnel` `egress` `packet` `swarm` `hive` `host` `image` `volume` `disk` `mount` `blob` `bucket` `pool` `mirror` `memory` `hyper` `calf` `metal` `chip` `board` `fabric` `vlan` `vxlan` `dhcp` `ipam` `cidr` `ospf` `mpls` `callus` `resize` `init` `config` `param` `cert` `jump` |
-| 19 | 发布运维 | 信标/港湾/航行/信号 | `beacon` `harbor` `anchor` `helm` `pulse` `signal` `watch` `port` `dock` `gate` `tower` `keep` `ferry` `orbit` `comet` `cameo` `radar` `sonar` `buoy` `canal` `ship` `revert` `swap` `bump` `repo` `binary` `dist` `prod` `sanity` `undo` `redo` `freeze` `thaw` `flag` `health` `vendor` `roll` `stable` `latest` `pinned` |
+| 18 | 基础设施 | 云/网络/存储/平台 | `cloud` `infra` `deploy` `subnet` `switch` `tunnel` `egress` `packet` `swarm` `hive` `host` `image` `volume` `disk` `mount` `blob` `bucket` `pool` `mirror` `memory` `hyper` `calf` `metal` `chip` `board` `fabric` `vlan` `vxlan` `dhcp` `ipam` `cidr` `ospf` `mpls` `callus` `mole` `init` `monkey` `param` `cert` `jump` |
+| 19 | 发布运维 | 信标/港湾/航行/信号 | `beacon` `harbor` `anchor` `helm` `pulse` `signal` `watch` `port` `dock` `gate` `tower` `keep` `ferry` `orbit` `comet` `cameo` `radar` `sonar` `buoy` `canal` `ship` `revert` `moth` `bump` `repo` `binary` `dist` `prod` `sanity` `undo` `redo` `freeze` `thaw` `flag` `health` `vendor` `roll` `stable` `latest` `pinned` |
 | 20 | 监控成本 | 告警/预算/计量/节俭 | `candle` `canoe` `canopy` `canyon` `cape` `limit` `rate` `util` `usage` `caper` `carol` `cask` `castle` `cater` `stat` `tally` `count` `spruce` `thrift` `frugal` `dash` `uptime` `floor` `cavern` `ceil` `cellar` `cement` `thorn` `chafe` `chaff` `spare` `oncall` `pager` `chair` `rota` `quiet` `silent` `chalk` `chant` `twig` |
 | 21 | 网络通信 | 协议/信号/传输/连接 | `https` `smtp` `imap` `sftp` `mqtt` `amqp` `coap` `quic` `radio` `wave` `fiber` `coax` `cable` `ping` `pong` `call` `dial` `ring` `beep` `buzz` `feed` `cell` `slot` `band` `modem` `codec` `demux` `parley` `chirp` `squawk` `shout` `speak` `flare` `uplink` `roam` `tether` `pair` `bond` `hail` `blink` |
 | 22 | 存储检索 | 索引/结构/容器/查找 | `folder` `seek` `find` `lookup` `match` `sort` `btree` `mvcc` `chase` `crdt` `paxos` `chasm` `mmap` `cold` `warm` `tier` `hnsw` `chaste` `radix` `octree` `extent` `inode` `dentry` `vacuum` `parse` `format` `cheek` `fifo` `lifo` `pack` `shelf` `rack` `locker` `chest` `crate` `pallet` `carton` `desk` `closet` `spool` |
 | 23 | 研究检索 | 智慧/索引/解密/探索 | `sage` `index` `cipher` `quest` `raven` `wren` `lark` `finch` `heron` `swift` `robin` `magpie` `merlin` `cheese` `rune` `lore` `riddle` `enigma` `lexis` `path` `browse` `chef` `delve` `scent` `eagle` `falcon` `osprey` `condor` `kite` `stork` `ibis` `egret` `swan` `goose` `teal` `cherry` `gull` `tern` `puffin` `petrel` |
 | 24 | 文档表达 | 书写/诗行/故事/清晰 | `quill` `verse` `fable` `glyph` `tome` `prose` `story` `voice` `echo` `page` `leaf` `scroll` `rhyme` `stanza` `meter` `chess` `phrase` `syntax` `lucid` `memo` `write` `edit` `copy` `paste` `clip` `note` `digest` `title` `style` `term` `jargon` `slang` `cite` `claim` `essay` `blog` `post` `book` `issue` `figure` |
 | 25 | 本地化翻译 | 语言/文字/区域/文化 | `locale` `lingua` `verb` `noun` `script` `violet` `willow` `yarrow` `badger` `beagle` `beaver` `choir` `chorus` `chrome` `text` `word` `clause` `idiom` `tongue` `globe` `global` `region` `zone` `area` `custom` `chuck` `chum` `char` `ascii` `boar` `bobcat` `camel` `cider` `cigar` `cinder` `cinema` `circus` `citrus` `city` `clam` |
-| 26 | 合规治理 | 议事/契约/裁决/秩序 | `nexus` `envoy` `herald` `relay` `clang` `bridge` `warden` `keeper` `forum` `agora` `quorum` `proxy` `accord` `truce` `pact` `clap` `civic` `polis` `realm` `clash` `ethic` `moral` `clasp` `claw` `cleat` `cleft` `clever` `cliff` `cattle` `house` `cling` `cloak` `clod` `clog` `peace` `cloth` `clover` `honor` `equity` `fair` |
+| 26 | 合规治理 | 议事/契约/裁决/秩序 | `nexus` `envoy` `herald` `relay` `clang` `bridge` `warden` `keeper` `forum` `agora` `quorum` `proxy` `accord` `truce` `pact` `clap` `civic` `polis` `realm` `mouse` `ethic` `moral` `clasp` `newt` `cleat` `cleft` `clever` `cliff` `cattle` `house` `cling` `cloak` `clod` `clog` `peace` `cloth` `clover` `honor` `equity` `fair` |
 | 27 | 法务风控 | 法律/合同/风险/保险 | `clown` `clump` `terms` `breach` `waiver` `patent` `docket` `hedge` `damage` `clutch` `coast` `coat` `cobalt` `cougar` `coyote` `will` `estate` `heir` `settle` `defend` `accuse` `plead` `cobble` `alibi` `motive` `notary` `clerk` `scribe` `assure` `insure` `surety` `cobra` `cocoa` `coil` `liable` `caveat` `umpire` `deed` `lien` `escrow` |
 | 28 | 教学讲解 | 导师/课程/练习/启发 | `tutor` `mentor` `coach` `guide` `lesson` `course` `class` `quiz` `exam` `hint` `demo` `show` `tell` `wonder` `answer` `simple` `plain` `skill` `repeat` `recall` `teach` `myth` `tale` `saga` `school` `campus` `studio` `ponder` `think` `recap` `flash` `praise` `tweak` `easy` `hard` `vivid` `cola` `novice` `collar` `mentee` |
-| 29 | 支持成功 | 帮助/关怀/响应/忠诚 | `help` `care` `assist` `rescue` `smile` `kind` `nice` `calm` `soothe` `triage` `assign` `refer` `loyal` `greet` `colon` `colt` `comb` `thread` `video` `glad` `cheer` `sorry` `dragon` `comic` `comma` `conch` `cone` `manual` `howto` `please` `update` `inform` `advise` `portal` `center` `heart` `hope` `confer` `hand` `conga` |
+| 29 | 支持成功 | 帮助/关怀/响应/忠诚 | `help` `care` `assist` `rescue` `smile` `kind` `nice` `calm` `soothe` `triage` `assign` `refer` `loyal` `greet` `colon` `colt` `comb` `thread` `video` `glad` `cheer` `sorry` `dragon` `comic` `comma` `conch` `cone` `manual` `howto` `please` `otter` `inform` `advise` `portal` `center` `heart` `hope` `confer` `hand` `conga` |
 | 30 | 销售市场 | 交易/推广/渠道/激励 | `sell` `sale` `duck` `lead` `promo` `social` `viral` `hype` `news` `press` `asset` `media` `free` `resell` `distro` `reach` `coupon` `upsell` `cart` `basket` `shop` `retail` `bazaar` `mall` `booth` `stand` `engage` `tend` `site` `maker` `champ` `bounty` `bonus` `gift` `prize` `award` `medal` `points` `outlet` `kiosk` |
 | 31 | 内容社交 | 媒体/社区/互动/创作 | `vlog` `reel` `short` `live` `like` `follow` `handle` `emoji` `upvote` `fawn` `club` `guild` `team` `crew` `squad` `cook` `cool` `scene` `beat` `tempo` `chord` `melody` `song` `audio` `zine` `onair` `meet` `meetup` `camp` `gather` `cope` `game` `arcade` `puzzle` `trivia` `kudos` `tile` `flair` `about` `mosaic` |
-| 32 | 财务计费 | 货币/账务/薪酬/投资 | `copper` `cord` `cork` `corn` `cornet` `fish` `corpus` `corral` `corset` `entry` `annual` `month` `week` `paid` `gross` `cortex` `cosmic` `cosmos` `cotton` `couch` `county` `couple` `cousin` `cove` `flea` `covet` `cozy` `crab` `crack` `cradle` `cram` `crank` `crater` `crave` `crayon` `craze` `cream` `create` `creek` `creep` |
-| 33 | 人力招聘 | 人才/职业/团队/流动 | `talent` `hire` `staff` `career` `ladder` `frog` `review` `rubric` `folio` `buddy` `morale` `perk` `values` `office` `seat` `room` `apply` `intern` `junior` `senior` `crib` `cringe` `ally` `croak` `crock` `crocus` `crook` `leave` `break` `repose` `roster` `swing` `flex` `temp` `perm` `cross` `crouch` `nest` `roost` `burrow` |
-| 34 | 项目管理 | 进度/看板/节奏/交付 | `scrum` `wrap` `gantt` `todo` `gecko` `doing` `crow` `time` `date` `work` `urgent` `major` `minor` `point` `size` `agenda` `item` `lane` `swim` `slack` `float` `fast` `slow` `speed` `pace` `weekly` `daily` `clock` `timer` `bell` `remind` `next` `last` `kick` `begin` `open` `ready` `park` `hold` `hare` |
-| 35 | 采购供应链 | 物流/仓储/运输/交易 | `supply` `tender` `cargo` `depot` `yard` `quay` `berth` `crane` `fork` `hoist` `chute` `belt` `roller` `seller` `crude` `trader` `cruise` `haggle` `bulk` `sack` `tote` `skid` `truck` `rail` `crumb` `safety` `pick` `haul` `unload` `crunch` `robot` `convey` `lading` `tanker` `barge` `vessel` `crush` `drum` `pier` `wharf` |
+| 32 | 财务计费 | 货币/账务/薪酬/投资 | `copper` `cord` `cork` `corn` `cornet` `fish` `corpus` `corral` `corset` `entry` `annual` `month` `week` `paid` `gross` `cortex` `cosmic` `cosmos` `cotton` `couch` `county` `couple` `cousin` `cove` `flea` `covet` `cozy` `crab` `panda` `cradle` `cram` `crank` `crater` `crave` `crayon` `craze` `cream` `create` `creek` `creep` |
+| 33 | 人力招聘 | 人才/职业/团队/流动 | `talent` `hire` `staff` `career` `ladder` `frog` `review` `rubric` `folio` `buddy` `morale` `perk` `values` `office` `seat` `room` `apply` `intern` `junior` `senior` `crib` `parrot` `ally` `croak` `crock` `crocus` `pigeon` `leave` `break` `repose` `roster` `swing` `flex` `temp` `perm` `cross` `crouch` `nest` `roost` `burrow` |
+| 34 | 项目管理 | 进度/看板/节奏/交付 | `scrum` `wrap` `gantt` `todo` `gecko` `doing` `crow` `time` `date` `work` `urgent` `major` `minor` `point` `size` `agenda` `item` `lane` `swim` `slack` `float` `fast` `slow` `speed` `pace` `weekly` `daily` `clock` `timer` `bell` `remind` `next` `last` `kick` `begin` `pike` `ready` `park` `hold` `hare` |
+| 35 | 采购供应链 | 物流/仓储/运输/交易 | `supply` `tender` `cargo` `depot` `yard` `quay` `berth` `crane` `fork` `hoist` `chute` `belt` `roller` `seller` `crude` `trader` `cruise` `haggle` `bulk` `sack` `tote` `skid` `truck` `rail` `crumb` `safety` `pick` `haul` `unload` `crunch` `robot` `convey` `lading` `tanker` `barge` `vessel` `pony` `drum` `pier` `wharf` |
 | 36 | 生态合作 | 连接/共生/联盟/共享 | `place` `crust` `addon` `biome` `mutual` `coop` `cuddle` `cuff` `invest` `spoke` `axle` `door` `give` `trade` `barter` `lend` `borrow` `cumin` `cupola` `grove` `forest` `reef` `coral` `kelp` `moss` `fern` `vine` `shoal` `curd` `knot` `weave` `braid` `strand` `curfew` `shared` `common` `cohost` `clone` `curate` `merit` |
-| 37 | 战略分析 | 框架/决策/竞争/格局 | `swot` `pest` `porter` `five` `curl` `chain` `life` `choice` `thesis` `assume` `lean` `wedge` `ocean` `weak` `assess` `turn` `move` `stake` `return` `yield` `bull` `bear` `lion` `tiger` `shark` `curry` `beach` `stance` `codex` `firm` `curt` `land` `cute` `wolf` `orca` `arena` `turf` `sector` `domain` `basis` |
-| 38 | 创意灵感 | 想象/新奇/玩心/火花 | `idea` `dream` `cymbal` `whim` `fancy` `novel` `unique` `rare` `weird` `wild` `dare` `draw` `doodle` `mash` `blend` `remix` `twist` `flip` `bend` `fairy` `genie` `magic` `spell` `charm` `joke` `quip` `jest` `jolly` `merry` `zest` `bang` `boom` `fizz` `zing` `neon` `improv` `adlib` `riff` `solo` `encore` |
+| 37 | 战略分析 | 框架/决策/竞争/格局 | `swot` `pest` `porter` `five` `curl` `chain` `life` `choice` `thesis` `assume` `lean` `wedge` `ocean` `weak` `assess` `turn` `puma` `stake` `return` `yield` `bull` `bear` `lion` `tiger` `shark` `curry` `beach` `stance` `codex` `firm` `curt` `land` `cute` `wolf` `orca` `arena` `turf` `sector` `domain` `basis` |
+| 38 | 创意灵感 | 想象/新奇/玩心/火花 | `idea` `dream` `cymbal` `whim` `fancy` `novel` `unique` `rare` `weird` `wild` `dare` `draw` `doodle` `mash` `blend` `remix` `twist` `flip` `bend` `puppy` `quail` `rabbit` `rhino` `charm` `joke` `quip` `jest` `jolly` `merry` `zest` `bang` `boom` `fizz` `zing` `neon` `improv` `adlib` `riff` `solo` `encore` |
 | 39 | 伦理安全 | 伤害/美德/诚实/守护 | `cynic` `acorn` `alder` `misuse` `aloe` `harden` `virtue` `aster` `good` `bamboo` `truth` `honest` `candor` `opaque` `curb` `brake` `right` `wisdom` `aware` `attune` `heed` `just` `equal` `same` `candid` `frank` `cred` `brier` `dahlia` `gentle` `still` `meek` `humble` `modest` `daisy` `blame` `shame` `regard` `esteem` `ebony` |
 | 40 | 领域专家 | 医学/科学/工程/艺术 | `medic` `vital` `juris` `earth` `chem` `astro` `math` `clinic` `pharma` `elder` `flora` `neuro` `cardio` `derma` `onco` `renal` `immune` `garden` `hazel` `heath` `holly` `laurel` `nurse` `hippo` `econ` `devops` `lilac` `mecha` `aero` `auto` `civil` `struct` `mechan` `elect` `optic` `editor` `music` `visual` `film` `dance` |
 
 ## 17. 替换映射
-
-<details><summary>round-1：242 条（政治/宗教/数据/暴力/族群/金融）</summary>
+<details><summary>round-1（历史，242 条，target 已被后续再替换，勿用于重建）</summary>
 
 | 原 | 新 |
 |---|---|
@@ -473,7 +419,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**；区分“没发
 
 </details>
 
-<details><summary>round-2：40 条（保留字 + 灰色词）</summary>
+<details><summary>round-2（40 条）</summary>
 
 | 原 | 新 |
 |---|---|
@@ -520,10 +466,41 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**；区分“没发
 
 </details>
 
-## 18. 实测验证记录（编排者 × forge）
+<details><summary>round-3（25 条）</summary>
 
-- forge 审核耗时 14m52s（max effort），复现哨兵回显误命中（0.009s 假匹配）→ 证实 §8 防回显必要。
-- `agent wait` 两次超时（5m/7m）因长任务 → 证实 §8 默认超时需放宽 + 进度心跳。
-- 用户写 w2:t1:p9，真实 pane id w2:p9 → 证实 §5 target 归一化。
-- `herdr agent get hao-forge-team`→agent_not_found → 证实 label 非 herdr target，需 §5 解析。
-- forge 核实：herdr 0.9.5 命令面正确；pane list 含 label、agent list 含 name/status/pane_id 可按 pane_id join；session.json/snapshots/log 保存 label → 零注册表机制成立（含 §7 resume 口径修正）；词表完整性通过；herdr agent name 规则 [a-z][a-z0-9_-]{0,31} live 唯一、agent start NAME 必填、agent rename 有 agent_name_taken。
+| 原 | 新 |
+|---|---|
+| `layout` | `hornet` |
+| `beard` | `horse` |
+| `input` | `jackal` |
+| `server` | `kitten` |
+| `view` | `koala` |
+| `start` | `lemur` |
+| `report` | `lizard` |
+| `brawn` | `llama` |
+| `attach` | `marten` |
+| `resize` | `mole` |
+| `config` | `monkey` |
+| `swap` | `moth` |
+| `clash` | `mouse` |
+| `claw` | `newt` |
+| `update` | `otter` |
+| `crack` | `panda` |
+| `cringe` | `parrot` |
+| `crook` | `pigeon` |
+| `open` | `pike` |
+| `crush` | `pony` |
+| `move` | `puma` |
+| `fairy` | `puppy` |
+| `genie` | `quail` |
+| `magic` | `rabbit` |
+| `spell` | `rhino` |
+
+</details>
+
+## 18. 实测验证记录
+- round-1：forge 14m52s 复现哨兵回显误命中（0.009s 假匹配）。
+- round-2：forge 9m29s；**编排者用 ^HAO_DONE 等待真实完成行超时（false-negative）**，forge 预言并证实 TUI 缩进/⏺ 前缀导致行首锚定失配 → v3 改 --match 完整 token + 尾部校验 + 容忍前缀回退。拆分令牌 prompt 级防回显经 forge 脚本验证生效（完整 token 不在 prompt）。
+- agent wait 两次超时（长任务）→ 默认超时放宽 + 异步 ask + 唤醒。
+- w2:t1:p9 vs w2:p9 → target 归一化；herdr agent get <label>→agent_not_found → label 需先解析。
+- forge 核实：herdr 0.9.5 命令面正确；pane list 含 label、agent list 含 name/status/pane_id 可 join；session.json/snapshots/log 保存 label；词表完整性通过；agent name [a-z][a-z0-9_-]{0,31} live 唯一、agent start NAME 必填、agent rename 有 agent_name_taken；wait-output --regex ^ 已按行匹配（无需 (?m)）。
