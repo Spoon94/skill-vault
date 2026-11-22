@@ -309,3 +309,34 @@ def cmd_list(workspace):
         if m:
             print(p["pane_id"], lbl, p.get("agent"), p.get("cwd"))
     return 0
+
+
+ERR = {
+    "agent_name_taken": 6, "agent_target_ambiguous": 6, "pane_not_found": 3,
+    "agent_not_found": 3, "timeout": 4, "agent_blocked": 5, "unknown_machine": 7,
+    "agent_prompt_stalled": 8, "agent_not_ready": 8, "agent_pane_not_found": 8,
+    "stale_pane_target": 8, "invalid_agent_timeout": 8, "invalid_agent_name": 2,
+}
+
+
+def map_herdr_error(err):
+    return ERR.get(err.get("code"), 8)
+
+
+def cmd_doctor(machine=None):
+    if machine:
+        rc, out, _ = run_herdr(["machine", "status", machine, "--json"])
+        if rc != 0:
+            return 7
+        print(out)
+        return 0
+    xdg = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
+    checks = [
+        ("python3", True),
+        ("herdr", True),
+        ("HERDR_ENV", os.environ.get("HERDR_ENV") == "1"),
+        ("XDG default", os.path.isdir(os.path.join(xdg, "hao", "tasks"))),
+    ]
+    for k, ok in checks:
+        print(k, "ok" if ok else "MISSING")
+    return 0 if all(ok for _, ok in checks) else 8
