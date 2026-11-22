@@ -1,7 +1,7 @@
-# herdr-agent-ops 设计稿 v14
+# herdr-agent-ops 设计稿 v15
 
 > 待 forge 复审 → 用户授权 · 2026-11-22 · 分支 docs/herdr-agent-team-design
-> v14：收口 round-13 最后一条 P3——活跃 waiter 可执行定义：hao wait 短循环每轮刷新 updated（heartbeat），running 存活按 updated 新鲜度判定（非 waiter_pid，避免 PID 复用/陈旧）；orphan running=updated 超 TTL 无心跳；长任务有活跃 waiter 持续刷新不清，async 无 waiter 超 TTL 清。
+> v15：收口 round-14 最后两条 P3——统一 §12/§15 措辞为"不清活跃 running、orphan running（无心跳且超 TTL）才清"（消除与 §3/§8.4 矛盾）；heartbeat 写失败（不可写/锁竞争）下轮重试+warning，台账持续不可写时 doctor 保守跳过 orphan 清理避免误判活跃 wait。
 
 ## 1. 背景
 herdr 多 agent：任务级等待缺失、名字不持久、取名难。
@@ -11,7 +11,7 @@ skill herdr-agent-ops；CLI hao；label 前缀 hao-。调用 ${CLAUDE_SKILL_DIR}
 
 ## 3. 关键决定
 - 名字映射零注册表：hao- label 唯一名字载体（session.json 存 label；agent_name/resume best-effort 非契约）。
-- 任务协调用可清理临时台账（非名字注册表）：$XDG_STATE_HOME/hao/tasks/<shortid>.json，默认 ~/.local/state/hao/tasks（XDG 未设必须实现），目录 0700 文件 0600，绝对路径+realpath。字段：token/shortid(12hex,创建前查重)/target/machine/caller/mode/status/created/**updated**/result_path/**summary**/submit_state/submit_seq/wait_consumed/result_consumed。waiter_pid 仅展示不 kill、**不用于存活判定（存活看 updated heartbeat）**。原子写 temp+rename+per-shortid 锁。
+- 任务协调用可清理临时台账（非名字注册表）：$XDG_STATE_HOME/hao/tasks/<shortid>.json，默认 ~/.local/state/hao/tasks（XDG 未设必须实现），目录 0700 文件 0600，绝对路径+realpath。字段：token/shortid(12hex,创建前查重)/target/machine/caller/mode/status/created/**updated**/result_path/**summary**/submit_state/submit_seq/wait_consumed/result_consumed。waiter_pid 仅展示不 kill、**不用于存活判定（存活看 updated heartbeat）**。**heartbeat 写失败（不可写/锁竞争）→下轮重试+warning；台账持续不可写时 doctor 保守跳过 orphan 清理（避免误判活跃 wait）并 warn**。原子写 temp+rename+per-shortid 锁。
 - **统一终态模型**：台账记录 status∈{running,done,cancelled}。**任何 wait 成功（sentinel/lifecycle/file，hao 或 no-hao）即写 status=done**：sentinel/lifecycle 记 matched_line/tail，file 记 result_path，hao done 另记 summary；置 updated、wait_consumed。**no-hao 任务也有终态**（不留 running）。cancel 仅对 running/unknown→cancelled；对 done no-op exit6；对 cancelled 幂等 no-op。**终态记录（done/cancelled）保留至 TTL**（默认 24h，按 updated 判），字段 token/shortid/status/updated/wait_consumed/result_consumed/可选 summary/result_path/matched_line（同一 <shortid>.json 缩减字段，schema 入 protocol.md）；**重复 wait/cancel/abort 读终态记录**（wait 返回 status+已有 summary/result_path/matched_line，cancel/abort 对 done exit6、对 cancelled no-op）；**活跃 waiter 定义=hao wait 短循环每轮刷新 updated（heartbeat）；running 存活按 updated 新鲜度判定，非 waiter_pid（避免 PID 复用/陈旧）。TTL/doctor 清 terminal/stale 及 orphan running（updated 超 TTL 无心跳，如 async ask 无 waiter+peer 无 hao）；活跃 running（updated 新鲜=有 waiter 心跳）不清**——长任务有活跃 waiter 持续刷新故不清；TTL 删除后 wait/result/cancel exit3。result 读 done 的 result_path，无 result_path（sentinel/lifecycle no-hao）或已删 exit3。写失败降级：ask 继续发送但禁 wake/cancel 并警告（--strict-ledger 报错）。token 落盘（非秘密，诚实）。
 - 命名 ^[a-z]{4,6}$ per-machine 唯一；一代号一 agent；scope 仅 label 注解。等待默认 sentinel，canonical=最终 assistant 消息打印哨兵。长等待 ask 异步+唤醒；终止 cancel/abort。恢复仅 skill 入口不装 hook。跨机器本机无 profile 仅 stub。
 
@@ -65,7 +65,7 @@ name ^[a-z]{4,6}$ per-machine 唯一；label ^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0
 ## 12. 五维
 功能：name/restore/ask/wait/done/list/suggest/clear/doctor/status/say/result/cancel/abort+target 归一化+稳定回显+--json+短别名。延后 broadcast/export-import；去掉可插拔框架/names.local/hook/交互式 input/--queue。watch/metadata/file 跨机器/result 跨机器/wake 跨机器=experimental 无验收不承诺不影响 sentinel 主路径。
 性能：server 侧 wait-output --regex/agent wait 短超时轮询（兼顾 cancel）；--lines 限界；restore 单遍 pre-flight；suggest 静态索引；rename 循环非 batch。
-容灾：防回显+防 false-negative+容忍正则天然防 busy-loop+旧 token 预检+滚动丢失重扫 fallback；blocked/exited/closed 立即返回；超时给状态尾部；mutating 不盲重试；restore 幂等+部分失败报告；cancel 全模式幂等停阻塞+忽略迟到哨兵；台账原子写+锁+tombstone+TTL 按 updated 不清 running+写失败降级；doctor 检 stale/invalid/dup+resume。
+容灾：防回显+防 false-negative+容忍正则天然防 busy-loop+旧 token 预检+滚动丢失重扫 fallback；blocked/exited/closed 立即返回；超时给状态尾部；mutating 不盲重试；restore 幂等+部分失败报告；cancel 全模式幂等停阻塞+忽略迟到哨兵；台账原子写+锁+tombstone+不清活跃 running、orphan running（无心跳且超 TTL）才清+写失败降级；doctor 检 stale/invalid/dup+resume。
 扩展性：--custom（过校验）；三模式；多 machine；**known-state agents 无关 kind，unknown/无 agent 走 --accept-unknown/--no-agent 或 ledger done**；保留字过滤覆盖全命令面。
 易用性：无参=帮助+roster；name 必填+--suggest；短别名无歧义；错误带下一步；mutating 全 --dry-run；doctor 可执行修复；--progress stderr；list/doctor 显式 scope。
 
@@ -93,7 +93,7 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 11. lifecycle 同步可 cancel：**target working/blocked 提交 exit6**；agent prompt 提交+state_change_seq 门槛（快速任务 seq 前进+idle/done 即完成不误 exit9；5s 无变化无输出才 exit9）+agent wait 短循环查台账；拒绝 async
 12. file：partial 不提前返回；result 用台账 tombstone result_path+realpath，穿越被拒；shortid 12hex 防碰撞；**终态记录只读不删保留至 TTL；result 可重复读，TTL 删后 exit3**
 13. wake 仅同机 hao done+台账可达生效，固定模板不含 summary；最终消息打印不产生 wake；caller blocked best-effort 丢失；caller 不存在 exit3；跨机器 caller 侧 poll
-14. 台账 0700/0600+原子写+锁+**统一终态（任何 wait 成功写 done，no-hao/file 均有终态）**+终态记录保留至 TTL（可重复 wait/cancel）+TTL 按 updated 不清 running+写失败降级；不 kill PID；重复 done 幂等限 done 记录尚在、刷新 updated/TTL、删后 exit3；hao done working warning/--final 首次立即 exit5（done 已存在则幂等跳过检查）；**file no-hao result 可读、sentinel no-hao result exit3、result 可重复读至 TTL**；--no-agent/--accept-unknown 双 flag 忽略不适用项、缺所需 flag 报错 exit3/9；orphan running（updated 超 TTL 无心跳）doctor/TTL 清、活跃 running（wait 每轮刷新 updated）不清；存活按 updated 非 PID
+14. 台账 0700/0600+原子写+锁+**统一终态（任何 wait 成功写 done，no-hao/file 均有终态）**+终态记录保留至 TTL（可重复 wait/cancel）+不清活跃 running、orphan running（无心跳且超 TTL）才清+写失败降级；不 kill PID；重复 done 幂等限 done 记录尚在、刷新 updated/TTL、删后 exit3；hao done working warning/--final 首次立即 exit5（done 已存在则幂等跳过检查）；**file no-hao result 可读、sentinel no-hao result exit3、result 可重复读至 TTL**；--no-agent/--accept-unknown 双 flag 忽略不适用项、缺所需 flag 报错 exit3/9；orphan running（updated 超 TTL 无心跳）doctor/TTL 清、活跃 running（wait 每轮刷新 updated）不清；存活按 updated 非 PID
 15. status 默认当前 pane（无 HERDR_PANE_ID exit3，无 agent shell 信息 exit0）/say 省 target 默认当前 pane（无 HERDR_PANE_ID exit3）、best-effort、--strict exit6/result 读 tombstone 只读不删（无 result_path 或已删 exit3）；summary 落盘 wait 可返回；hao done 重复幂等；早引用 best-effort 文档化；wake caller 跨机 exit7；done 写前查 cancelled；逐条 output/exit/JSON schema（protocol.md，含 done 例外）
 16. test_names：完整性+保留字（全命令面）+显式 deny；list/doctor 默认当前 workspace+per-machine 标注
 
@@ -479,5 +479,5 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 </details>
 
 ## 18. 实测记录
-r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条→v8；r8 4m6s 余 6 条→v9；r9 3m9s 余 4 条→v10；r10 余 5 条→v11 统一终态模型；r11 3m8s 余 5 条→v12；r12 1m27s 余 2 条→v13；r13 1m37s 两条已收口余 1 条 P3（活跃 waiter 缺可执行定义、waiter_pid 仅展示、wait 是否刷新 updated 未写）→v14 收口（wait 短循环每轮刷新 updated heartbeat、running 存活按 updated 新鲜度非 PID、orphan=updated 超 TTL 无心跳、长任务活跃 waiter 不清）。
+r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条→v8；r8 4m6s 余 6 条→v9；r9 3m9s 余 4 条→v10；r10 余 5 条→v11 统一终态模型；r11 3m8s 余 5 条→v12；r12 1m27s 余 2 条→v13；r13 1m37s 余 1 条→v14；r14 1m20s 主条已解决余 2 条 P3（§12/§15 残留 TTL 不清 running 与 orphan 清理矛盾、heartbeat 写失败误判 orphan）→v15 收口（统一不清活跃 running/orphan 无心跳超 TTL 才清、heartbeat 写失败重试+warning+doctor 保守跳过）。
 forge 核实 herdr 0.9.5 命令面/label 持久化/词表完整性/agent name 规则/wait-output ^ 按行匹配/pane read 无 offset。
