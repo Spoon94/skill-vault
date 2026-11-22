@@ -11,7 +11,7 @@ import time
 HAO_LABEL_RE = re.compile(r"^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$")
 PANE_ID_RE = re.compile(r"^w\w+:p\w+$")
 SENTINEL_RE = re.compile(
-    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+(hao-[0-9a-f]{12,16})[\s.。!！│`*|]*$")
+    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+(hao-[0-9a-f]{12,32})[\s.。!！│`*|]*$")
 
 
 def run_herdr(args, machine=None):
@@ -118,7 +118,7 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
     if rc2 != 0:
         return 0  # shell-only pane: label set, no agent to rename
     rc3, _, err3 = run_herdr(["agent", "rename", pane, name], machine)
-    return 0 if rc3 == 0 else herdr_error_rc(err3, 6)
+    return 0 if rc3 == 0 else herdr_error_rc(err3, 8)
 
 
 def cmd_clear(target, force, dry_run=False, machine=None):
@@ -348,23 +348,33 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
 _LEDGER_WARNED = False
 
 
+def _ledger_warn(err):
+    """One-time stderr warning when the ledger is unusable (graceful
+    degradation: pane evidence stays authoritative)."""
+    global _LEDGER_WARNED
+    if not _LEDGER_WARNED:
+        print(f"hao: warning: ledger unavailable ({err}); "
+              f"degrading to pane evidence", file=sys.stderr)
+        _LEDGER_WARNED = True
+
+
+def _safe_get(l, sid):
+    try:
+        return l.get(sid)
+    except Exception:
+        return None
+
+
 def _wait_round_rec(l, sid):
     """Fresh record for this wait round: heartbeat (locked read+merge+write)
     with read-only fallback. Ledger unavailable must never kill a wait —
     pane sentinel evidence stays authoritative (graceful degradation)."""
-    global _LEDGER_WARNED
     try:
         return l.heartbeat(sid)
     except Exception as e:
-        if not _LEDGER_WARNED:
-            print(f"hao: warning: ledger unavailable ({e}); "
-                  f"degrading to pane evidence", file=sys.stderr)
-            _LEDGER_WARNED = True
-        try:
-            rec = l.get(sid)
-            return rec if rec is not None else {}
-        except Exception:
-            return {}
+        _ledger_warn(e)
+        rec = _safe_get(l, sid)
+        return rec if rec is not None else {}
 
 
 def _wait_common_check(rec):
@@ -383,7 +393,7 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
         return None
     rc, out, err = run_herdr(["agent", "get", pane], machine)
     if rc != 0:
-        return herdr_error_rc(err, 3)
+        return herdr_error_rc(err, 8)
     st = json.loads(out)["result"]["agent"].get("agent_status")
     if st == "blocked":
         return 5
@@ -428,6 +438,25 @@ def _sentinel_check(pane, token, sid, machine):
     return (ml, None) if _token_matches(m.group(1), token, sid) else (None, None)
 
 
+_PARTIAL_SENTINEL_RE = re.compile(r"HAO_DONE:?\s+hao-[0-9a-f]{1,31}$")
+_HEX_CONT_RE = re.compile(r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*([0-9a-f]{1,24})[\s.。!！│`*|]*$")
+
+
+def _join_wrapped_sentinels(lines):
+    """Rejoin a sentinel split by narrow-pane wrapping: previous line ends
+    with an incomplete HAO_DONE hao-<hex> token and the next line is bare
+    hex. Observed live: peer printed the token across two rendered lines."""
+    out = []
+    for line in lines:
+        if out and _PARTIAL_SENTINEL_RE.search(out[-1]):
+            m = _HEX_CONT_RE.match(line)
+            if m:
+                out[-1] = out[-1] + m.group(1)
+                continue
+        out.append(line)
+    return out
+
+
 def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
     """Big-window rescan: return the LAST matching sentinel line for this task."""
     rc, out, err = run_herdr(
@@ -439,7 +468,7 @@ def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
     except Exception:
         txt = out
     last = None
-    for line in txt.splitlines():
+    for line in _join_wrapped_sentinels(txt.splitlines()):
         m = SENTINEL_RE.match(line)
         if m and _token_matches(m.group(1), token, sid):
             last = line
@@ -473,7 +502,10 @@ FAST_PATH_SECONDS = 30
 
 
 def _finish_done(l, sid, ml):
-    l.write_done(sid, matched_line=ml)
+    try:
+        l.write_done(sid, matched_line=ml)
+    except Exception as e:
+        _ledger_warn(e)  # r7#1: confirmed completion must still be returned
     return {"status": "done", "matched_line": ml}
 
 
@@ -533,7 +565,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     Completion still requires sentinel/ledger done (task-level evidence)."""
     _led = _load_module("hao_ledger", "ledger.py")
     l = _led.Ledger()
-    rec0 = l.get(sid) or {}
+    rec0 = _safe_get(l, sid) or {}
     submit_seq = rec0.get("submit_seq") or 0
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
@@ -546,7 +578,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             return 10
         rc, out, err = run_herdr(["agent", "get", pane], machine)
         if rc != 0:
-            return herdr_error_rc(err, 3)
+            return herdr_error_rc(err, 8)
         ag = json.loads(out)["result"]["agent"]
         st = ag.get("agent_status")
         seq = ag.get("state_change_seq") or 0
@@ -603,7 +635,7 @@ def _wait_file(pane, sid, token, timeout, machine):
                 # confirm the pane itself still exists before skipping the gate
                 rcp, _, errp = run_herdr(["pane", "get", pane], machine)
                 if rcp != 0:
-                    return herdr_error_rc(errp, 3)
+                    return herdr_error_rc(errp, 8)
             else:
                 return herdr_error_rc(err, 8)
         else:
@@ -615,12 +647,15 @@ def _wait_file(pane, sid, token, timeout, machine):
                 return 5
             if st in ("exited", "closed"):
                 return 3
-        rec = l.get(sid) or {}
+        rec = _safe_get(l, sid) or {}
         rp = rec.get("result_path")
         if rp and os.path.isfile(rp):
             sz = os.path.getsize(rp)
             if sz > 0 and sz == last_size:
-                l.write_done(sid, result_path=rp)
+                try:
+                    l.write_done(sid, result_path=rp)
+                except Exception as e:
+                    _ledger_warn(e)  # r7#1: stable file is the evidence
                 return {"status": "done", "result_path": rp}
             last_size = sz
         time.sleep(1)
@@ -842,7 +877,7 @@ def cmd_say(target, text, strict=False):
     if strict and current_state(pane) == "working":
         return 6
     rc, _, err = run_herdr(["agent", "prompt", pane, text])
-    return 0 if rc == 0 else herdr_error_rc(err, 5)
+    return 0 if rc == 0 else herdr_error_rc(err, 8)
 
 
 def cmd_result(shortid, target=None, file=None):

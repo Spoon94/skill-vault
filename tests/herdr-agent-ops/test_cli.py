@@ -172,6 +172,29 @@ class TestTokenMatches(unittest.TestCase):
             "hao-aabbccddeeff0011", "hao-9999888877776666", "999988887777"))
 
 
+class TestSentinelRobustness(unittest.TestCase):
+    def test_regex_accepts_overlong_token(self):
+        # peer mis-assembled the token (20-hex, duplicated segment) must
+        # still match; the sid prefix anchors task identity
+        self.assertIsNotNone(SENTINEL_RE.match("  HAO_DONE hao-aabb11223344aabb1122"))
+
+    def test_join_wrapped_sentinel(self):
+        lines = ["  HAO_DONE hao-aabb11", "  223344aabb1122"]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual(joined, ["  HAO_DONE hao-aabb11223344aabb1122"])
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), None, "aabb11223344"))
+
+    def test_join_skips_non_hex_continuation(self):
+        lines = ["  HAO_DONE hao-aabb11", "  ordinary output line"]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_join_leaves_complete_sentinel_alone(self):
+        lines = ["  HAO_DONE hao-aabb11223344", "  next message"]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+
 class TestParserFlags(unittest.TestCase):
     def test_wait_token_flag(self):
         a = build_parser().parse_args(["wait", "w2:p9", "--token", "hao-abc123"])

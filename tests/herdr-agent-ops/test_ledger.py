@@ -6,6 +6,29 @@ import tempfile
 from ledger import Ledger
 
 
+class TestLockTimeout(unittest.TestCase):
+    def test_rw_times_out_on_held_lock(self):
+        # r7#3: flock must not block indefinitely; waiter degrades instead
+        import fcntl
+        import time
+        from ledger import _path
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            try:
+                l = Ledger()
+                l.write_running("aabb11223344")
+                with open(_path("aabb11223344") + ".lock", "w") as lf:
+                    fcntl.flock(lf, fcntl.LOCK_EX)
+                    t0 = time.time()
+                    with self.assertRaises(TimeoutError):
+                        l._rw("aabb11223344", lambda rec: None, lock_timeout=0.3)
+                    self.assertLess(time.time() - t0, 3)
+                    # lock-free get still works while the lock is held
+                    self.assertEqual(l.get("aabb11223344")["status"], "running")
+            finally:
+                os.environ.pop("XDG_STATE_HOME", None)
+
+
 class TestLedger(unittest.TestCase):
     def test_done_tombstone(self):
         with tempfile.TemporaryDirectory() as d:

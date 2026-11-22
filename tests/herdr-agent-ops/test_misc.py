@@ -32,6 +32,22 @@ class TestMisc(unittest.TestCase):
 
 
 class TestGuards(unittest.TestCase):
+    def test_finish_done_degrades_on_write_failure(self):
+        # r7#1 (P1): confirmed completion returns done even if ledger write fails
+        import contextlib
+        import io as _io
+
+        class Boom:
+            def write_done(self, *a, **k):
+                raise PermissionError("read-only state dir")
+
+        buf = _io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            r = hao._finish_done(Boom(), "aabb11223344", "HAO_DONE hao-aabb11223344")
+        self.assertEqual(r["status"], "done")
+        self.assertIn("warning", buf.getvalue())
+        hao._LEDGER_WARNED = False
+
     def test_map_herdr_error_nested(self):
         # herdr stderr JSON nests the code under "error"
         self.assertEqual(hao.map_herdr_error({"error": {"code": "agent_name_taken"}}), 6)

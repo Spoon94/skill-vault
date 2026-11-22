@@ -32,11 +32,19 @@ class Ledger:
         # _rw creates the directory on demand
         pass
 
-    def _rw(self, shortid, fn):
+    def _rw(self, shortid, fn, lock_timeout=5.0):
         p = _path(shortid)
         os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
         with open(p + ".lock", "w") as lf:
-            fcntl.flock(lf, fcntl.LOCK_EX)
+            deadline = time.time() + lock_timeout
+            while True:
+                try:
+                    fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError:
+                    if time.time() >= deadline:
+                        raise TimeoutError(f"ledger lock timeout: {shortid}")
+                    time.sleep(0.05)
             rec = {}
             if os.path.exists(p):
                 with open(p) as f:
@@ -102,7 +110,10 @@ class Ledger:
             return  # nothing to clean
         lock_path = os.path.join(base, ".cleanup.lock")
         with open(lock_path, "w") as lf:
-            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return  # another cleanup holds the lock: conservatively skip
             for fn in os.listdir(base):
                 if not fn.endswith(".json"):
                     continue

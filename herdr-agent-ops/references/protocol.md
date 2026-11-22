@@ -23,8 +23,8 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。Bash tool stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
 - **peer 调用时机**：`hao done` 必须在最终答复正文**全部输出之后**才调用——台账 done 会立即释放等待方，早于正文调用会让等待方从 pane 读不到结论。
 - **防回显**：token 拆分两段，prompt 不含完整 token；`[TASK <shortid>]` 用独立短 id。
-- **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。
-- **完成确认**：必须有任务级证据（哨兵 `HAO_DONE <token>` 或台账 `status=done`），可降级（台账不可写时哨兵仍可确认）。`state_change_seq` 仅活动门槛，不作完成信号。
+- **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。token 位数容忍 12–32 hex——peer 拼接段出错（实测出现重复段 20-hex）时按 shortid 前缀比对锚定；大窗口重扫先合并窄 pane 折行断开的哨兵（不完整 `hao-<hex>` 行 + 纯 hex 续行）。
+- **完成确认**：必须有任务级证据（哨兵 `HAO_DONE <token>` 或台账 `status=done`），可降级（台账不可写时哨兵仍可确认）。`state_change_seq` 仅活动门槛，不作完成信号。台账锁等待有界（5s 超时即抛，flock 随进程死亡自动释放）；heartbeat/write_done 失败一律降级为凭 pane 证据返回成功 + 一次性 stderr warning，已确认的完成不因台账丢失。
 - **命中确认**：哨兵命中后 agent 仍 working 不确认；2s 稳定窗口内无更晚匹配、且该行仍是本任务最后一条 `HAO_DONE` 才写 done（防提前引用/流式残片）。gate 报错（exited 等）前也先大窗口重扫——哨兵可能刚好在退出前到达。
 - **活动门槛**：相对 submit_state 的 working/blocked transition，或 submit_seq + 短窗口 final idle/done（fast coverage）。
 - **两阶段等待（sentinel 模式）**：前 ~30s fast path（`pane wait-output --regex` 短轮询 + 台账/心跳）；之后切**长等待兜底**——server 侧 `herdr agent wait --until idle --until done --until blocked --timeout 8000` 短循环（每轮查台账顾及 cancel），settle 后 `pane read --lines 200` 大窗口重扫哨兵，防止哨兵滚出 1s 快照丢失。`--timeout 0` 翻译为省略 `--timeout`。
