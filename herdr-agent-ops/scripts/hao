@@ -456,24 +456,25 @@ def _sentinel_check(pane, token, sid, machine):
 
 
 _PREFIX_LINE_RE = re.compile(
-    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE[:\s.。!！│`*|]*(hao-)?([0-9a-f]{0,11})$")
+    r"^(?P<head>\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE[:\s.。!！│`*|]*)"
+    r"(?P<pre>hao-)?(?P<frag>[0-9a-f]{0,11})(?P<tail>[\s.。!！│`*|]*)$")
 _HEX_CONT_RE = re.compile(
     r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*(hao-)?([0-9a-f]{1,32})[\s.。!！│`*|]*$")
 
 
 def _join_wrapped_sentinels(lines):
-    """Rejoin sentinels split by narrow-pane wrapping (r8#1/r10/r11#1).
+    """Rejoin sentinels split by narrow-pane wrapping (r8#1/r10/r11#1/r12).
 
     Only a STANDALONE sentinel-prefix line may absorb a continuation —
     the same left anchor and decorations SENTINEL_RE accepts, so prompt
     echoes like "…打印：HAO_DONE" never join. Shapes:
     - keyword line already carrying hao- and/or <12 hex absorbs a bare-hex
       continuation while the joined token stays <=32 hex (chains across
-      multiple wraps; live r7 mid-token split);
-    - keyword-only line absorbs a following COMPLETE token line — hao-
-      prefixed, or bare with >12 hex; a bare 12-hex shortid line alone is
-      NOT enough (r11#1: prefer miss over false done);
-    - keyword line trailing decorations (。│ etc.) are stripped on join;
+      multiple wraps); trailing decorations after the fragment are kept
+      and the continuation is inserted before them (r12#2);
+    - keyword-only line absorbs a following COMPLETE token line — >=16
+      hex with or without the hao- prefix (r12#1: shorter continuations
+      would ride the shortid anchor, which is not proof of a full token);
     - a complete sentinel is never extended.
     Rejoined candidates must still pass _token_matches."""
     out = []
@@ -484,13 +485,13 @@ def _join_wrapped_sentinels(lines):
                 c = _HEX_CONT_RE.match(line)
                 if c:
                     pre, cont = c.group(1), c.group(2)
-                    if pm.group(1) or pm.group(2):
-                        # token already begun: bare-hex continuation only
-                        if not pre and len(pm.group(2)) + len(cont) <= 32:
-                            out[-1] = out[-1] + cont
+                    if pm.group("pre") or pm.group("frag"):
+                        if not pre and len(pm.group("frag")) + len(cont) <= 32:
+                            out[-1] = (pm.group("head") + (pm.group("pre") or "")
+                                       + pm.group("frag") + cont + pm.group("tail"))
                             continue
-                    elif pre or len(cont) > 12:
-                        kw = re.sub(r"[:\s.。!！│`*|]+$", "", out[-1].rstrip())
+                    elif len(cont) >= 16:
+                        kw = re.sub(r"[:\s.。!！│`*|]+$", "", pm.group("head").rstrip())
                         out[-1] = kw + " " + (pre or "") + cont
                         continue
         out.append(line)

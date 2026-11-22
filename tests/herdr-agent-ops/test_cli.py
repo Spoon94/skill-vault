@@ -262,6 +262,22 @@ class TestSentinelRobustness(unittest.TestCase):
         lines = ["  HAO_DONE", "  " + sid]
         self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
 
+    def test_keyword_requires_complete_token_continuation(self):
+        # r12#1: 13-15 hex continuations ride the shortid anchor -> reject
+        almost = "0011223344556" + "67"  # 15 hex
+        lines = ["  HAO_DONE", "  " + almost]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_fragment_with_border_decoration_joins(self):
+        # r12#2: decorations AFTER the token fragment must not block joining
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE hao-" + full[:4] + " │", "  " + full[4:]]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual(joined, ["  HAO_DONE hao-" + full + " │"])
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+
     def test_keyword_with_trailing_decoration_joins(self):
         # r11#1 漏报修复: trailing 。/│ decorations must not block the join
         full = "00112233" + "445566ff"
