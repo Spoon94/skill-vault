@@ -45,6 +45,7 @@ class Ledger:
                 json.dump(rec, f)
             os.replace(tmp, p)
             fcntl.flock(lf, fcntl.LOCK_UN)
+        return rec
 
     def write_running(self, shortid, **fields):
         def go(rec):
@@ -64,8 +65,9 @@ class Ledger:
         self._rw(shortid, go)
 
     def heartbeat(self, shortid):
-        # field-level merge of updated only (active-waiter heartbeat)
-        self._rw(shortid, lambda rec: rec.__setitem__("updated", time.time()))
+        # field-level merge of updated only (active-waiter heartbeat);
+        # returns the fresh record so wait loops need one locked read per round
+        return self._rw(shortid, lambda rec: rec.__setitem__("updated", time.time()))
 
     def get(self, shortid):
         p = _path(shortid)

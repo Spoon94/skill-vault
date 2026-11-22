@@ -213,6 +213,9 @@ def _load_module(name, filename):
     """Load a sibling module by absolute path (works via CLI or SourceFileLoader)."""
     import types
     from importlib.machinery import SourceFileLoader
+    cached = sys.modules.get(name)
+    if cached is not None:
+        return cached
     try:
         base = os.path.dirname(os.path.abspath(__file__))
     except NameError:
@@ -228,6 +231,7 @@ def _load_module(name, filename):
     mod = types.ModuleType(loader.name)
     mod.__file__ = loader.get_filename()
     loader.exec_module(mod)
+    sys.modules[name] = mod
     return mod
 
 
@@ -325,9 +329,8 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
             "next": f"hao wait {pane} --token {token}"}
 
 
-def _wait_common_check(l, sid):
-    """Returns (kind, payload): 'done'/'cancelled'/None."""
-    rec = l.get(sid)
+def _wait_common_check(rec):
+    """Returns (kind, payload): 'done'/'cancelled'/None. rec = fresh heartbeat read."""
     if rec and rec.get("status") == "done":
         return "done", {"status": "done", "result_path": rec.get("result_path"),
                         "summary": rec.get("summary"), "matched_line": rec.get("matched_line")}
@@ -446,12 +449,11 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(l, sid)
+        kind, payload = _wait_common_check(l.heartbeat(sid))
         if kind == "done":
             return payload
         if kind == "cancelled":
             return 10
-        l.heartbeat(sid)
         gate = _agent_gate(pane, machine, no_agent, accept_unknown)
         if gate is not None:
             # before giving up, rescan: sentinel may have arrived right before exit
@@ -497,12 +499,11 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     deadline = None if timeout == 0 else start + (timeout or 1800)
     saw_activity = False
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(l, sid)
+        kind, payload = _wait_common_check(l.heartbeat(sid))
         if kind == "done":
             return payload
         if kind == "cancelled":
             return 10
-        l.heartbeat(sid)
         rc, out, err = run_herdr(["agent", "get", pane], machine)
         if rc != 0:
             return herdr_error_rc(err, 3)
@@ -544,12 +545,11 @@ def _wait_file(pane, sid, token, timeout, machine):
     deadline = None if timeout == 0 else time.time() + (timeout or 1800)
     last_size = None
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(l, sid)
+        kind, payload = _wait_common_check(l.heartbeat(sid))
         if kind == "done":
             return payload
         if kind == "cancelled":
             return 10
-        l.heartbeat(sid)
         rc, out, _ = run_herdr(["agent", "get", pane], machine)
         if rc == 0:
             try:
