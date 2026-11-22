@@ -25,3 +25,38 @@ def resolve_target(target, machine=None):
 
 if __name__ == "__main__":
     pass
+
+
+def validate_name(name):
+    """Agent name must be 4-6 lowercase letters (herdr-unique per machine)."""
+    return bool(re.fullmatch(r"[a-z]{4,6}", name))
+
+
+def make_label(name, scope=None):
+    return f"hao-{name}" + (f"-{scope}" if scope else "")
+
+
+def cmd_name(target, name, scope, force, dry_run):
+    if not validate_name(name):
+        return 2
+    pane = resolve_target(target)
+    label = make_label(name, scope)
+    if dry_run:
+        print(f"would set label {label} and agent name {name} on {pane}")
+        return 0
+    # Set label first, then agent name; rename failure leaves label for restore.
+    rc1, _, _ = run_herdr(["pane", "rename", pane, label])
+    if rc1 != 0:
+        return 8
+    rc2, _, _ = run_herdr(["agent", "rename", pane, name])
+    return 0 if rc2 == 0 else 6
+
+
+def cmd_clear(target, force):
+    pane = resolve_target(target)
+    # Clear label first, then agent name.
+    rc1, _, _ = run_herdr(["pane", "rename", pane, "--clear"])
+    if rc1 != 0:
+        return 8
+    rc2, _, _ = run_herdr(["agent", "rename", pane, "--clear"])
+    return 0 if rc2 == 0 else 8
