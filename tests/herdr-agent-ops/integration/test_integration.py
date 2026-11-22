@@ -11,7 +11,7 @@ import os
 import types
 from importlib.machinery import SourceFileLoader
 
-_loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "hao"))
+_loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
 

@@ -27,9 +27,14 @@ GRAY = set(_GRAY_STR.split())
 def _load(path=None):
     if path is None:
         try:
-            path = os.path.join(os.path.dirname(__file__), "references", "names.md")
+            here = os.path.dirname(os.path.abspath(__file__))
         except NameError:
-            path = os.path.join(os.getcwd(), "references", "names.md")
+            here = os.getcwd()
+        for cand in (os.path.join(here, "..", "references", "names.md"),
+                     os.path.join(os.getcwd(), "references", "names.md")):
+            if os.path.exists(cand):
+                path = cand
+                break
     names = {}
     group = theme = kw_zh = kw_en = None
     with open(path, encoding="utf-8") as f:

@@ -36,7 +36,7 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 - `eli5` 的产物不要再过 `clarify`。eli5 要生动，clarify 要平实，两者方向冲突。`clarify` 与 `deslop-bi` 互斥：前者压平人味，后者恢复人味。
 - `falsify` 的对象是论断/讲解/计划，不是纯渲染产物。`diagram-*` 只是按描述画图，没有可证伪的论断。
 
-## 技能索引（63 个 · 按场景）
+## 技能索引（64 个 · 按场景）
 
 ### 讲解与绘图（核心 14 个）
 
@@ -102,12 +102,13 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 | [anthropics/skills/doc-coauthoring](./anthropics/skills/doc-coauthoring) | 结构化协同写作 |
 | [anthropics/skills/internal-comms](./anthropics/skills/internal-comms) | 写各类内部沟通（周报/公告/FAQ） |
 
-### 操作与集成（6 个）
+### 操作与集成（7 个）
 
 | 技能 | 用途 |
 |------|------|
 | [tmux](./tmux) | 脚本化驱动 tmux：后台会话/send-keys/capture-pane |
 | [herdr](./herdr) | Herdr CLI 控制终端多路复用器，协调 agent |
+| [herdr-agent-ops](./herdr-agent-ops) | hao：herdr agent 命名/持久化/任务级等待（哨兵+台账+agent wait 兜底） |
 | [opencli](./opencli) | 把网站/Electron 应用/外部 CLI 变成统一操作面 |
 | [mcp2cli](./mcp2cli) | 把 MCP/OpenAPI/GraphQL 变成 CLI |
 | [anthropics/skills/mcp-builder](./anthropics/skills/mcp-builder) | 构建高质量 MCP 服务器 |
