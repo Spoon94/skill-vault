@@ -1,7 +1,7 @@
-# herdr-agent-ops 设计稿 v21
+# herdr-agent-ops 设计稿 v22
 
 > 待 forge 复审 → 用户授权 · 2026-11-22 · 分支 docs/herdr-agent-team-design
-> v21：收口 round-20 两条 P3——fencing_token 持久存于台账记录（释放锁清 owner/acquired_at 但保留 token），acquire 用 CAS 单调递增，lease 过期新 owner CAS 递增并拒旧 token（PID 复用亦拒旧 token，防永久卡锁）；--file 用 openat+O_NOFOLLOW+fstat 校验 inode/dev 在安全根（防 realpath→open 的 TOCTOU symlink/硬链接绕过），并文档化威胁模型（本地单用户、--allow-any-path 用户显式担责）。
+> v22：收口 round-21 最后一条 P3——安全根包含性用 dirfd 链而非 dev/ino 比较：打开安全根 dir fd→逐段 openat(O_NOFOLLOW|O_DIRECTORY) 解析、拒绝 .. /绝对路径/任意段 symlink→末段 openat(O_NOFOLLOW) 打开文件→fstat 仅校验 S_ISREG；包含性由 dirfd  ancestry 保证（子目录 dev/ino 本就不同）；macOS：openat+O_NOFOLLOW 支持、dir fd 用 O_RDONLY|O_NOFOLLOW（无 O_PATH）、中间段 O_DIRECTORY。
 
 ## 1. 背景
 herdr 多 agent：任务级等待缺失、名字不持久、取名难。
@@ -70,7 +70,7 @@ name ^[a-z]{4,6}$ per-machine 唯一；label ^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0
 易用性：无参=帮助+roster；name 必填+--suggest；短别名无歧义；错误带下一步；mutating 全 --dry-run；doctor 可执行修复；--progress stderr；list/doctor 显式 scope。
 
 ## 13. 安全
-不碰 server stop/不主动关 pane；只改 hao- label+显式 target name；restore 默认当前 workspace+adopt 可控；非 hao- 需 --force；跨机器校验 profile 不猜 SSH；不自动点审批（abort blocked 需 TTY/0600 approval，guardrail 非 security boundary）；result 限安全临时目录 realpath；**--file 用 openat+O_NOFOLLOW 打开后 fstat 校验 st_dev/st_ino 在安全根（hao tasks 目录或 --safe-root）内，防 realpath→open 间 TOCTOU（symlink 替换/硬链接绕过）；任意路径须 --allow-any-path+warning（用户显式担责）；威胁模型：本地单用户、安全根用户所有，--allow-any-path 越界由用户负责**；wake 固定模板不注入 summary；不 kill 任意 PID。
+不碰 server stop/不主动关 pane；只改 hao- label+显式 target name；restore 默认当前 workspace+adopt 可控；非 hao- 需 --force；跨机器校验 profile 不猜 SSH；不自动点审批（abort blocked 需 TTY/0600 approval，guardrail 非 security boundary）；result 限安全临时目录 realpath；**--file 安全根包含性用 dirfd 链（非 dev/ino 比较，子目录 dev/ino 本就与根不同）：打开安全根 dir fd→逐段 openat(dirfd, seg, O_NOFOLLOW|O_DIRECTORY) 解析、拒绝 `..`/绝对路径/任意段 symlink（O_NOFOLLOW 遇 symlink 失败）→末段 openat(O_NOFOLLOW) 打开文件→fstat 仅校验 S_ISREG（regular file）；包含性由 dirfd ancestry 保证，防中间 symlink/`..` 逃逸与 realpath→open TOCTOU。macOS：openat+O_NOFOLLOW 支持，dir fd 用 O_RDONLY|O_NOFOLLOW（无 O_PATH），中间段 O_DIRECTORY。任意路径须 --allow-any-path+warning（用户显式担责）；威胁模型：本地单用户、安全根用户所有**；wake 固定模板不注入 summary；不 kill 任意 PID。
 
 ## 14. 敏感审查
 test_names.py 只断言可判定集合：完整性+显式 deny+保留字（覆盖当前完整命令面含 watch/cancel/abort/say/result/status）。对外口径=无显式 deny 词+无保留字，不声称无灰色词全覆盖。
@@ -479,5 +479,5 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 </details>
 
 ## 18. 实测记录
-r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条→v8；r8 4m6s 余 6 条→v9；r9 3m9s 余 4 条→v10；r10 余 5 条→v11 统一终态模型；r11 3m8s 余 5 条→v12；r12 1m27s 余 2 条→v13；r13 1m37s 余 1 条→v14；r14 1m20s 余 2 条→v15；r15 2m8s 余 2 条→v16；r16 1m42s 余 2 条→v17；r17 1m25s pending_done 引入 3 条→v18 简化移除；r18 1m29s 余 2 条→v19；r19 1m44s 余 2 条→v20；r20 1m24s 两条收口余 2 条 P3（fencing_token 持久化/自举未定、--file realpath→open TOCTOU）→v21 收口（fencing_token 持久存台账释放不重置、acquire CAS 递增、lease 过期新 owner 递增拒旧 token 防 PID 复用卡锁、--file openat+O_NOFOLLOW+fstat inode/dev 校验防 TOCTOU、威胁模型文档化）。
+r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条→v8；r8 4m6s 余 6 条→v9；r9 3m9s 余 4 条→v10；r10 余 5 条→v11 统一终态模型；r11 3m8s 余 5 条→v12；r12 1m27s 余 2 条→v13；r13 1m37s 余 1 条→v14；r14 1m20s 余 2 条→v15；r15 2m8s 余 2 条→v16；r16 1m42s 余 2 条→v17；r17 1m25s pending_done 引入 3 条→v18 简化移除；r18 1m29s 余 2 条→v19；r19 1m44s 余 2 条→v20；r20 1m24s 余 2 条→v21；r21 1m15s 两条收口余 1 条 P3（fstat dev/ino 非目录包含性、openat 仅防末段 symlink、中间 symlink/.. 逃逸、macOS 实现）→v22 收口（dirfd 链逐段 openat O_NOFOLLOW|O_DIRECTORY 拒 ../绝对/任意段 symlink、末段 openat+fstat S_ISREG、包含性由 dirfd ancestry、macOS O_RDONLY|O_NOFOLLOW 无 O_PATH）。
 forge 核实 herdr 0.9.5 命令面/label 持久化/词表完整性/agent name 规则/wait-output ^ 按行匹配/pane read 无 offset。
