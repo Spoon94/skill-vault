@@ -1,7 +1,7 @@
-# herdr-agent-ops 设计稿 v7
+# herdr-agent-ops 设计稿 v8
 
 > 待 forge 复审 → 用户授权 · 2026-11-22 · 分支 docs/herdr-agent-team-design
-> v7：收口 round-6 七条——wait 读台账 done 作权威完成信号、lifecycle 用 state_change_seq 门槛不漏快速任务、正则容忍 Markdown/backtick/冒号+最后一次匹配稳定窗口、tombstone 只读不删（双消费/TTL 清理）、say 默认 best-effort/--strict、status 无 HERDR_PANE_ID exit3、wake caller 须同机否则 exit7、done 写前查 cancelled、result --machine 错误码 7/8。
+> v8：收口 round-7 七条——完成判定加 agent idle/done 门槛（去掉不可操作的 footer 条件）、台账增 summary 字段落盘、终态优先级 done>cancelled（cancel/abort 对 done no-op exit6）、正则容忍 bold/编号/标题/表格+--match 邻接 fallback、lifecycle seq 须配合 observed working 或提交后短窗口、say/status/result 边界补全、wake 同机不同 XDG best-effort。
 
 ## 1. 背景
 herdr 多 agent：任务级等待缺失、名字不持久、取名难。
@@ -11,7 +11,7 @@ skill herdr-agent-ops；CLI hao；label 前缀 hao-。调用 ${CLAUDE_SKILL_DIR}
 
 ## 3. 关键决定
 - 名字映射零注册表：hao- label 唯一名字载体（session.json 存 label；agent_name/resume best-effort 非契约）。
-- 任务协调用可清理临时台账（非名字注册表）：$XDG_STATE_HOME/hao/tasks/<shortid>.json，默认 ~/.local/state/hao/tasks（XDG 未设必须实现），目录 0700 文件 0600，绝对路径+realpath。字段：token/shortid(12hex,创建前查重)/target/machine/caller/mode/status/created/**updated**/result_path/submit_state/submit_seq。waiter_pid 仅展示不 kill。原子写 temp+rename+per-shortid 锁。
+- 任务协调用可清理临时台账（非名字注册表）：$XDG_STATE_HOME/hao/tasks/<shortid>.json，默认 ~/.local/state/hao/tasks（XDG 未设必须实现），目录 0700 文件 0600，绝对路径+realpath。字段：token/shortid(12hex,创建前查重)/target/machine/caller/mode/status/created/**updated**/result_path/**summary**/submit_state/submit_seq/wait_consumed/result_consumed。waiter_pid 仅展示不 kill。原子写 temp+rename+per-shortid 锁。
 - **tombstone**：完成/取消不立即删台账，转 status=done/cancelled 的 tombstone **保留 result_path**，供 hao result 按 shortid 读取；**tombstone 不因单次 result 读取删除**，记 wait_consumed/result_consumed，两者都消费或 TTL/doctor 才清（result 只读不删）。**TTL 按 updated/heartbeat 判 stale，只清 terminal/stale，不清 running**（>24h running 有误清风险→用 updated+waiter 状态）。doctor 清 stale tombstone。写失败降级：ask 继续发送但禁 wake/cancel 并警告（--strict-ledger 报错）。token 落盘（非秘密，诚实）。
 - 命名 ^[a-z]{4,6}$ per-machine 唯一；一代号一 agent；scope 仅 label 注解。等待默认 sentinel，canonical=最终 assistant 消息打印哨兵。长等待 ask 异步+唤醒；终止 cancel/abort。恢复仅 skill 入口不装 hook。跨机器本机无 profile 仅 stub。
 
@@ -32,26 +32,26 @@ name ^[a-z]{4,6}$ per-machine 唯一；label ^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0
 ### 8.1 canonical 完成 + 匹配器（server 侧容忍正则为主，无单调游标）
 - canonical=peer 最终 assistant 消息最后一行打印 HAO_DONE <token>。Bash tool stdout 不进 pane snapshot（forge 实测），hao done 经 tool 执行 stdout 不可靠，但 **hao done 的台账/wake 副作用仍可用**（见 8.3）。
 - token=hao-<12–16hex>；task marker 短 id [TASK <shortid>] 不含完整 token；prompt 拆 token 两段令 peer 拼接；ask 扫描整个最终 prompt 含完整 token 则拒绝/改写。
-- **主检测=server 侧 pane wait-output --regex 容忍正则**（短超时循环兼顾 cancel）：`^\s*(?:[⏺●✻│⎿>*\-•·`+]\s*)?HAO_DONE:?\s+<token>[\s.。!！│`]*$`。要求 HAO_DONE 与 token 邻接→token-only 引用不匹配天然无 busy-loop；容忍 TUI 缩进/⏺ 前缀/**Markdown 引用 >、列表 -、backtick `、冒号 HAO_DONE:**/尾部标点/代码框边框。另保留 --match+邻接作 fallback（后缀重叠避免 busy-loop）。**不依赖 pane read 单调游标**（pane read 无 offset/绝对行号，滚动窗口第 0 行会变，不能当单调游标）。
-- 命中后校验：同一 matched_line 含 HAO_DONE+完整 token（允许 Markdown 前缀/冒号/尾部标点边框）。**最后一次匹配+稳定窗口**：命中后记录该行，继续短轮询稳定窗口（2s），仅当窗口内无更晚匹配、且该行是尾部最后一个 HAO_DONE 行（最后一条非空内容，TUI footer 除外）才完成——防 agent 先引用一次哨兵（“我会打印 HAO_DONE <token>”）造成提前假完成。无效命中→pane read 后缀重叠推进越过，不 re-arm 同一匹配。
+- **主检测=server 侧 pane wait-output --regex 容忍正则**（短超时循环兼顾 cancel）：`^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+<token>[\s.。!！│`*|]*$`。要求 HAO_DONE 与 token 邻接→token-only 引用不匹配天然无 busy-loop；容忍 TUI 缩进/⏺ 前缀/Markdown 引用 >、列表 -、编号 1.、backtick `、bold **、标题 #、表格 |、冒号 HAO_DONE:/尾部标点边框。** exotic 格式由 --match+邻接 fallback 兜底**（后缀重叠避免 busy-loop），不把严格正则当唯一 gate。**不依赖 pane read 单调游标**（pane read 无 offset/绝对行号，滚动窗口第 0 行会变，不能当单调游标）。
+- 命中后校验：同一 matched_line 含 HAO_DONE+完整 token（允许 Markdown 前缀/冒号/尾部标点边框）。**最后一次匹配+agent 状态门槛+稳定窗口**：命中后记录该行，继续短轮询；仅当 **agent get 为 idle/done（非 working/blocked/unknown）**、窗口（2s）内无更晚匹配、且该行是最后一个 HAO_DONE 匹配行才完成；agent 仍 working 则继续等（不只看 2s 窗口）。**不依赖“最后一条非空内容/footer 除外”（footer 不可靠定义，删除该条件）**。防早引用假完成；验收覆盖引用与最终行间隔 >2s。无效命中→pane read 后缀重叠推进越过，不 re-arm 同一匹配。
 - **滚动丢失 fallback**：sentinel 可能被大量输出顶出窗口；超时后 pane read --lines 大窗口重扫该正则；仍无→继续短轮询或 exit4。--match 完整 token 仅作可选 wakeup 预筛，每轮新行无条件跑邻接判定；预筛 miss 也 fallback 扫全窗口。
 - baseline 旧 token 预检：生成 token→读快照确认不存在否则重生成；发拆分 prompt；可选等 [TASK shortid] 再确认 token 不存在；命中若属发送前快照旧 token→exit9 不循环。
 ### 8.2 等待模式
 - sentinel（默认核心）：上述。
-- **lifecycle 同步且可 cancel**：--mode lifecycle 隐含 --wait 拒绝 async。hao ask 用 **agent prompt（不带 --wait）提交**，然后**自实现门槛（用 state_change_seq，不漏快速任务）**：记提交时 submit_seq，50–100ms 短轮询 agent get；只要 state_change_seq 前进且最终 idle/done 即视为完成（继续读结果），**不因没看到 working 就 exit9**；仅当 5s 内既无 seq 变化也无输出才 exit9。之后 agent wait --timeout 5–10s 循环+每轮查台账（可被 cancel）。仅单轮、提交时 agent 非 working；已 working 不得把当前 turn 当本任务完成。
+- **lifecycle 同步且可 cancel**：--mode lifecycle 隐含 --wait 拒绝 async。hao ask 用 **agent prompt（不带 --wait）提交**，然后**自实现门槛（用 state_change_seq，不漏快速任务）**：记提交时 submit_seq，50–100ms 短轮询 agent get；完成判定=state_change_seq 前进 + 当前 idle/done + **（提交后观察到过 working/blocked，或 seq 前进发生在提交后短窗口内）**，防无关事件（unknown→idle/会话恢复/其他 client）推进 seq 造成假完成；快速任务 seq 前进+idle/done 即完成不误 exit9；5s 无 seq 变化无输出才 exit9。best-effort 局限文档注明。之后 agent wait --timeout 5–10s 循环+每轮查台账（可被 cancel）。仅单轮、提交时 agent 非 working；已 working 不得把当前 turn 当本任务完成。
 - file local-only：ask --mode file 创建 tasks/<shortid>/result.md，result_path 写台账（tombstone 保留）；peer 原子写 temp+rename 或完成标记/长度校验防 partial；hao result <shortid> 用台账 result_path+realpath+防 symlink/穿越，peer 返回其他路径拒绝或需 --file。跨机器 result experimental/不支持。
 - metadata 旁路 experimental。不做可插拔框架。
 ### 8.3 长等待与唤醒
 - ask 默认异步立即返回 token+shortid；--wait 内联（lifecycle 强制）。默认超时 30m，--timeout 0 无限；--progress 心跳 stderr。台账 caller-local+machine 键。
-- **--wake 生效条件**：仅当 peer 运行 hao done（或等价 completion hook）**且能访问 caller-local 台账（同机）**时，hao done 写台账 status=done 并注入固定模板 [HAO_WAKE] <shortid> <status>（不含 peer summary）到 caller。**最终消息打印哨兵只是 wait 信号，不产生 wake**。跨机器 caller-local 台账不可达→peer 无法 wake，**只能 caller 侧 poll**。**--wake 须确认 caller-target 与 peer 同机，caller 在另一 machine 直接拒绝 exit7，不尝试注入**。
+- **--wake 生效条件**：仅当 peer 运行 hao done（或等价 completion hook）**且能访问 caller-local 台账（同机）**时，hao done 写台账 status=done 并注入固定模板 [HAO_WAKE] <shortid> <status>（不含 peer summary）到 caller。**最终消息打印哨兵只是 wait 信号，不产生 wake**。跨机器 caller-local 台账不可达→peer 无法 wake，**只能 caller 侧 poll**。**--wake 须确认 caller-target 与 peer 同机（按 ledger machine 键），caller 在另一 machine 直接拒绝 exit7 不注入；同机但不同 XDG_STATE_HOME 台账不可达→best-effort 警告，退化宿主 scheduler/poll**。
 - **主 fallback=宿主 scheduler（ScheduleWakeup）定时复查 hao wait --timeout 短 + caller 侧短轮询**；token 稳定可重复 wait。hao watch experimental（--once/超时/幂等/清理，非隐性 daemon，无验收不承诺）。caller blocked→agent_blocked wake 丢失 best-effort；caller 不存在 exit3。
 ### 8.4 终止与超时（全模式可 cancel）
 - 所有模式短超时轮询+每轮查台账：**台账 status=done 直接返回成功（带 result_path/summary）——台账 done 是权威完成信号，覆盖 hao done stdout 不可见场景；正则用于无 hao 的 peer 手动打印**。cancelled exit10，running 继续。sentinel 用 wait-output --regex 短循环；lifecycle 用 agent wait 短循环；file 文件轮询。cancel 停任一阻塞 wait（别于 timeout4）。
-- cancel <token|shortid> 只标台账 cancelled（幂等不碰 peer）；waiter 停；迟到哨兵忽略；cancel 后 done 不得标 done；token 不存在 exit3。
+- cancel <token|shortid> 只标台账 cancelled（幂等不碰 peer）；waiter 停；迟到哨兵忽略；cancel 后 done 不得标 done；token 不存在 exit3。**终态优先级 done>cancelled：cancel/abort 对 status=done 的 tombstone 为 no-op exit6，不覆盖 done；cancel 只对 running/unknown 有效**。
 - abort <token> [--interrupt]：cancel+可选发键 send-keys esc→ctrl+c。**blocked 下 --interrupt 只认用户级授权：TTY 二次确认，或用户拥有的 0600 approval 文件/独立 approval token**；HAO_ABORT_ALLOW=1 仅是“用户预先授权”约定**不是安全边界**（agent 可在自己 shell 设 env，甚至直接 herdr send-keys 绕过 hao）。文档明示：abort 授权是 guardrail 非 security boundary；esc/ctrl+c 可能丢审批。abort blocked 无授权 exit5。不关 pane 不停 server。cancel 与 abort 分开。
 - 超时 exit4+状态+尾部→编排者决定重试/cancel/abort；blocked exit5→交用户审批或 abort，绝不自动点审批；exited/closed exit3。一 pane 一 task best-effort（台账 busy 无分布式锁）；无 --queue。
 - hao done --token T [--summary]：**写前先查台账，cancelled tombstone 存在则拒绝标 done**；先 summary 后哨兵 stdout 最后一行；写台账 done+tombstone result_path；同机有 --wake 则注入；stdout 可能不可见但台账/wake/result 副作用可用（wait 读台账 done）；done 不在 pane/无法渲染 exit8；远端无 hao 手动打印（仅 wait 信号）。
-- **status** 默认 target=当前 pane（HERDR_PANE_ID），输出 agent 状态/label/mode/outstanding shortid；**say** fire-forget 无哨兵不写台账，对 blocked exit5、**对 working 默认 best-effort 提交，--strict 时 working exit6**；**result** 按 shortid 读 tombstone result_path（只读不删）。**status 无 HERDR_PANE_ID（herdr 外）exit3 并提示**。
+- **status** 默认 target=当前 pane（HERDR_PANE_ID），输出 agent 状态/label/mode/outstanding shortid；**say** target 可省略默认当前 pane；fire-forget 无哨兵不写台账，对 blocked exit5、对 working 默认 best-effort、--strict exit6。**result** 按 shortid 读 tombstone result_path（只读不删）；**mode=sentinel/lifecycle 无 result_path 时 exit3**。**status** 无 HERDR_PANE_ID exit3；当前 pane 无 agent 时输出 shell/pane 信息 exit0。hao done 写 summary 落盘并更新 tombstone updated，wait/result 双消费顺序一致。
 
 ## 9. 错误码
 0 成功/2 用法（invalid_agent_name·mode 非法·result 路径被拒·别名未知·--file 非法·HAO_ABORT_ALLOW 格式错）/3 target 不存在·exited·closed·result 文件不存在·cancel token 不存在·wake caller 不存在·status 无 HERDR_PANE_ID/4 超时/5 blocked·abort blocked 无授权·say 对 blocked/6 冲突·歧义·name taken·say --strict 对 working/7 machine 不可用·wake caller 跨机·result --machine/8 herdr·server 错误（prompt_stalled·remote failure·agent_not_ready·agent_pane_not_found·stale_pane_target·invalid_agent_timeout·watch 失败·台账损坏/不可写·done 不在 pane·result --machine 不支持）/9 协议错误（baseline 旧 token·lifecycle 未观察 working 转变）/10 cancelled。startup pending 可重试。解析 herdr JSON error.code/stderr 不透传；mutating 不盲重试。
@@ -86,15 +86,15 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 4. 两 hao-hawk→都歧义 exit6 不 rename；--pick 只恢复被选
 5. hao-hawk-api/hao-hawk-web→name hawk 冲突 exit6
 6. 另一 workspace 有 live hawk→本 workspace restore/name exit6
-7. 预置哨兵/prompt 回显 wait 不成功；真实最终消息（TUI 缩进/⏺/尾部标点/代码框/**backtick `、引用 >、列表 -、冒号 HAO_DONE:**）命中；**先引用后打印→稳定窗口取最后一次匹配不提前完成**；Bash tool hao done stdout 不可见但 **wait 读台账 done 成功**；token-only 引用不 busy-loop；滚动顶出→超时重扫 fallback
+7. 预置哨兵/prompt 回显 wait 不成功；真实最终消息（TUI 缩进/⏺/尾部标点/代码框/**backtick `、引用 >、列表 -、冒号 HAO_DONE:**）命中；**先引用后打印（间隔 >2s）→agent idle/done 门槛+最后匹配+稳定窗口不提前完成**；bold/编号 1./标题 #/表格 | 正例命中；Bash tool hao done stdout 不可见但 **wait 读台账 done 成功**；token-only 引用不 busy-loop；滚动顶出→超时重扫 fallback
 8. machine fixture：list 两 shape/unknown/remote down/machine+session；本机无 profile 标注；result/wake 跨机器 experimental/不支持
 9. suggest 3–5 中英文 task；live 重名扫 names+labels+stale
-10. cancel 全模式停阻塞 wait exit10+幂等+迟到哨兵忽略+done-after-cancel 拒绝+token 不存在 exit3；abort blocked 无 TTY/0600 approval exit5（HAO_ABORT_ALLOW 不算）；超时 exit4 带状态尾部；blocked exit5
+10. cancel 全模式停阻塞 wait exit10+幂等+迟到哨兵忽略+done-after-cancel 拒绝+**cancel-after-done no-op exit6（done>cancelled）**+token 不存在 exit3；abort blocked 无 TTY/0600 approval exit5（HAO_ABORT_ALLOW 不算）；超时 exit4 带状态尾部；blocked exit5
 11. lifecycle 同步可 cancel：agent prompt 提交+state_change_seq 门槛（**快速任务 seq 前进+idle/done 即完成，不误 exit9**；5s 无变化无输出才 exit9）+agent wait 短循环查台账；拒绝 async
 12. file：partial 不提前返回；result 用台账 tombstone result_path+realpath，穿越被拒；shortid 12hex 防碰撞；**tombstone 只读不删，wait/result 双消费或 TTL 才清**
 13. wake 仅同机 hao done+台账可达生效，固定模板不含 summary；最终消息打印不产生 wake；caller blocked best-effort 丢失；caller 不存在 exit3；跨机器 caller 侧 poll
 14. 台账 0700/0600+原子写+锁+tombstone 保 result_path+TTL 按 updated 不清 running+写失败降级；不 kill PID
-15. status 默认当前 pane（无 HERDR_PANE_ID exit3）/say 默认 best-effort、--strict working exit6、不写台账/result 读 tombstone 只读不删；wake caller 跨机 exit7；done 写前查 cancelled；逐条 output/exit/JSON schema（protocol.md，含 done 例外）
+15. status 默认当前 pane（无 HERDR_PANE_ID exit3，无 agent 输出 shell 信息 exit0）/say target 可省默认当前 pane、best-effort、--strict exit6/result 读 tombstone 只读不删（无 result_path exit3）；summary 落盘 wait 可返回；wake caller 跨机 exit7；done 写前查 cancelled；逐条 output/exit/JSON schema（protocol.md，含 done 例外）
 16. test_names：完整性+保留字（全命令面）+显式 deny；list/doctor 默认当前 workspace+per-machine 标注
 
 ## 16. 词表（40×40，round-4 后）
@@ -479,5 +479,5 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 </details>
 
 ## 18. 实测记录
-r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条（wait 未读台账 done/lifecycle 漏快速任务/正则漏 Markdown/尾部非最后匹配/tombstone 读即删/say 语义/status-wake-done 边界）→v7 收口（wait 读台账 done 权威、state_change_seq 门槛、正则容忍 Markdown+最后匹配稳定窗口、tombstone 只读双消费、say --strict、status exit3、wake 同机 exit7、done 查 cancelled）。
+r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条（完成缺 agent idle 门槛/台账无 summary/footer 不可操作/cancel-after-done 未定/正则漏 bold 编号标题表格/seq 无关事件/say-status-result 边界）→v8 收口（agent idle/done 门槛去 footer 条件、summary 落盘、done>cancelled no-op exit6、正则容忍 bold/编号/标题/表格+fallback、seq 配合 observed working、边界补全、wake 同机不同 XDG best-effort）。
 forge 核实 herdr 0.9.5 命令面/label 持久化/词表完整性/agent name 规则/wait-output ^ 按行匹配/pane read 无 offset。
