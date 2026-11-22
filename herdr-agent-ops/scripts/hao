@@ -346,8 +346,11 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
         _ledger_warn(e)
     if wait:
         return cmd_wait(pane, token, timeout, mode, machine)
-    return {"token": token, "shortid": shortid,
-            "next": f"hao wait {pane} --token {token}"}
+    out = {"token": token, "shortid": shortid,
+           "next": f"hao wait {pane} --token {token}"}
+    if result_path:
+        out["result_path"] = result_path  # r9#2: survives a lost ledger write
+    return out
 
 
 _LEDGER_WARNED = False
@@ -411,16 +414,23 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
 
 def _token_matches(matched, token, sid):
     """matched: token text from the pane; the hao- prefix is optional (a
-    live peer dropped it once). Accept the exact token, a bare 12-hex
-    shortid prefix, or the shortid anchor for mis-assembled over-long
-    tokens (live peer duplicated a segment once -> 20-hex)."""
+    live peer dropped it once). Accept the exact token, or a bare 12-hex
+    shortid prefix. Over-long (>16-hex) matches — the observed segment-
+    duplication corruption — additionally require head-8 AND tail-8 of the
+    KNOWN full token: a shortid anchor alone would let a truncated sentinel
+    plus an unrelated hex line fake a completion (r9#1). Without the full
+    token (degraded ledger) over-long never matches: prefer the miss."""
     hexpart = matched[4:] if matched.startswith("hao-") else matched
+    bare = None
     if token:
         bare = token[4:] if token.startswith("hao-") else token
         if hexpart == bare:
             return True
-        if re.fullmatch(r"[0-9a-f]{12}", bare or "") and hexpart.startswith(bare):
-            return True
+    if len(hexpart) > 16:
+        return bool(bare) and len(bare) >= 16 \
+            and hexpart[:8] == bare[:8] and hexpart[-8:] == bare[-8:]
+    if bare and re.fullmatch(r"[0-9a-f]{12}", bare) and hexpart.startswith(bare):
+        return True
     if sid and hexpart[:12] == sid[:12]:
         return True
     return False
@@ -573,7 +583,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                 time.sleep(0.5)
     # r8#2 last chance: a wrapped sentinel is invisible to the single-line
     # fast path — one joined tail rescan before declaring timeout
-    last, _e = _sentinel_scan_tail(pane, token, sid, machine)
+    last, errc = _sentinel_scan_tail(pane, token, sid, machine)
+    if errc is not None:
+        return errc  # r9#3: pane read/server error, not a plain timeout
     if last:
         conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
         if conf:
@@ -672,6 +684,10 @@ def _wait_file(pane, sid, token, timeout, machine):
                 return 3
         rec = _safe_get(l, sid) or {}
         rp = rec.get("result_path")
+        if not rp:
+            # r9#2 fallback: ask's convention path (state_dir/<sid>/result.md)
+            # survives even when the ledger write was lost
+            rp = os.path.join(_led.state_dir(), sid, "result.md")
         if rp and os.path.isfile(rp):
             sz = os.path.getsize(rp)
             if sz > 0 and sz == last_size:

@@ -23,13 +23,13 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。Bash tool stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
 - **peer 调用时机**：`hao done` 必须在最终答复正文**全部输出之后**才调用——台账 done 会立即释放等待方，早于正文调用会让等待方从 pane 读不到结论。
 - **防回显**：token 拆分两段，prompt 不含完整 token；`[TASK <shortid>]` 用独立短 id。
-- **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。token 形态容错（均实测出现过）：`hao-` 前缀可缺失；peer 拼段出错（重复段 20-hex）——位数容忍 12–32 hex，一律以 shortid 前缀比对锚定身份。折行合并仅在尾部 token 不足 12-hex 且合并后总长 ≤32-hex 时吸收纯 hex 续行，**完整哨兵永不续接**（其后紧跟的 hex 输出行不会破坏匹配）；大窗口重扫先合并再匹配；fast path 放弃前（`--timeout`<30s 场景）补做一次合并尾扫。
+- **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。token 形态容错（均实测出现过）：`hao-` 前缀可缺失；peer 拼段出错（重复段 20-hex）——位数容忍 12–32 hex；超长（>16-hex）必须同时匹配完整 token 的**首 8 与尾 8 段**（覆盖段重复损坏；shortid 锚定不足以排除「截断哨兵+无关 hex 行」误报），完整 token 不可得（台账降级）时超长一律不匹配——宁漏判不误判。折行合并仅在尾部 token 不足 12-hex 且合并后总长 ≤32-hex 时吸收纯 hex 续行，**完整哨兵永不续接**（其后紧跟的 hex 输出行不会破坏匹配）；大窗口重扫先合并再匹配；fast path 放弃前（`--timeout`<30s 场景）补做一次合并尾扫。
 - **写失败降级**：台账不可写/锁超时（5s）时——`ask` 照常返回 token（任务已派发，wake/cancel 退化为不可用）；`done` 照常打印哨兵（pane 证据是 ground truth）；`wait` 已确认的完成照常返回 done。任何台账写失败都不得阻断协议主证据链，仅一次性 stderr warning。
 - **完成确认**：必须有任务级证据（哨兵 `HAO_DONE <token>` 或台账 `status=done`），可降级（台账不可写时哨兵仍可确认）。`state_change_seq` 仅活动门槛，不作完成信号。台账锁等待有界（5s 超时即抛，flock 随进程死亡自动释放）；heartbeat/write_done 失败一律降级为凭 pane 证据返回成功 + 一次性 stderr warning，已确认的完成不因台账丢失。
 - **命中确认**：哨兵命中后 agent 仍 working 不确认；2s 稳定窗口内无更晚匹配、且该行仍是本任务最后一条 `HAO_DONE` 才写 done（防提前引用/流式残片）。gate 报错（exited 等）前也先大窗口重扫——哨兵可能刚好在退出前到达。
 - **活动门槛**：相对 submit_state 的 working/blocked transition，或 submit_seq + 短窗口 final idle/done（fast coverage）。
 - **两阶段等待（sentinel 模式）**：前 ~30s fast path（`pane wait-output --regex` 短轮询 + 台账/心跳）；之后切**长等待兜底**——server 侧 `herdr agent wait --until idle --until done --until blocked --timeout 8000` 短循环（每轮查台账顾及 cancel），settle 后 `pane read --lines 200` 大窗口重扫哨兵，防止哨兵滚出 1s 快照丢失。`--timeout 0` 翻译为省略 `--timeout`。
-- **模式差异**：`lifecycle` 以 submit_seq 为活动门槛（5s 内无活动 → exit9），agent unknown → exit6，完成仍需哨兵/台账证据；`file` 每轮重读台账（result_path 可后到），结果文件非空且大小连续两轮稳定才算完成，blocked → exit5、exited → exit3（pane 无 agent 时跳过门槛）。
+- **模式差异**：`lifecycle` 以 submit_seq 为活动门槛（5s 内无活动 → exit9），agent unknown → exit6，完成仍需哨兵/台账证据；`file` 每轮重读台账（result_path 可后到；台账丢失时回退约定路径 `state_dir/<shortid>/result.md`），结果文件非空且大小连续两轮稳定才算完成，blocked → exit5、exited → exit3（pane 无 agent 但 pane 存在时跳过门槛；pane 不存在 → exit3）。
 - **终态模型**：任何 wait 成功即写 `status=done`（含 matched_line 或 result_path）；TTL 按 updated 不清活跃 running，orphan running（无心跳超 TTL）才清；terminal 记录保留至 TTL，可重复 wait/result。
 - **wake**：`hao done` 同机 wake 失败以退出码报告（caller 不存在 → exit3），已写的台账 done 与已打印的哨兵不回滚。
 - **abort 授权**：目标 agent 处于 blocked 时 `--interrupt` 只认用户级授权——TTY 二次确认，或 0600 的 `~/.config/hao/abort-approval` 文件（内容含 shortid）；`HAO_ABORT_ALLOW=1` 仅是预授权**约定**非安全边界（agent 可自设 env 或直接 herdr send-keys 绕过），其它取值 → exit2；无授权 → exit5。
@@ -38,7 +38,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 ## JSON schema（各命令 --json）
 
 - `hao suggest --json`：`{"group": str, "reason": str, "candidates": [name, ...]}`
-- `hao ask`（异步）：`{"token": str}`
+- `hao ask`（异步）：`{"token": str, "shortid": str, "next": str, "result_path": str?（file 模式，台账写失败时仍在）}`
 - `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?}`
 - `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
 - `hao status`：`{"agent": {...}}` 或 shell/pane 信息。

@@ -180,12 +180,16 @@ class TestSentinelRobustness(unittest.TestCase):
         self.assertIsNotNone(SENTINEL_RE.match("  HAO_DONE hao-aabb11223344aabb1122"))
 
     def test_join_wrapped_sentinel(self):
-        lines = ["  HAO_DONE hao-aabb11", "  223344aabb1122"]
+        # round-7 shape: 8-hex fragment + 12-hex continuation rebuilding a
+        # segment-duplicated token; full token from ledger authenticates it
+        full = "00112233" + "445566ff"
+        corrupt = full[:12] + full[8:12] + full[12:]
+        lines = ["  HAO_DONE hao-" + corrupt[:8], "  " + corrupt[8:]]
         joined = hao._join_wrapped_sentinels(lines)
-        self.assertEqual(joined, ["  HAO_DONE hao-aabb11223344aabb1122"])
+        self.assertEqual(joined, ["  HAO_DONE hao-" + corrupt])
         m = SENTINEL_RE.match(joined[0])
         self.assertIsNotNone(m)
-        self.assertTrue(hao._token_matches(m.group(1), None, "aabb11223344"))
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
 
     def test_join_skips_non_hex_continuation(self):
         lines = ["  HAO_DONE hao-aabb11", "  ordinary output line"]
@@ -215,6 +219,59 @@ class TestSentinelRobustness(unittest.TestCase):
         self.assertFalse(hao._token_matches(
             "hao-ccddee00112233445566", None, "aabb11223344"))
 
+    def test_overlong_matches_full_token_head_tail(self):
+        # r9#1: round-7 style segment duplication, full token known from ledger
+        full = "00112233" + "445566ff"
+        corrupt = full[:12] + full[8:12] + full[12:]
+        self.assertTrue(hao._token_matches("hao-" + corrupt, full, full[:12]))
+
+    def test_overlong_rejected_without_full_token(self):
+        # degraded bare-shortid wait: over-long never matches (prefer miss)
+        full = "00112233" + "445566ff"
+        corrupt = full[:12] + full[8:12] + full[12:]
+        self.assertFalse(hao._token_matches("hao-" + corrupt, full[:12], full[:12]))
+
+    def test_overlong_false_positive_rejected(self):
+        # forge r9 repro: truncated sentinel fragment + unrelated hex line
+        # faking the shortid prefix -> head/tail rule rejects it
+        full = "00112233" + "445566ff"
+        faked = full[:12] + "dead" + "beef"
+        self.assertFalse(hao._token_matches("hao-" + faked, full, full[:12]))
+
+
+class TestFileConventionPath(unittest.TestCase):
+    def test_wait_file_falls_back_to_convention_path(self):
+        # r9#2: ledger lost result_path; state_dir/<sid>/result.md still completes
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
+            try:
+                from ledger import Ledger
+                sid = "beef11223344"
+                rp = os.path.join(d, "hao", "tasks", sid, "result.md")
+                os.makedirs(os.path.dirname(rp), exist_ok=True)
+                with open(rp, "w") as f:
+                    f.write("body")
+                Ledger().write_running(sid)  # no result_path field
+                orig = hao.run_herdr
+
+                def stub(args, machine=None):
+                    if args[:2] == ["agent", "get"]:
+                        return 1, "", '{"error":{"code":"agent_not_found"}}'
+                    if args[:2] == ["pane", "get"]:
+                        return 0, '{"result":{"pane":{"pane_id":"w2:pX"}}}', ""
+                    return orig(args, machine)
+
+                hao.run_herdr = stub
+                try:
+                    r = hao._wait_file("w2:pX", sid, "hao-beef1122334499", 6, None)
+                finally:
+                    hao.run_herdr = orig
+                self.assertEqual(r["status"], "done")
+                self.assertEqual(r["result_path"], rp)
+            finally:
+                sys.path.pop(0)
+
 
 class TestWriteDegradation(unittest.TestCase):
     def setUp(self):
@@ -240,10 +297,25 @@ class TestWriteDegradation(unittest.TestCase):
         self.lm.Ledger = BoomLedger
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), contextlib.redirect_stderr(err):
-            rc = hao.cmd_done("hao-aabb1122334499ff", None)
+            rc = hao.cmd_done("hao-" + "00112233" + "445566ff", None)
         self.assertEqual(rc, 0)
         self.assertIn("HAO_DONE", out.getvalue())
         self.assertIn("warning", err.getvalue())
+
+    def test_ask_file_mode_returns_result_path(self):
+        def stub(args, machine=None):
+            if args[:2] == ["agent", "prompt"]:
+                return 0, '{"result":{}}', ""
+            if args[:2] == ["agent", "get"]:
+                return 1, "", '{"error":{"code":"agent_not_found"}}'
+            return self.orig_run(args, machine)
+
+        hao.run_herdr = stub
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            r = hao.cmd_ask("w2:pX", "task", False, "file", None, 60)
+        self.assertIn("result_path", r)
+        self.assertTrue(r["result_path"].endswith("result.md"))
 
     def test_ask_returns_token_when_ledger_write_fails(self):
         # r8#3 (P1): task dispatched -> the token must survive the write failure
