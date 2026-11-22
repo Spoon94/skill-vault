@@ -11,12 +11,7 @@ Web search, content extraction, site crawling, URL discovery, deep research, and
 
 ## Prerequisites
 
-Before running any `tvly` command, check that the CLI is installed and authenticated.
-
-```bash
-# 1. Check install
-command -v tvly || tvly --status
-```
+`tvly` is the Tavily CLI. **Search and extract support capped keyless access** — run them directly; do not look for an API key or authenticate before the first request. Map, crawl, and research require authentication. Do not add a `--status` check to every invocation.
 
 If `tvly` is not found, install it:
 
@@ -26,15 +21,17 @@ curl -fsSL https://cli.tavily.com/install.sh | bash
 # or: pip install tavily-cli
 ```
 
-Then authenticate (one of):
+If an installed CLI reports an authentication error:
 
 ```bash
-tvly login --api-key tvly-YOUR_KEY   # API key from tavily.com
-tvly login                           # browser OAuth
-export TAVILY_API_KEY=tvly-...       # env var
+tvly login                        # browser OAuth (preferred for an interactive user)
+tvly login --api-key tvly-YOUR_KEY
+export TAVILY_API_KEY=tvly-...    # CI / unattended environments
 ```
 
-Verify with `tvly --status` — should show `Authenticated via ...`. If you get exit code 3 (auth error), re-run `tvly login`.
+- `--no-browser` prints the sign-in link instead of opening it, but still waits for a localhost callback.
+- If the keyless cap is reached in an interactive session, run `tvly login`, then retry the blocked request once.
+- Do not start a second login immediately after guided setup has completed.
 
 ## Workflow: Start simple, escalate
 
@@ -126,3 +123,7 @@ All commands support `--json` for structured output and `-o` to save to a file.
 - **Read from stdin with `-`** — `echo "query" | tvly search -`.
 - **Use `--include-raw-content`** on search to skip a separate extract call when you need full page text.
 - **For multi-step research**, save raw results to `/tmp/` and process them in separate turns — keeps context lean across iterations.
+
+## 同步说明
+
+本 skill 是本地融合版，源于重组前 tavily-ai/skills 的 7 个 CLI 子技能。上游已于 2026-10 重组为 `tavily-search` 核心技能加 `tavily-entity` / `tavily-list` / `tavily-monitor` / `tavily-research` / `tavily-sdk`，原目录已删除；本地暂不迁移到新分类，但认证行为（search/extract 可无密钥试用、map/crawl/research 需登录）已按上游最后版本更新。

@@ -4,11 +4,13 @@
 
 前 4 个为本家族原生成员；`diagram-graphviz` / `diagram-infocard` / `diagram-infographic` 来自 markdown-viewer/skills 集合（上游裸名 graphviz / infocard / infographic），本地已统一改为 `diagram-*` 前缀（见根 README 不变式 I7）。
 
+> 上游 `markdown-viewer/skills` 已于 2026-10 把这 3 个子技能（连同 archimate/bpmn 等）合并为单个 `documd-visuals` skill，原目录已删除。本仓库保留合并前的独立版本（内容冻结），不迁移到需要 Node 18+ 与 Chrome 导出的新包。
+
 | Skill | 输出形态 | 主用途 | 必需依赖 |
 |---|---|---|---|
 | [`diagram-mermaid`](diagram-mermaid/) | Mermaid 代码块（内联 Markdown） | GitHub README/issue/PR 嵌入，零依赖 | 无 |
 | [`diagram-plantuml`](diagram-plantuml/) | PlantUML 代码块（内联 Markdown） | UML/云架构/网络拓扑/安全/ArchiMate/BPMN/数据管道/IoT 等专业图 | 无（Java + plantuml.jar 可选） |
-| [`diagram-html`](diagram-html/) | 独立 HTML 文件 | 可分享的成品图，浏览器打开即用，双主题切换 + 浏览器导出菜单 | 无（Node.js 可选） |
+| [`diagram-html`](diagram-html/) | 独立 HTML 文件 | 可分享的成品图/一页讲解（10 种图 + explainer），双主题切换 + 浏览器导出 | 无（Node.js 可选） |
 | [`diagram-image`](diagram-image/) | SVG + PNG + 离线 HTML + GIF | 命令行直接产出图片/动图，适合 CI/批处理/嵌入不支持 SVG 的环境 | Python 3（PNG/GIF 需可选渲染器） |
 | [`diagram-graphviz`](diagram-graphviz/) | DOT 代码块（内联 Markdown） | 依赖树/调用图/包层级/模块关系，需细粒度边路由的图 | 无（Graphviz 可选） |
 | [`diagram-infocard`](diagram-infocard/) | HTML/CSS 卡片（直接内嵌 Markdown） | 编辑风信息卡片：知识摘要/数据高亮/公告，杂志级排版 | 无 |
@@ -28,7 +30,7 @@
 │   │       → diagram-graphviz（DOT 自动布局）
 │   │
 │   └─ 要独立文件分享 → 文件路线
-│       ├─ 要可交互的成品（双主题切换、点按钮导出、可分享给非技术同事）
+│       ├─ 要可交互的成品（10 种图 / 一页讲解、双主题切换、点按钮导出、可分享给非技术同事）
 │       │   → diagram-html（archify，HTML 文件 + 浏览器导出菜单）
 │       └─ 要命令行直接产出图片文件（CI/批处理/嵌入不支持 SVG 的环境）
 │           → diagram-image（fireworks，SVG + PNG 文件）
@@ -72,12 +74,13 @@
 
 ### diagram-html
 
-5 种图类型：architecture / workflow / sequence / data flow / lifecycle。
+10 种图类型：architecture / workflow / sequence / dataflow / lifecycle / erd / class / tree / timeline / waterfall；另支持把回答做成一页 **explainer**。
 
 - **双主题切换**：暗/亮主题，按 T 键切换，跟随系统 prefers-color-scheme
-- **导出菜单**：按 E 键打开，复制 PNG 到剪贴板，下载 PNG/JPEG/WebP/SVG（4× 分辨率）
-- **结构**：`SKILL.md` + `bin/` + `renderers/` (5 个图类型渲染器) + `schemas/` (6 个 JSON schema) + `scripts/` + `examples/` + `assets/`
-- **来源**：导入自 archify v2.10（基于 Cocoon-AI/architecture-diagram-generator v1.0 演化）
+- **导出菜单**：按 E 键打开，复制 PNG 到剪贴板，下载 PNG/JPEG/WebP/SVG，或导出 WebM 动图
+- **校验闭环**：`bin/archify.mjs finalize` 串起 schema 校验、严格 check、真实浏览器 browser-check
+- **结构**：`SKILL.md` + `bin/`（7 个）+ `renderers/`（10 种图渲染器 + 共享库）+ `explainer/` + `references/`（9 篇）+ `schemas/`（13 个 JSON schema）+ `examples/` + `assets/`
+- **来源**：导入自 archify v3.2（基于 Cocoon-AI/architecture-diagram-generator v1.0 演化）
 
 ### diagram-image
 
@@ -86,7 +89,7 @@
 - **命令行产出**：`scripts/fireworks.py`（`validate` / `render` / `check` / `export-png` / `export-html` / `animate`）
 - **输出形态**：SVG（权威产物）、PNG、离线 HTML（pan/zoom + 下载）、GIF 动图
 - **结构**：`SKILL.md` + `scripts/`（20 个）+ `templates/`（10 个 SVG 模板）+ `references/`（20 个）+ `schemas/`（输入契约）+ `assets/samples/` + `fixtures/`
-- **来源**：导入自 fireworks-tech-graph
+- **来源**：导入自 fireworks-tech-graph v1.2.0
 
 ### diagram-graphviz
 
@@ -117,15 +120,15 @@ DOT 语言有向/无向图，自动布局。
 |---|---|---|
 | 主输出 | HTML 文件 | SVG/PNG 文件 |
 | 图片生成方式 | 浏览器打开 HTML → 点导出菜单按钮 → 下载 | 命令行脚本直接产出文件 |
-| 是否需要浏览器 | 需要（手动点击导出） | 不需要（脚本直接出文件） |
-| 是否可自动化 | 否（需要人工点击） | 是（CI/CD、批处理可调用） |
-| 主题/风格 | 暗+亮双主题 + 双主题 SVG | 8 种风格 |
-| 图类型 | 5 种 | 10 种 |
+| 是否需要浏览器 | 只在校验/导出阶段需要 | 不需要（脚本直接出文件） |
+| 是否可自动化 | 校验可自动化；浏览器导出需人工点击 | 是（CI/CD、批处理可调用） |
+| 主题/风格 | 暗+亮双主题 + 双主题 SVG | 12 种风格 |
+| 图类型 | 10 种 + explainer 一页讲解 | 10 种 |
 | 接受 Mermaid 输入 | 是 | 否 |
 
 **不重叠的部分**：
-- diagram-html 独有：双主题切换、HTML 内导出菜单、复制到剪贴板、Mermaid 输入转换
-- diagram-image 独有：命令行直接出文件、8 种视觉风格、ER/use-case/timeline/comparison/agent-architecture 5 种额外图类型
+- diagram-html 独有：双主题切换、HTML 内导出菜单、复制到剪贴板、Mermaid 输入转换、explainer 页面、motion / WebM 导出
+- diagram-image 独有：命令行直接出文件、12 种视觉风格、ER/use-case/timeline/comparison/agent-architecture 5 种额外图类型、GIF 动图
 
 ## 安装
 
@@ -154,15 +157,16 @@ cp -r diagram-mermaid diagram-plantuml diagram-html diagram-image diagram-graphv
 |---|---|---|---|
 | diagram-mermaid | —（全新创建） | — | — |
 | diagram-plantuml | markdown-viewer/skills (9 个 PlantUML 子技能合并) | — | https://github.com/markdown-viewer/skills |
-| diagram-html | archify | v2.10 | https://github.com/tt-a1i/archify (基于 Cocoon-AI/architecture-diagram-generator v1.0) |
-| diagram-image | fireworks-tech-graph | v1.0.4 | https://github.com/yizhiyanhua-ai/fireworks-tech-graph |
-| diagram-graphviz | markdown-viewer/skills（上游目录名 `graphviz`） | — | https://github.com/markdown-viewer/skills |
-| diagram-infocard | markdown-viewer/skills（上游目录名 `infocard`） | — | https://github.com/markdown-viewer/skills |
-| diagram-infographic | markdown-viewer/skills（上游目录名 `infographic`） | — | https://github.com/markdown-viewer/skills |
+| diagram-html | archify | v3.2 | https://github.com/tt-a1i/archify (基于 Cocoon-AI/architecture-diagram-generator v1.0) |
+| diagram-image | fireworks-tech-graph | v1.2.0 | https://github.com/yizhiyanhua-ai/fireworks-tech-graph |
+| diagram-graphviz | markdown-viewer/skills（上游目录名 `graphviz`，已合并为 documd-visuals） | 冻结于 2026-10 前 | https://github.com/markdown-viewer/skills |
+| diagram-infocard | markdown-viewer/skills（上游目录名 `infocard`，已合并为 documd-visuals） | 冻结于 2026-10 前 | https://github.com/markdown-viewer/skills |
+| diagram-infographic | markdown-viewer/skills（上游目录名 `infographic`，已合并为 documd-visuals） | 冻结于 2026-10 前 | https://github.com/markdown-viewer/skills |
 
 ## License
 
 各 skill 沿用其来源项目的 license：
 
-- `diagram-mermaid`、`diagram-plantuml`、`diagram-html`、`diagram-image`：MIT（diagram-mermaid 为新建，无 license 限制）
-- `diagram-graphviz`、`diagram-infocard`、`diagram-infographic`：来自 markdown-viewer/skills（上游裸名 graphviz / infocard / infographic），其 README 声明 **GPL-3.0**（该仓库无 LICENSE 文件，README 声明是唯一依据），使用/再分发请按 GPL-3.0 处理
+- `diagram-html`：**Apache-2.0**（archify v3.2；其中部分文件为 MIT，见 `LICENSE-MIT` 与 `THIRD_PARTY_NOTICES.md`）
+- `diagram-mermaid`、`diagram-plantuml`、`diagram-image`：MIT（diagram-mermaid 为新建，无 license 限制）
+- `diagram-graphviz`、`diagram-infocard`、`diagram-infographic`：复制自 markdown-viewer/skills 合并前的版本。当时仓库无 LICENSE 文件，README 声明 **GPL-3.0**（该声明是唯一依据）；上游现改为 `documd-visuals` 的 CC-BY-4.0，不适用于本仓库的冻结副本。使用/再分发请按 GPL-3.0 处理

@@ -193,7 +193,7 @@ The squash commit is made on a detached HEAD, as `git rebase` does, so git's own
 
 ### Recovering staged changes
 
-Before squashing staged changes, Worktrunk saves them to `refs/wt-backup/<branch>`. Changes left unstaged are not included in the backup.
+Before squashing, Worktrunk saves the uncommitted changes the squash includes (everything staged, by hand or by `--stage`) to `refs/wt-backup/<branch>`. Changes left out of the squash stay in the working tree and aren't backed up.
 
 The output prints a command to recover the saved changes in a new worktree, including after `wt merge` removes the original.
 
@@ -811,13 +811,13 @@ Bulk-removes worktrees and branches that are integrated into the default branch,
 
 In `wt list`, candidates show `_` (same commit) or `⊂` (content integrated). Run `--dry-run` to preview. See `wt remove --help` for the full integration criteria.
 
-Locked worktrees, worktrees with uncommitted changes, and the main worktree are always skipped. The current worktree is removed last, triggering cd to the primary worktree. Pre-remove and post-remove hooks run for each removal; a candidate whose hooks include an unapproved project command is skipped with `(approval required)` (pre-approve with `wt config approvals add`, or pass `--yes`).
+Locked worktrees, worktrees with uncommitted changes, worktrees containing another worktree, and the main worktree are always skipped. The current worktree is removed last, triggering cd to the primary worktree. Pre-remove and post-remove hooks run for each removal; a candidate whose hooks include an unapproved project command is skipped with `(approval required)` (pre-approve with `wt config approvals add`, or pass `--yes`).
 
 Prune removes worktrees concurrently, so hooks that write shared resources must coordinate those writes.
 
 ### Min-age guard
 
-Candidates younger than `--min-age` (default: 1 day) are skipped. A worktree's age comes from its creation time. For branches without a reflog, Git maintenance or branch deletion can restart the age guard, even on older branches. This prevents removing a worktree just created from the default branch: it looks "merged" because its branch points at the same commit.
+Candidates younger than `--min-age` (default: 1 day) are skipped, so a worktree just created from the default branch isn't removed for looking "merged" (its branch points at the same commit). A worktree's age is its creation time; a branch with no worktree takes its age from its reflog. A branch with no reflog, which is common in bare repositories, can look new again after Git maintenance or a branch deletion, and is then skipped until `--min-age` passes.
 
 ```console
 $ wt step prune --min-age=0s     # no age guard
@@ -980,14 +980,7 @@ Run a command; kill its whole process tree when its worktree is removed. Teardow
 
 ### Why
 
-A `post-start` hook to start a long-lived process and a `pre-remove` hook to
-stop it is usually enough. But `pre-remove` only runs when worktrunk removes
-the worktree, so a `git worktree remove`, an `rm -rf`, or a crashed hook skips
-it. Across enough worktree churn some process is bound to outlive its worktree,
-and with no cleanup these leaks accumulate (on macOS they eventually saturate
-`fseventsd`). `tether` removes the need for a `pre-remove`: it ties the
-command's lifetime to the worktree and kills the whole process group once the
-worktree is gone.
+`pre-remove` hooks run only when Worktrunk removes a worktree. `tether` also stops the command when another tool removes the worktree.
 
 ### Arguments
 

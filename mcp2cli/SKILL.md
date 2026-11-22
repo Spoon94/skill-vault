@@ -77,6 +77,8 @@ Options:
   --refresh               Bypass cache
   --list                  List available subcommands
   --search PATTERN        Search tools by name or description (implies --list)
+  --schema TOOL           Print one MCP tool's raw definition (inputSchema,
+                          outputSchema, annotations); wire names preserved
   --fields FIELDS         Override GraphQL selection set (e.g. "id name email")
   --pretty                Pretty-print JSON output
   --raw                   Print raw response body
@@ -97,6 +99,15 @@ Bake mode:
 ```
 
 Subcommands and flags are generated dynamically from the source.
+
+**Global options go BEFORE the subcommand.** Argument parsing stops at the first
+non-flag token, so everything after the subcommand name belongs to that command — a
+tool may legitimately have its own `--pretty` or `--head`.
+
+```bash
+mcp2cli --spec ./spec.json --pretty list-pets    # works
+mcp2cli --spec ./spec.json list-pets --pretty    # error: unrecognized arguments: --pretty
+```
 
 ## Patterns
 
@@ -157,7 +168,7 @@ mcp2cli --graphql https://api.example.com/graphql users --limit 10
 mcp2cli --graphql https://api.example.com/graphql create-user --name "Alice" --email "alice@example.com"
 
 # Override auto-generated selection set
-mcp2cli --graphql https://api.example.com/graphql users --fields "id name email"
+mcp2cli --graphql https://api.example.com/graphql --fields "id name email" users
 
 # With auth
 mcp2cli --graphql https://api.example.com/graphql --auth-header "Authorization:env:API_TOKEN" users
@@ -174,11 +185,45 @@ mcp2cli --graphql https://api.example.com/graphql --search "user"
 
 `--search` implies `--list` — shows only matching tools.
 
-### POST with JSON body from stdin
+### Inspecting a tool's raw schema
+
+`--list --json` flattens each tool into CLI parameters and drops nested
+structure. To read the exact wire contract (nested objects, `anyOf`, `default`,
+`outputSchema`), print the raw definition:
 
 ```bash
+# Wire name, or the kebab-case name shown by --list
+mcp2cli --mcp https://mcp.example.com/sse --schema getUserProfile
+mcp2cli --mcp https://mcp.example.com/sse --schema get-user-profile
+
+# After the tool name, including through a session
+mcp2cli --mcp https://mcp.example.com/sse get-user-profile --schema
+mcp2cli --session work get-user-profile --schema
+```
+
+A tool with its own `schema` parameter keeps `--schema` for that parameter; use
+the global `--schema TOOL` form for it.
+
+Output is the server's own `tools/list` entry — `inputSchema`, `outputSchema`,
+`annotations`, and property names such as `fooBar` are never renamed.
+
+### JSON request body (`--req-json` / `--stdin`)
+
+Pass the whole request as one JSON object. `--req-json` takes it inline, which
+avoids the shell pipeline (and the quoting pain on Windows); `--stdin` reads the
+same JSON from stdin. Flags given alongside are merged in, and a value that
+disagrees with the JSON is an error.
+
+```bash
+# Inline: OpenAPI body, MCP tool arguments, GraphQL variables
+mcp2cli --spec ./spec.json create-pet --req-json '{"name": "Fido", "tag": "dog"}'
+mcp2cli --mcp https://mcp.example.com/sse search --req-json '{"query": "test", "limit": 5}'
+
+# Piped stdin still works, and is what you want when a tool generated the JSON
 echo '{"name": "Fido", "tag": "dog"}' | mcp2cli --spec ./spec.json create-pet --stdin
 ```
+
+`--req-json` and `--stdin` are mutually exclusive.
 
 ### Multipart file uploads
 
@@ -299,7 +344,7 @@ Best for large uniform arrays — 40-60% fewer tokens than JSON.
 
 ```bash
 # Preview first 3 records from a potentially huge dataset
-mcp2cli --spec ./spec.json list-records --head 3 --pretty
+mcp2cli --spec ./spec.json --head 3 --pretty list-records
 ```
 
 `--head N` slices JSON arrays to the first N elements. Useful for datasets with oversized fields (e.g. geo_shape polygons at ~200KB per record).
@@ -367,7 +412,7 @@ When the user asks to create a skill from an MCP server, OpenAPI spec, or GraphQ
    # Get help for a command
    ${CLAUDE_SKILL_DIR}/scripts/myapi <command> --help
    # Run a command
-   ${CLAUDE_SKILL_DIR}/scripts/myapi <command> --param value --pretty
+   ${CLAUDE_SKILL_DIR}/scripts/myapi --pretty <command> --param value
    ```
 
    **Before Querying** checklist — include a decision framework:
@@ -386,9 +431,9 @@ When the user asks to create a skill from an MCP server, OpenAPI spec, or GraphQ
    **Output Processing** — use `--pretty` for readable JSON, `--head` to limit results, or pipe to `jq` for filtering:
    ```bash
    # Pretty-print results
-   ${CLAUDE_SKILL_DIR}/scripts/myapi list-records --pretty
+   ${CLAUDE_SKILL_DIR}/scripts/myapi --pretty list-records
    # Limit large datasets
-   ${CLAUDE_SKILL_DIR}/scripts/myapi list-records --head 5
+   ${CLAUDE_SKILL_DIR}/scripts/myapi --head 5 list-records
    # Filter with jq (pipe)
    ${CLAUDE_SKILL_DIR}/scripts/myapi list-records | jq '.[].name'
    ```
@@ -396,7 +441,7 @@ When the user asks to create a skill from an MCP server, OpenAPI spec, or GraphQ
    **Export Formats** (if the API supports multiple output types):
    - List supported formats (JSON, CSV, xlsx, parquet, etc.)
    - Note which are text-safe vs binary
-   - For binary formats: `${CLAUDE_SKILL_DIR}/scripts/myapi export --format xlsx --raw > output.xlsx`
+   - For binary formats: `${CLAUDE_SKILL_DIR}/scripts/myapi --raw export --format xlsx > output.xlsx`
 
    **Knowledge Delta Principle:** Do not duplicate parameter listings from `--help`. Instead, document which parameters actually matter for common tasks, default behaviors that are surprising, combinations that don't work, and rate limits or response size limits.
 

@@ -1,14 +1,6 @@
 # Extending Worktrunk
 
-Worktrunk has three extension mechanisms.
-
-**[Hooks](#hooks)** are shell commands that run automatically at lifecycle events (switching, starting, committing, merging, removing). Defined in TOML.
-
-**[Aliases](#aliases)** are reusable shell commands invoked as `wt <name>`. Defined in TOML.
-
-**[Custom subcommands](#custom-subcommands)** are standalone executables invoked as `wt <name>`. Drop `wt-foo` on `PATH` and it becomes `wt foo`.
-
-| | Hooks | Aliases | Custom subcommands |
+| | [Hooks](#hooks) | [Aliases](#aliases) | [Custom subcommands](#custom-subcommands) |
 |---|---|---|---|
 | **Trigger** | Automatic (lifecycle events) | Manual (`wt <name>`) | Manual (`wt <name>`) |
 | **Defined in** | TOML config | TOML config | Any executable on `PATH` |
@@ -164,9 +156,9 @@ if git diff --quiet HEAD && test -z "$(git ls-files --others --exclude-standard)
   wt switch --create {{ to }} --execute sh -- -c \
     'if [ "$#" -gt 0 ]; then exec "$@"; fi' worktrunk-move {{ args }}
 else
-  git stash push --include-untracked --quiet
+  git stash push --include-untracked --quiet || exit
   wt switch --create {{ to }} --execute sh -- -c \
-    'git stash pop --index; if [ "$#" -gt 0 ]; then exec "$@"; fi' worktrunk-move {{ args }}
+    'git stash pop --index || exit; if [ "$#" -gt 0 ]; then exec "$@"; fi' worktrunk-move {{ args }}
 fi
 '''
 ```
@@ -226,9 +218,9 @@ Aside from the differences below, hooks and aliases behave the same.
 | Reach `{{ args }}` from positionals | Must use `--` (`wt hook pre-merge -- extra`) | Any bare positional lands there |
 | Approval skip flag | Post-subcommand `--yes` / `-y` supported (`wt hook pre-merge --yes`) | Only the global form (`wt -y <alias>`); post-alias `--yes` falls through to `{{ args }}` |
 | Source discrimination | `user:` / `project:` / `user:name` / `project:name` filter syntax | Run user first, then project; no filter syntax |
-| `--help` | `wt hook --help` lists hook types; `wt hook <type> --help` shows flags and arguments for that type | The template body is the documentation: `wt <alias> --help` redirects to `wt config alias show` / `dry-run`. `wt --help` and `wt step --help` list configured aliases alongside built-in commands |
+| `--help` | `wt hook --help` lists hook types; `wt hook <type> --help` shows flags and arguments for that type | An alias whose template references `{{ args }}` or `{{ help }}` takes `--help` and `-h` like any other argument and runs, every pipeline step included, so `wt sw --help` with `sw = "wt switch {{ args }}"` shows `wt switch --help`. Other aliases print how to inspect them (`wt config alias show` / `dry-run`) without running. `wt --help` and `wt step --help` list configured aliases alongside built-in commands |
 | Inspection | `wt hook show [type] [--expanded]` | `wt config alias show <name>` / `wt config alias dry-run <name>` |
-| Stdin | See [Interactive hooks](https://worktrunk.dev/hook/#interactive-hooks) | Serial steps inherit parent stdin |
+| Stdin | A command running alone in the foreground inherits wt's stdin; concurrent and background commands get empty stdin ([Interactive hooks](https://worktrunk.dev/hook/#interactive-hooks)) | A command running alone inherits wt's stdin; concurrent commands get empty stdin |
 | Template-context extras | `hook_type`, `hook_name`, per-type operation vars (`base`, `target`, `pr_number`, …) | `args` on top of the shared base variables |
 
 </details>

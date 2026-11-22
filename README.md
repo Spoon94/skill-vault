@@ -47,7 +47,7 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 | [diagram-mermaid](./diagram/diagram-mermaid) | 嵌入基础图（流程/时序/状态/ER 等 11 种） |
 | [diagram-plantuml](./diagram/diagram-plantuml) | 专业图：UML/云架构/网络/安全/BPMN（图标库 9500+） |
 | [diagram-graphviz](./diagram/diagram-graphviz) | 依赖树/调用图/包层级，细粒度边路由 |
-| [diagram-html](./diagram/diagram-html) | 可分享的 HTML 成品图，双主题 + 一键导出 |
+| [diagram-html](./diagram/diagram-html) | 可分享的 HTML 成品图/一页讲解，双主题 + 一键导出 |
 | [diagram-image](./diagram/diagram-image) | 产 SVG / PNG / 离线 HTML / GIF 动图，命令行适合 CI/批处理 |
 | [diagram-infocard](./diagram/diagram-infocard) | 单主题信息卡片，杂志级排版 |
 | [diagram-infographic](./diagram/diagram-infographic) | KPI 看板/时间线/SWOT/漏斗/对比 |
@@ -151,6 +151,7 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 | I6 | `diagram/` 家族跨两个上游集合：`arch-diagram/diagram/` 的 4 个 `diagram-*` + `arch-diagram/skills/`（即 markdown-viewer/skills）的 3 个改名为 `diagram-*` 的目录（`diagram-graphviz` / `diagram-infocard` / `diagram-infographic`，上游裸名 graphviz / infocard / infographic） | 同属绘图技能集中放置便于路由与发现 | `diagram/diagram-{graphviz,infocard,infographic}/` |
 | I7 | diagram 家族统一用 `diagram-*` 前缀命名，与上游 `markdown-viewer/skills` 的裸名（graphviz/infocard/infographic）不同 | 家族内命名一致性优先于上游保真；便于按名字定位 | `diagram/diagram-{graphviz,infocard,infographic}/`；下次同步这 3 个时需重做改名 + 改 `name` 字段补丁 |
 | I8 | `worktrunk/reference/claude-code.md` 中关于 `wt-switch-create` 的描述保留上游原文，但加了「本仓库未收录」标注 | 该 skill 已删除（用户不需要），上游文本仍提及它；标注避免 agent 误以为可用 | `worktrunk/reference/claude-code.md` |
+| I9 | `diagram-{graphviz,infocard,infographic}` 冻结在 markdown-viewer/skills 合并前的版本 | 上游 2026-10 已把这 3 个（及同仓库其他子技能）合并为单个 `documd-visuals`，原目录删除且新包要求 Node 18+ 与 Chrome；本地保留无需构建的旧版 | `diagram/diagram-{graphviz,infocard,infographic}/`；下次同步跳过这 3 个 |
 
 除上述不变式外，其余内容与各上游项目保持一致。
 

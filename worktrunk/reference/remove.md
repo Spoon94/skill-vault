@@ -22,10 +22,18 @@ $ wt remove feature-branch
 $ wt remove old-feature another-branch
 ```
 
+To choose interactively, open the [`wt switch` picker](https://worktrunk.dev/switch/#interactive-picker) and press `Alt-x` on a row.
+
 Keep the branch:
 
 ```console
 $ wt remove --no-delete-branch feature-branch
+```
+
+If `[remove] delete-branch = false` is configured, use `--delete-branch` to delete a branch for one removal:
+
+```console
+$ wt remove --delete-branch feature-branch
 ```
 
 Force-delete an unmerged branch:
@@ -68,6 +76,8 @@ $ wt remove feature -D            # Delete unmerged branch
 $ wt remove feature --force -D    # Both
 ```
 
+Before `--force` discards uncommitted changes, Worktrunk saves them (except ignored files and changes inside submodules) to `refs/wt-backup/<branch>` and prints a command to recover them in a new worktree.
+
 Use `--no-delete-branch` to keep the branch regardless of merge status.
 
 ## Background removal
@@ -96,7 +106,7 @@ Unix only; on Windows `--reap` is rejected.
 
 ## JSON output
 
-`--format=json` prints one object per removal to stdout: `{kind, branch, path, branch_outcome, branch_checked_out_at}` for a worktree, with `pruned` in place of `path` for a branch-only removal. Branch-only results also include `detached_worktree`: the path of a detached worktree left behind, or `null`.
+`--format=json` prints one object per removal to stdout: `{kind, branch, path, branch_outcome, branch_checked_out_at}` for a worktree, with `pruned` in place of `path` for a branch-only removal. Branch-only results also include `detached_worktree`: the path of a detached worktree at the branch's expected location, which the removal leaves in place, or `null`.
 
 `branch_outcome` names what happened to the branch, so a caller can tell a deletion the removal declined from one it was never asked to make:
 
@@ -134,6 +144,9 @@ Arguments:
 Options:
       --no-delete-branch
           Keep branch after removal
+
+      --delete-branch
+          Delete branch after removal (overrides config [remove] delete-branch = false)
 
   -D, --force-delete
           Delete unmerged branches

@@ -16,7 +16,7 @@ List all worktrees:
 
 ```console
 $ wt list
-  Branch       Status      HEAD±     main↕    main…±    Remote⇅  Commit    Age  Message
+  Branch       Status       @±        ^↕        ^…±     Remote⇅  Commit    Age  Message
 @ feature-api  +   ↕⇡     +54   -5   ↑4  ↓1  +234  -24   ⇡3      6814f02   30m  Add API tests
 ^ main             ^⇅                                    ⇡1  ⇣1  41ee083    4d  Merge fix-auth: ha…
 + fix-auth         ↕|                ↑2  ↓1   +25  -11     |     b772e68    5h  Add secure token s…
@@ -29,7 +29,7 @@ Include CI status and LLM summaries:
 
 ```console
 $ wt list --full
-  Branch       Status      HEAD±     main↕    main…±    Summary                       Remote⇅  CI
+  Branch       Status       @±        ^↕        ^…±     Summary                       Remote⇅  CI
 @ feature-api  +   ↕⇡     +54   -5   ↑4  ↓1  +234  -24  Refactor API to REST archit…   ⇡3      #412
 ^ main             ^⇅                                                                  ⇡1  ⇣1  #
 + fix-auth         ↕|                ↑2  ↓1   +25  -11  Harden auth with constant-t…     |     #408
@@ -42,7 +42,7 @@ Include branches that don't have worktrees:
 
 ```console
 $ wt list --branches --full
-  Branch       Status      HEAD±     main↕    main…±    Summary                       Remote⇅  CI
+  Branch       Status       @±        ^↕        ^…±     Summary                       Remote⇅  CI
 @ feature-api  +   ↕⇡     +54   -5   ↑4  ↓1  +234  -24  Refactor API to REST archit…   ⇡3      #412
 ^ main             ^⇅                                                                  ⇡1  ⇣1  #
 + fix-auth         ↕|                ↑2  ↓1   +25  -11  Harden auth with constant-t…     |     #408
@@ -65,20 +65,22 @@ $ wt list --format=json
 |--------|-------|
 | Branch | Branch name, elided with `…` past 32 characters; a detached worktree shows its short hash |
 | Status | Compact symbols (see below) |
-| HEAD± | Uncommitted changes, including untracked files: +added -deleted lines |
-| main↕ | Commits ahead/behind default branch |
-| main…± | Line diffs since the merge-base (three-dot) with the default branch |
+| @± | Uncommitted changes, including untracked files: +added -deleted lines |
+| ^↕ | Commits ahead/behind default branch |
+| ^…± | Line diffs since the merge-base (three-dot) with the default branch |
 | Summary | LLM-generated branch summary; requires `--full`, `summary = true`, and [`commit.generation`](https://worktrunk.dev/config/#commit) |
 | Remote⇅ | Commits ahead/behind tracking branch |
 | CI | PR/MR number colored by pipeline status; `--full` only |
 | Path | Worktree directory |
 | URL | Dev server URL from project config; dimmed if port is not listening |
-| *(custom)* | User-defined [custom columns](#custom-columns) from `[list.custom-columns]` user config [experimental] |
+| *(custom)* | User-defined [custom columns](#custom-columns-experimental) from `[list.custom-columns]` user config [experimental] |
 | Commit | Short hash, abbreviated per `core.abbrev` |
 | Age | Time since last commit |
 | Message | Last commit message (truncated) |
 
-The `main↕` and `main…±` headers keep the familiar `main` label in every repository.
+In the headers, `@` stands for the worktree's own `HEAD` and `^` for the default branch, whatever it is named — the same shortcuts `wt switch` accepts.
+
+Counts too large for their column are shortened, rounded down, and drawn brighter: `C` is hundreds and `K` thousands (`↑3C` is 300–399 commits, `+2K` is 2,000–2,999 lines), and `∞` means 10,000 or more. Line counts stay exact up to 999; commit counts up to 99. `--format=json` carries the exact counts.
 
 The table sizes itself to the terminal. When the columns don't all fit, the least important go first — roughly right to left, since the order above runs from identity to nice-to-have — and the summary footer names them (`hidden: Commit, Age, Message`). A wider terminal brings them back. To pin a set rather than leave it to the width, name the columns in [`[list] columns`](https://worktrunk.dev/config/#list); `--format=json` carries every field at any width.
 
@@ -122,7 +124,7 @@ Reuses the [`commit.generation`](https://worktrunk.dev/config/#commit) command �
 
 ### Custom columns [experimental]
 
-Each `[list.custom-columns]` entry in user config adds a column: the key is the header, the template renders each row's cell. Templates read two per-branch namespaces — `{{ vars.* }}`, stored with [`wt config state vars set`](https://worktrunk.dev/config/#wt-config-state-vars), and `{{ git.branch.* }}`, the branch's own git config under `branch.<name>.*` (a `jira` key you set yourself, or the git-native `description`) — useful for tracking what each of many (often agent-driven) branches is for:
+Each `[list.custom-columns]` entry in user config adds a column. Its key sets the header; its template renders each row's cell. Templates read `{{ vars.* }}`, set with [`wt config state vars set`](https://worktrunk.dev/config/#wt-config-state-vars), and `{{ git.branch.* }}`, from `branch.<name>.*` in Git config:
 
 ```toml
 # ~/.config/worktrunk/config.toml
@@ -169,7 +171,7 @@ The single highest-priority state describing the branch's relation to the defaul
 
 | Symbol | display.state | Meaning |
 |--------|---------------|---------|
-| `^` | `"is_main"` | The main worktree (the repo's home worktree) |
+| `^` | `"is_main"` | The primary worktree (the repo's home worktree) |
 | `∅` | `"orphan"` | No common ancestor with the default branch |
 | `_` | `"empty"` | Same commit as the default branch, working tree clean — safe to remove; row dimmed |
 | `⊂` | `"integrated"` | Content [integrated](https://worktrunk.dev/remove/#branch-cleanup) into the default branch or merge target via different history; the matching check is in `default_branch.integration.reason`; row dimmed |
@@ -233,9 +235,9 @@ One envelope object. Items carry independent facts; rendered strings
       "branch": "feature",
       "head": {"sha": "05a4a45d…", "short_sha": "05a4a45", "subject": "Add login page",
                "committed_at": "2025-01-01T08:00:00Z"},
-      "worktree": {"path": "/home/user/repo.feature", "main": false, "current": true,
-                   "previous": false, "detached": false, "branch_mismatch": false,
-                   "duplicate_branch": false,
+      "worktree": {"path": "/home/user/repo.feature", "modified_at": "2025-01-01T09:30:00Z",
+                   "main": false, "current": true, "previous": false, "detached": false,
+                   "branch_mismatch": false, "duplicate_branch": false,
                    "changes": {"staged": false, "modified": true, "untracked": false,
                                "renamed": false, "deleted": false, "conflicted": false,
                                "diff": {"added": 10, "deleted": 2}}},
@@ -277,7 +279,7 @@ Item fields:
 | `remote` | string | Remote name, present only on remote-only branch rows |
 | `head` | object/null | HEAD commit (see [head object](#head-object)); null for unborn branches |
 | `worktree` | object | Worktree facts (see [worktree object](#worktree-object)); absent on branch-only rows |
-| `default_branch` | object | Relation to the default branch (see [default_branch object](#default-branch-object)); absent on the default branch itself |
+| `default_branch` | object | Relation to the default branch (see [default_branch object](#default_branch-object)); absent on the default branch itself |
 | `upstream` | object | Tracking branch (see [upstream object](#upstream-object)); absent when none is configured |
 | `pr` | object | Open PR/MR (see [pr object](#pr-object)); collected with `--full` |
 | `checks` | object | CI pipeline (see [checks object](#checks-object)); collected with `--full` |
@@ -292,7 +294,7 @@ Item fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `sha` | string | Full commit SHA (40 chars) |
-| `short_sha` | string | Short commit SHA, abbreviated per `core.abbrev` (auto-extends for ambiguous prefixes) |
+| `short_sha` | string/null | Short commit SHA, abbreviated per `core.abbrev` (auto-extends for ambiguous prefixes); null when the commit can't be read |
 | `subject` | string/null | Commit subject (first line); null when not loaded, as for a prunable worktree |
 | `committed_at` | string/null | Committer time, RFC 3339 UTC; null when not loaded |
 
@@ -303,7 +305,8 @@ Present only on worktree rows. The location attributes are independent, so they 
 | Field | Type | Description |
 |-------|------|-------------|
 | `path` | string | Worktree path |
-| `main` | boolean | Is the main worktree |
+| `modified_at` | string/null | Later of HEAD committer time and the newest changed or untracked file mtime, RFC 3339 UTC; null when unresolved |
+| `main` | boolean | Is the primary worktree: the main worktree, or in a bare repo the one on the default branch |
 | `current` | boolean | Is the worktree the command ran from |
 | `previous` | boolean | Is the previous worktree (`wt switch -`) |
 | `detached` | boolean | HEAD is detached |
@@ -388,7 +391,7 @@ Presentation only — every value here renders facts that appear elsewhere in th
 | `state` | string | The table's collapsed default-branch state (see [state values](#state-values)); absent when none applies |
 | `symbols` | string | Raw status symbols without colors (e.g., `"!?↓"`) |
 | `statusline` | string | Pre-formatted status with colors and links |
-| `columns` | object | Rendered [custom column](#custom-columns) values keyed by header; empty cells omitted |
+| `columns` | object | Rendered [custom column](#custom-columns-experimental) values keyed by header; empty cells omitted |
 
 ### repo object
 
@@ -399,6 +402,7 @@ Presentation only — every value here renders facts that appear elsewhere in th
 | `url` | string | Repository web URL |
 | `provider` | string | `"github"`, `"gitlab"`, `"gitea"`, `"azure-devops"`, or `"unknown"` |
 | `host` | string | Repository web host |
+| `api_host` | string | API host from `forge.hostname`, only on `repo.forge` when set |
 | `owner` | string | Owner, organization, or namespace path |
 | `name` | string | Repository name |
 | `project` | string | Azure DevOps project name; absent for other providers |
@@ -556,7 +560,7 @@ The line carries the same cells as the worktree's row in `wt list`. A stale CI s
 
 ### Output formats
 
-- `table` (default): `branch  status  HEAD±  main↕  main…±  Remote⇅  CI  URL`
+- `table` (default): `branch  status  @±  ^↕  ^…±  Remote⇅  CI  URL`
 - `json`: the current [`wt list --format=json`](https://worktrunk.dev/list/#json-output) schema — a one-item envelope by default, or a one-item array with `[list] json-schema = 1`
 - `claude-code`: the `table` cells, preceded by `dir` and followed by `model  context  pace`
 
