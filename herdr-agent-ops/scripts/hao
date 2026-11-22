@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""hao — herdr-agent-ops CLI (single-file, stdlib only)."""
+import json
+import os
+import re
+import subprocess
+
+HAO_LABEL_RE = re.compile(r"^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$")
+
+
+def run_herdr(args, machine=None):
+    """Run a herdr command, return (rc, stdout, stderr)."""
+    cmd = ["herdr"] + (["--machine", machine] if machine else []) + args
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def resolve_target(target, machine=None):
+    """Normalize w:t:p -> w:p; pass through w:p or other targets."""
+    m = re.match(r"^(w\d+):t\d+:(p\w+)$", target)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}"
+    return target
+
+
+if __name__ == "__main__":
+    pass
