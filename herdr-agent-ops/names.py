@@ -26,10 +26,15 @@ GRAY = set(_GRAY_STR.split())
 
 def _load(path=None):
     if path is None:
-        path = os.path.join(os.path.dirname(__file__), "references", "names.md")
+        try:
+            path = os.path.join(os.path.dirname(__file__), "references", "names.md")
+        except NameError:
+            path = os.path.join(os.getcwd(), "references", "names.md")
     names = {}
     group = theme = kw_zh = kw_en = None
-    for line in open(path, encoding="utf-8"):
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
+    for line in lines:
         line = line.rstrip("\n")
         if line.startswith("## "):
             group = line[3:].strip()

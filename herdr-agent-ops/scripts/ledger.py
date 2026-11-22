@@ -7,15 +7,19 @@ All writes are fresh read-modify-write field merges under a per-shortid lock.
 import fcntl
 import json
 import os
+import re
 import time
 
 STATE = os.path.join(
     os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
     "hao", "tasks",
 )
+SHORTID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 
 
 def _path(shortid):
+    if not SHORTID_RE.match(shortid or ""):
+        raise ValueError(f"invalid shortid: {shortid!r}")
     return os.path.join(STATE, shortid + ".json")
 
 
@@ -41,6 +45,8 @@ class Ledger:
 
     def write_running(self, shortid, **fields):
         def go(rec):
+            if rec.get("status") == "done":
+                return  # never downgrade done -> running
             rec.update(fields)
             rec["status"] = "running"
             rec.setdefault("created", time.time())
@@ -66,22 +72,34 @@ class Ledger:
             return json.load(f)
 
     def cancel(self, shortid):
-        rec = self.get(shortid)
-        if rec is None:
+        if not os.path.exists(_path(shortid)):
             return 3
-        if rec.get("status") == "done":
-            return 6  # done > cancelled, no-op
-        self._rw(shortid, lambda r: (r.__setitem__("status", "cancelled"),
-                                     r.__setitem__("updated", time.time())))
-        return 0
+        rc = 0
+        def go(rec):
+            nonlocal rc
+            if rec.get("status") == "done":
+                rc = 6  # done > cancelled, no-op
+            else:
+                rec["status"] = "cancelled"
+                rec["updated"] = time.time()
+                rc = 0
+        self._rw(shortid, go)
+        return rc
 
     def cleanup(self, ttl_s=86400):
         now = time.time()
-        for fn in os.listdir(STATE):
-            if not fn.endswith(".json"):
-                continue
-            with open(os.path.join(STATE, fn)) as f:
-                rec = json.load(f)
-            # clean terminal/stale and orphan running (no fresh heartbeat)
-            if now - rec.get("updated", 0) > ttl_s:
-                os.remove(os.path.join(STATE, fn))
+        lock_path = os.path.join(STATE, ".cleanup.lock")
+        with open(lock_path, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            for fn in os.listdir(STATE):
+                if not fn.endswith(".json"):
+                    continue
+                try:
+                    with open(os.path.join(STATE, fn)) as f:
+                        rec = json.load(f)
+                except Exception:
+                    continue  # skip bad JSON
+                # clean terminal/stale and orphan running (no fresh heartbeat)
+                if now - rec.get("updated", 0) > ttl_s:
+                    os.remove(os.path.join(STATE, fn))
+            fcntl.flock(lf, fcntl.LOCK_UN)
