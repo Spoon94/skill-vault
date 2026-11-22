@@ -1,7 +1,7 @@
-# herdr-agent-ops 设计稿 v23
+# herdr-agent-ops 设计稿 v24
 
 > 待 forge 复审 → 用户授权 · 2026-11-22 · 分支 docs/herdr-agent-team-design
-> v23：集成「herdr agent wait 作长等待兜底」（用户指定）——哨兵只是任务级信号的一种实现，长等待以 herdr agent wait（server 侧 --until idle/done 生命周期等待）为高效兜底；台账 done/哨兵是完成确认，agent wait 是长阻塞的可靠机制，避免文本哨兵滚丢/忙轮询/挂死。forge v22 已放行「没有疑问和问题」。
+> v24：自洽收口 round-23 四条集成 P3——--timeout 0 翻译为省略 --timeout（agent wait 省略后活动后无限，非传字面 0，实测 0 立即返回）；兜底加 working 门槛（submit_seq 前进+最终 idle/done 才算本任务完成，已 idle/上一轮 done 不误算，唤醒后未确认则 re-arm 非忙循环）；--until idle/done/blocked（blocked 并行 agent get 立即 exit5 不挂 timeout）；兜底统一 5–10s agent wait --timeout 短循环+每轮查台账（可 cancel，非单次无限阻塞）。
 
 ## 1. 背景
 herdr 多 agent：任务级等待缺失、名字不持久、取名难。
@@ -30,7 +30,7 @@ name ^[a-z]{4,6}$ per-machine 唯一；label ^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0
 
 ## 8. 等待协议
 
-**等待架构（用户指定 herdr agent wait 兜底）**：哨兵只是任务级信号的一种实现，长等待必须以 `herdr agent wait`（server 侧 `--until idle/done` 生命周期等待）为高效兜底——台账 done/哨兵负责「任务完成确认」，`agent wait` 负责「长阻塞的可靠唤醒」，避免文本哨兵滚丢/忙轮询/挂死。fast path 用哨兵短轮询做任务级检测；长任务以 `agent wait --until idle/done` 阻塞兜底（server 侧高效，不占 CPU），唤醒后再确认台账 done/哨兵；`--timeout 0` 无限由 agent wait server 侧支撑。lifecycle（§8.2）是该兜底机制的具体化。
+**等待架构（用户指定 herdr agent wait 兜底）**：哨兵只是任务级信号的一种实现，长等待必须以 `herdr agent wait`（server 侧 `--until idle/done` 生命周期等待）为高效兜底——台账 done/哨兵负责「任务完成确认」，`agent wait` 负责「长阻塞的可靠唤醒」，避免文本哨兵滚丢/忙轮询/挂死。fast path 用哨兵短轮询做任务级检测；长任务以 `agent wait` 短循环兜底——**每轮 `agent wait --timeout 5–10s --until idle/done/blocked`（blocked 时并行 agent get 立即 exit5，不挂 timeout），每轮查台账 done**（可 cancel，非单次无限阻塞）。**working 门槛**：仅当 submit_seq 前进且最终 idle/done 才判本任务完成；已 idle/上一轮 done 不误算，唤醒后未确认本任务则 re-arm 继续（非忙循环）。**--timeout 0 翻译为省略 --timeout flag**（agent wait 省略后活动后无限等待；实测传字面 0 会立即返回 timeout，禁传 0）。lifecycle（§8.2）是该兜底机制的具体化。
 
 ### 8.1 canonical 完成 + 匹配器（server 侧容忍正则为主，无单调游标）
 - canonical=peer 最终 assistant 消息最后一行打印 HAO_DONE <token>。Bash tool stdout 不进 pane snapshot（forge 实测），hao done 经 tool 执行 stdout 不可靠，但 **hao done 的台账/wake 副作用仍可用**（见 8.3）。
@@ -41,7 +41,7 @@ name ^[a-z]{4,6}$ per-machine 唯一；label ^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0
 - baseline 旧 token 预检：生成 token→读快照确认不存在否则重生成；发拆分 prompt；可选等 [TASK shortid] 再确认 token 不存在；命中若属发送前快照旧 token→exit9 不循环。
 ### 8.2 等待模式
 - sentinel（默认核心）：上述。
-- **lifecycle=herdr agent wait 兜底的具体化（长等待可靠唤醒）**：--mode lifecycle 隐含 --wait 拒绝 async；长任务以 `agent wait --until idle/done` server 侧阻塞兜底，哨兵/台账 done 作完成确认。hao ask 用 **agent prompt（不带 --wait）提交**，然后**自实现门槛（用 state_change_seq，不漏快速任务）**：记提交时 submit_seq，50–100ms 短轮询 agent get；完成判定=state_change_seq 前进 + 当前 idle/done + **（提交后观察到过 working/blocked，或 seq 前进发生在提交后短窗口内）**，防无关事件（unknown→idle/会话恢复/其他 client）推进 seq 造成假完成；快速任务 seq 前进+idle/done 即完成不误 exit9；5s 无 seq 变化无输出才 exit9。best-effort 局限文档注明。之后 agent wait --timeout 5–10s 循环+每轮查台账（可被 cancel）。仅单轮；**hao ask --mode lifecycle 在 target working/blocked 时直接 exit6 不提交**（无排队语义），不得把当前 turn 当本任务完成。
+- **lifecycle=herdr agent wait 兜底的具体化**：--mode lifecycle 隐含 --wait 拒绝 async；用 `agent prompt`（不 wait）提交+state_change_seq 门槛（seq 前进+最终 idle/done 才算本任务完成，漏快速任务见 §8.2 主门槛；已 idle/上一轮 done 不误算），再 `agent wait --timeout 5–10s --until idle/done/blocked` 短循环+每轮查台账（可 cancel），blocked 并行 agent get 立即 exit5。hao ask 用 **agent prompt（不带 --wait）提交**，然后**自实现门槛（用 state_change_seq，不漏快速任务）**：记提交时 submit_seq，50–100ms 短轮询 agent get；完成判定=state_change_seq 前进 + 当前 idle/done + **（提交后观察到过 working/blocked，或 seq 前进发生在提交后短窗口内）**，防无关事件（unknown→idle/会话恢复/其他 client）推进 seq 造成假完成；快速任务 seq 前进+idle/done 即完成不误 exit9；5s 无 seq 变化无输出才 exit9。best-effort 局限文档注明。之后 agent wait --timeout 5–10s 循环+每轮查台账（可被 cancel）。仅单轮；**hao ask --mode lifecycle 在 target working/blocked 时直接 exit6 不提交**（无排队语义），不得把当前 turn 当本任务完成。
 - file local-only：ask --mode file 创建 tasks/<shortid>/result.md，result_path 写台账（tombstone 保留）；peer 原子写 temp+rename 或完成标记/长度校验防 partial；hao result <shortid> 用台账 result_path+realpath+防 symlink/穿越，peer 返回其他路径拒绝或需 --file。跨机器 result experimental/不支持。
 - metadata 旁路 experimental。不做可插拔框架。
 ### 8.3 长等待与唤醒
@@ -482,5 +482,5 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 </details>
 
 ## 18. 实测记录
-r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条→v8；r8 4m6s 余 6 条→v9；r9 3m9s 余 4 条→v10；r10 余 5 条→v11 统一终态模型；r11 3m8s 余 5 条→v12；r12 1m27s 余 2 条→v13；r13 1m37s 余 1 条→v14；r14 1m20s 余 2 条→v15；r15 2m8s 余 2 条→v16；r16 1m42s 余 2 条→v17；r17 1m25s pending_done 引入 3 条→v18 简化移除；r18 1m29s 余 2 条→v19；r19 1m44s 余 2 条→v20；r20 1m24s 余 2 条→v21；r21 1m15s 余 1 条→v22；r22 forge **放行「没有疑问和问题」**；用户补充「哨兵只是实现方式、长等待须 herdr agent wait 兜底」→v23 集成（agent wait server 侧生命周期等待作长阻塞兜底，哨兵/台账 done 作完成确认，防滚丢/忙轮询/挂死）。
+r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条→v6；r6 3m55s 余 7 条→v7；r7 2m47s 余 7 条→v8；r8 4m6s 余 6 条→v9；r9 3m9s 余 4 条→v10；r10 余 5 条→v11 统一终态模型；r11 3m8s 余 5 条→v12；r12 1m27s 余 2 条→v13；r13 1m37s 余 1 条→v14；r14 1m20s 余 2 条→v15；r15 2m8s 余 2 条→v16；r16 1m42s 余 2 条→v17；r17 1m25s pending_done 引入 3 条→v18 简化移除；r18 1m29s 余 2 条→v19；r19 1m44s 余 2 条→v20；r20 1m24s 余 2 条→v21；r21 1m15s 余 1 条→v22；r22 forge **放行「没有疑问和问题」**；用户补充「哨兵只是实现方式、长等待须 herdr agent wait 兜底」→v23 集成；r23 forge 认可方向但指 4 条集成 P3（--timeout 0 须省略 flag 非传 0、生命周期需 working 门槛/re-arm 防忙循环、--until 不含 blocked 需并行 exit5、单次长阻塞与可 cancel 冲突）→v24 自洽（--timeout 0 省略 flag、submit_seq 门槛+re-arm、--until idle/done/blocked+并行 exit5、5–10s 短循环可 cancel）。
 forge 核实 herdr 0.9.5 命令面/label 持久化/词表完整性/agent name 规则/wait-output ^ 按行匹配/pane read 无 offset。
