@@ -215,6 +215,39 @@ class TestSentinelRobustness(unittest.TestCase):
         lines = ["  HAO_DONE hao-aabb1122334", "  4556677889900aabbccddee"]
         self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
 
+    def test_join_keyword_token_split(self):
+        # round-10 live shape: ~17-col pane split HAO_DONE | hao-<token>
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE", "  hao-" + full]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+
+    def test_join_keyword_bare_hex_token(self):
+        # keyword line + prefix-less token line
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE", "  " + full]
+        joined = hao._join_wrapped_sentinels(lines)
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+
+    def test_join_chains_across_three_lines(self):
+        # "HAO_DONE hao-" | "0011" | rest -> chained joins, total <=32
+        full = "00112233" + "445566ff"
+        lines = ["  HAO_DONE hao-", "  " + full[:4], "  " + full[4:]]
+        joined = hao._join_wrapped_sentinels(lines)
+        self.assertEqual(joined, ["  HAO_DONE hao-" + full])
+        m = SENTINEL_RE.match(joined[0])
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), full, full[:12]))
+
+    def test_bare_keyword_followed_by_non_hex_not_joined(self):
+        lines = ["  打印：HAO_DONE", "  加一个空格再拼接"]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
     def test_overlong_without_sid_anchor_rejected(self):
         self.assertFalse(hao._token_matches(
             "hao-ccddee00112233445566", None, "aabb11223344"))

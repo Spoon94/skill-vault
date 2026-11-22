@@ -61,7 +61,7 @@ hao restore                        # 从 label 恢复
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（87 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（91 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

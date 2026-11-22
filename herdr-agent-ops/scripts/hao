@@ -455,25 +455,38 @@ def _sentinel_check(pane, token, sid, machine):
     return (ml, None) if _token_matches(m.group(1), token, sid) else (None, None)
 
 
-_PARTIAL_SENTINEL_RE = re.compile(r"HAO_DONE:?\s+(?:hao-)?([0-9a-f]{1,11})$")
-_HEX_CONT_RE = re.compile(r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*([0-9a-f]{1,24})[\s.。!！│`*|]*$")
+_PARTIAL_SENTINEL_RE = re.compile(r"HAO_DONE:?\s+(?:hao-)?([0-9a-f]{0,11})$")
+_BARE_DONE_RE = re.compile(r"HAO_DONE:?\s*$")
+_HEX_CONT_RE = re.compile(
+    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*(hao-)?([0-9a-f]{1,32})[\s.。!！│`*|]*$")
 
 
 def _join_wrapped_sentinels(lines):
-    """Rejoin a sentinel split by narrow-pane wrapping, with r8#1 guards:
-    only an INCOMPLETE tail token (<12 hex, hao- prefix optional) absorbs a
-    following bare-hex line, and only while the joined token stays <=32 hex.
-    A complete sentinel is never extended, so a hex output line after it
-    cannot corrupt the match; a truncated tail cannot grow past the regex
-    bound either."""
+    """Rejoin sentinels split by narrow-pane wrapping, with r8#1/r10 guards.
+
+    Live-observed split shapes: mid-token (r7), keyword|token on separate
+    lines (r10, ~17-col pane). Rules:
+    - a tail token fragment (<12 hex) absorbs a following BARE-hex line
+      while the joined token stays <=32 hex (chains across multiple wraps);
+    - a line ending at the bare keyword HAO_DONE absorbs a following
+      complete-token line (optional hao- prefix), joined with one space;
+    - a COMPLETE sentinel is never extended, so an unrelated hex output
+      line after it cannot corrupt the match.
+    False-positive bound: any rejoined candidate must still pass
+    _token_matches (exact / full-token head-8+tail-8 / shortid anchor)."""
     out = []
     for line in lines:
         if out:
-            m = _PARTIAL_SENTINEL_RE.search(out[-1])
-            if m:
-                c = _HEX_CONT_RE.match(line)
-                if c and len(m.group(1)) + len(c.group(1)) <= 32:
-                    out[-1] = out[-1] + c.group(1)
+            prev = out[-1]
+            c = _HEX_CONT_RE.match(line)
+            if c:
+                pre, cont = c.group(1), c.group(2)
+                pm = _PARTIAL_SENTINEL_RE.search(prev)
+                if pm and not pre and len(pm.group(1)) + len(cont) <= 32:
+                    out[-1] = prev + cont
+                    continue
+                if _BARE_DONE_RE.search(prev) and len(cont) <= 32:
+                    out[-1] = prev.rstrip() + " " + (pre or "") + cont
                     continue
         out.append(line)
     return out
