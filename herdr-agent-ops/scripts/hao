@@ -11,7 +11,7 @@ import time
 HAO_LABEL_RE = re.compile(r"^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$")
 PANE_ID_RE = re.compile(r"^w\w+:p\w+$")
 SENTINEL_RE = re.compile(
-    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+(hao-[0-9a-f]{12,32})[\s.。!！│`*|]*$")
+    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+((?:hao-)?[0-9a-f]{12,32})[\s.。!！│`*|]*$")
 
 
 def run_herdr(args, machine=None):
@@ -335,10 +335,15 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
     if rc != 0:
         return herdr_error_rc(err)
     l = _led.Ledger()
-    l.write_running(shortid, token=token, target=pane, machine=machine,
-                    wake=wake, mode=mode, result_path=result_path,
-                    submit_seq=current_seq(pane, machine),
-                    submit_state=current_state(pane, machine))
+    try:
+        l.write_running(shortid, token=token, target=pane, machine=machine,
+                        wake=wake, mode=mode, result_path=result_path,
+                        submit_seq=current_seq(pane, machine),
+                        submit_state=current_state(pane, machine))
+    except Exception as e:
+        # r8#3: the task is already dispatched — the token MUST survive;
+        # wake/cancel degrade to unavailable (spec: ledger best-effort)
+        _ledger_warn(e)
     if wait:
         return cmd_wait(pane, token, timeout, mode, machine)
     return {"token": token, "shortid": shortid,
@@ -405,16 +410,18 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
 
 
 def _token_matches(matched, token, sid):
-    """matched: full hao-<hex> from the pane. Accept exact token, or bare
-    12-hex shortid prefix (forge #9)."""
+    """matched: token text from the pane; the hao- prefix is optional (a
+    live peer dropped it once). Accept the exact token, a bare 12-hex
+    shortid prefix, or the shortid anchor for mis-assembled over-long
+    tokens (live peer duplicated a segment once -> 20-hex)."""
+    hexpart = matched[4:] if matched.startswith("hao-") else matched
     if token:
-        tok = token if token.startswith("hao-") else "hao-" + token
-        if matched == tok:
-            return True
         bare = token[4:] if token.startswith("hao-") else token
-        if re.fullmatch(r"[0-9a-f]{12}", bare or "") and matched[4:].startswith(bare):
+        if hexpart == bare:
             return True
-    if sid and matched[4:][:12] == sid[:12]:
+        if re.fullmatch(r"[0-9a-f]{12}", bare or "") and hexpart.startswith(bare):
+            return True
+    if sid and hexpart[:12] == sid[:12]:
         return True
     return False
 
@@ -438,21 +445,26 @@ def _sentinel_check(pane, token, sid, machine):
     return (ml, None) if _token_matches(m.group(1), token, sid) else (None, None)
 
 
-_PARTIAL_SENTINEL_RE = re.compile(r"HAO_DONE:?\s+hao-[0-9a-f]{1,31}$")
+_PARTIAL_SENTINEL_RE = re.compile(r"HAO_DONE:?\s+(?:hao-)?([0-9a-f]{1,11})$")
 _HEX_CONT_RE = re.compile(r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*([0-9a-f]{1,24})[\s.。!！│`*|]*$")
 
 
 def _join_wrapped_sentinels(lines):
-    """Rejoin a sentinel split by narrow-pane wrapping: previous line ends
-    with an incomplete HAO_DONE hao-<hex> token and the next line is bare
-    hex. Observed live: peer printed the token across two rendered lines."""
+    """Rejoin a sentinel split by narrow-pane wrapping, with r8#1 guards:
+    only an INCOMPLETE tail token (<12 hex, hao- prefix optional) absorbs a
+    following bare-hex line, and only while the joined token stays <=32 hex.
+    A complete sentinel is never extended, so a hex output line after it
+    cannot corrupt the match; a truncated tail cannot grow past the regex
+    bound either."""
     out = []
     for line in lines:
-        if out and _PARTIAL_SENTINEL_RE.search(out[-1]):
-            m = _HEX_CONT_RE.match(line)
+        if out:
+            m = _PARTIAL_SENTINEL_RE.search(out[-1])
             if m:
-                out[-1] = out[-1] + m.group(1)
-                continue
+                c = _HEX_CONT_RE.match(line)
+                if c and len(m.group(1)) + len(c.group(1)) <= 32:
+                    out[-1] = out[-1] + c.group(1)
+                    continue
         out.append(line)
     return out
 
@@ -521,7 +533,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(_wait_round_rec(l, sid))
+        rec = _wait_round_rec(l, sid)
+        token = rec.get("token") or token  # ledger holds the full token
+        kind, payload = _wait_common_check(rec)
         if kind == "done":
             return payload
         if kind == "cancelled":
@@ -557,6 +571,13 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                     return _finish_done(l, sid, conf)
             else:
                 time.sleep(0.5)
+    # r8#2 last chance: a wrapped sentinel is invisible to the single-line
+    # fast path — one joined tail rescan before declaring timeout
+    last, _e = _sentinel_scan_tail(pane, token, sid, machine)
+    if last:
+        conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
+        if conf:
+            return _finish_done(l, sid, conf)
     return 4
 
 
@@ -571,7 +592,9 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     deadline = None if timeout == 0 else start + (timeout or 1800)
     saw_activity = False
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(_wait_round_rec(l, sid))
+        rec = _wait_round_rec(l, sid)
+        token = rec.get("token") or token  # ledger holds the full token
+        kind, payload = _wait_common_check(rec)
         if kind == "done":
             return payload
         if kind == "cancelled":
@@ -683,7 +706,7 @@ def cmd_done(token, summary, final=False):
     except ValueError:
         return 2
     l = _led.Ledger()
-    rec = l.get(sid)
+    rec = _safe_get(l, sid)
     if rec and rec.get("status") == "cancelled":
         return 6
     if final and (not rec or rec.get("status") != "done"):
@@ -691,7 +714,12 @@ def cmd_done(token, summary, final=False):
         mach = rec.get("machine") if rec else None
         if target and current_state(target, mach) not in ("idle", "done"):
             return 5
-    l.write_done(sid, summary=summary)
+    try:
+        l.write_done(sid, summary=summary)
+    except Exception as e:
+        # r8#3: the sentinel printed below is the fallback evidence —
+        # a ledger failure must never swallow it
+        _ledger_warn(e)
     # same-machine wake: fixed template, no peer summary injection;
     # wake caller missing -> exit3 (ledger done + sentinel still stand)
     wake = rec.get("wake") if rec else None

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import types
 from importlib.machinery import SourceFileLoader
+import contextlib
 from contextlib import redirect_stdout
 
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
@@ -193,6 +194,80 @@ class TestSentinelRobustness(unittest.TestCase):
     def test_join_leaves_complete_sentinel_alone(self):
         lines = ["  HAO_DONE hao-aabb11223344", "  next message"]
         self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_regex_accepts_missing_prefix(self):
+        # round-8 live incident: peer dropped the hao- prefix entirely
+        m = SENTINEL_RE.match("  HAO_DONE aabb1122334499ff")
+        self.assertIsNotNone(m)
+        self.assertTrue(hao._token_matches(m.group(1), None, "aabb11223344"))
+
+    def test_join_never_extends_complete_sentinel(self):
+        # r8#1: hex output line right after a COMPLETE 16-hex sentinel
+        lines = ["  HAO_DONE hao-aabb1122334499ff", "  ccddeeff0011223344"]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_join_respects_total_cap(self):
+        # r8#1: fragment 11-hex + continuation 23-hex > 32 -> not joined
+        lines = ["  HAO_DONE hao-aabb1122334", "  4556677889900aabbccddee"]
+        self.assertEqual(hao._join_wrapped_sentinels(lines), lines)
+
+    def test_overlong_without_sid_anchor_rejected(self):
+        self.assertFalse(hao._token_matches(
+            "hao-ccddee00112233445566", None, "aabb11223344"))
+
+
+class TestWriteDegradation(unittest.TestCase):
+    def setUp(self):
+        self.lm = hao._load_module("hao_ledger", "ledger.py")
+        self.orig_ledger = self.lm.Ledger
+        self.orig_run = hao.run_herdr
+
+    def tearDown(self):
+        self.lm.Ledger = self.orig_ledger
+        hao.run_herdr = self.orig_run
+        hao._LEDGER_WARNED = False
+        os.environ.pop("XDG_STATE_HOME", None)
+
+    def test_done_prints_sentinel_when_ledger_write_fails(self):
+        # r8#3 (P1): ledger failure must never swallow the sentinel
+        class BoomLedger(self.orig_ledger):
+            def write_done(self, *a, **k):
+                raise TimeoutError("ledger lock timeout")
+
+            def get(self, sid):
+                return None
+
+        self.lm.Ledger = BoomLedger
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = hao.cmd_done("hao-aabb1122334499ff", None)
+        self.assertEqual(rc, 0)
+        self.assertIn("HAO_DONE", out.getvalue())
+        self.assertIn("warning", err.getvalue())
+
+    def test_ask_returns_token_when_ledger_write_fails(self):
+        # r8#3 (P1): task dispatched -> the token must survive the write failure
+        class BoomLedger(self.orig_ledger):
+            def write_running(self, *a, **k):
+                raise TimeoutError("ledger lock timeout")
+
+        def stub(args, machine=None):
+            if args[:2] == ["agent", "prompt"]:
+                return 0, '{"result":{}}', ""
+            if args[:2] == ["agent", "get"]:
+                return 1, "", '{"error":{"code":"agent_not_found"}}'
+            return self.orig_run(args, machine)
+
+        self.lm.Ledger = BoomLedger
+        hao.run_herdr = stub
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                r = hao.cmd_ask("w2:pX", "task text", False, "sentinel", None, 60)
+        self.assertIsInstance(r, dict)
+        self.assertIn("token", r)
+        self.assertIn("warning", err.getvalue())
 
 
 class TestParserFlags(unittest.TestCase):
