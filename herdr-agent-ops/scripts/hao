@@ -132,3 +132,89 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None):
     if not json_out:
         print(out["group"], out["candidates"])
     return out
+
+
+SENTINEL_RE = re.compile(
+    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+(hao-[0-9a-f]{12,16})[\s.。!！│`*|]*$")
+
+
+def build_prompt(task, full_token):
+    h = full_token[4:]
+    half = len(h) // 2
+    shortid = h[:8]
+    return (
+        f"[TASK {shortid}]\n{task}\n\n"
+        f"完成时，将令牌的两段拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}。"
+        f"在最终消息最后一行打印：HAO_DONE 加一个空格，再拼接这两段"
+        f"（格式：HAO_DONE + 空格 + hao- + 第一段 + 第二段）。"
+    )
+
+
+def cmd_ask(target, text, wait, mode, wake, timeout):
+    from ledger import Ledger
+    token = f"hao-{int(time.time() * 1000):x}{os.urandom(3).hex()}"
+    prompt = build_prompt(text, token)
+    assert token not in prompt, "full token must not appear in prompt (echo guard)"
+    rc, _, _ = run_herdr(["agent", "prompt", target, prompt])
+    if rc != 0:
+        return 8
+    Ledger().write_running(token, target=target, wake=wake)
+    if wait:
+        return cmd_wait(target, token, timeout, mode)
+    return {"token": token}
+
+
+def cmd_wait(target, token, timeout, mode="sentinel"):
+    from ledger import Ledger
+    l = Ledger()
+    deadline = time.time() + (timeout or 1800)
+    while time.time() < deadline:
+        rec = l.get(token)
+        if rec and rec.get("status") == "done":
+            return {"status": "done", "result_path": rec.get("result_path"), "summary": rec.get("summary")}
+        if rec and rec.get("status") == "cancelled":
+            return 10
+        rc, out, _ = run_herdr(["pane", "wait-output", target, "--regex", SENTINEL_RE.pattern, "--timeout", "8000"])
+        if "HAO_DONE" in out:
+            l.write_done(token, matched_line=out)
+            return {"status": "done", "matched_line": out}
+        time.sleep(0.5)
+    return 4
+
+
+def cmd_done(token, summary):
+    from ledger import Ledger
+    l = Ledger()
+    rec = l.get(token)
+    if rec and rec.get("status") == "cancelled":
+        return 6
+    l.write_done(token, summary=summary)
+    if summary:
+        print(summary, flush=True)
+    print(f"HAO_DONE {token}", flush=True)
+    return 0
+
+
+def cmd_cancel(shortid):
+    from ledger import Ledger
+    return Ledger().cancel(shortid)
+
+
+def cmd_abort(shortid, interrupt):
+    from ledger import Ledger
+    l = Ledger()
+    rec = l.get(shortid)
+    if rec is None:
+        return 3
+    rc = cmd_cancel(shortid)
+    if rc != 0:
+        return rc
+    if interrupt:
+        if os.environ.get("HAO_ABORT_ALLOW") != "1":
+            return 5
+        target = rec.get("target")
+        if not target:
+            return 3
+        run_herdr(["agent", "send-keys", target, "esc"])
+        run_herdr(["agent", "send-keys", target, "ctrl+c"])
+    return 0
