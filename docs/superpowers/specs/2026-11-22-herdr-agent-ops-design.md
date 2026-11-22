@@ -1,18 +1,18 @@
-# herdr-agent-ops 设计稿 v5
+# herdr-agent-ops 设计稿 v6
 
 > 待 forge 复审 → 用户授权 · 2026-11-22 · 分支 docs/herdr-agent-team-design
-> v5：收口 forge round-4 九条——lifecycle 同步化、--match 无效命中游标防 busy-loop、台账 result_path+shortid 12hex、abort 用户级授权、result 跨机器归 experimental、cancel 覆盖全模式、错误码/别名/N=40 邻接判定/list-doctor scope/status-say-result 验收。实验项进一步收窄。
+> v6：收口 round-5 七条——台账 tombstone 保 result_path、--wake 限同机+主 fallback 宿主 scheduler、lifecycle 自实现门槛可 cancel、匹配器改 server 侧容忍正则为主（无单调游标）、邻接容忍标点/边框、abort 用户级授权（TTY/0600 approval）、TTL 按 updated 不清 running、status/say 行为补全。
 
 ## 1. 背景
 herdr 多 agent：任务级等待缺失、名字不持久、取名难。
 
 ## 2. 命名与调用
-skill herdr-agent-ops；CLI hao；label 前缀 hao-。调用 ${CLAUDE_SKILL_DIR}/scripts/hao 或 PATH；远端无 python3/hao 退化手动打印。doctor 查 python3≥3.9/herdr/HERDR_ENV/machine/resume/XDG 默认。--json+人读；--progress/日志 stderr；hao done 哨兵 stdout 最后一行、JSON stderr。
-**短别名（无歧义）**：n=name r=restore a=ask w=wait d=done l=list s=suggest c=clear st=status sy=say rs=result；doctor/cancel/abort 无别名。每命令 --json schema 在 protocol.md 定义。
+skill herdr-agent-ops；CLI hao；label 前缀 hao-。调用 ${CLAUDE_SKILL_DIR}/scripts/hao 或 PATH；远端无 python3/hao 退化手动打印。doctor 查 python3≥3.9/herdr/HERDR_ENV/machine/resume/XDG 默认。--json+人读；--progress/日志 stderr；**hao done 例外：哨兵 stdout 最后一行、JSON stderr（写进 protocol.md schema）**。短别名无歧义：n=name r=restore a=ask w=wait d=done l=list s=suggest c=clear st=status sy=say rs=result；doctor/cancel/abort 无别名。
 
 ## 3. 关键决定
-- **名字映射零注册表**：hao- label 唯一名字载体（session.json 存 label；agent_name/resume best-effort 非契约）。
-- **任务协调用可清理临时台账**（非名字注册表）：$XDG_STATE_HOME/hao/tasks/<shortid>.json，默认 ~/.local/state/hao/tasks（XDG 未设时，必须实现该默认），目录 0700 文件 0600，绝对路径+realpath。字段：token/**shortid(12hex,48bit,创建前查台账防碰撞)**/target/machine/caller/mode/status/created/**result_path**/submit_state/submit_seq。waiter_pid 仅信息展示，**不用于 kill（防 PID 复用）**，取消靠台账 flag+短轮询。原子写 temp+rename + per-shortid 锁；完成/取消清理；async 无 waiter TTL 24h+doctor 清 stale；写失败降级：ask 继续发送但禁 wake/cancel 并警告（--strict-ledger 报错）。token 落盘（非秘密，诚实）。
+- 名字映射零注册表：hao- label 唯一名字载体（session.json 存 label；agent_name/resume best-effort 非契约）。
+- 任务协调用可清理临时台账（非名字注册表）：$XDG_STATE_HOME/hao/tasks/<shortid>.json，默认 ~/.local/state/hao/tasks（XDG 未设必须实现），目录 0700 文件 0600，绝对路径+realpath。字段：token/shortid(12hex,创建前查重)/target/machine/caller/mode/status/created/**updated**/result_path/submit_state/submit_seq。waiter_pid 仅展示不 kill。原子写 temp+rename+per-shortid 锁。
+- **tombstone**：完成/取消不立即删台账，转 status=done/cancelled 的 tombstone **保留 result_path**，供 hao result 按 shortid 读取；result 读取后或 TTL 到期才删。**TTL 按 updated/heartbeat 判 stale，只清 terminal/stale，不清 running**（>24h running 有误清风险→用 updated+waiter 状态）。doctor 清 stale tombstone。写失败降级：ask 继续发送但禁 wake/cancel 并警告（--strict-ledger 报错）。token 落盘（非秘密，诚实）。
 - 命名 ^[a-z]{4,6}$ per-machine 唯一；一代号一 agent；scope 仅 label 注解。等待默认 sentinel，canonical=最终 assistant 消息打印哨兵。长等待 ask 异步+唤醒；终止 cancel/abort。恢复仅 skill 入口不装 hook。跨机器本机无 profile 仅 stub。
 
 ## 4. 目录
@@ -26,50 +26,51 @@ name ^[a-z]{4,6}$ per-machine 唯一；label ^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0
 
 ## 7. restore
 口径：session.json 存 label+agent_name；resume=true 恢复受支持 agent；label 解耦槽位。兜底：退出/被替换/unsupported/resume=false/失败。
-1. scope 只决定恢复哪些 label（默认当前 workspace，--workspace/--all 扩大）。2. name 占用扫整台 machine（所有 live+所有 workspace label role），跨 workspace 同名 exit6。3. pre-flight 检测冲突/占用/startup pending/stale/非法。4. 不自动选 winner：同 role 多 pane 全歧义 exit6+候选，--pick 只恢复被选者其余留 label 由 doctor 报冲突。5. 默认 adopt：scope 内 hao- pane 非空不等价 name 改为 role；--no-adopt 只填无名（agent start 必有名，实际只覆盖手动无名 agent）；--dry-run；非 hao- 需 --force。6. 幂等+部分失败报告；startup pending 等待/重试/报告。doctor 列 stale/invalid/dup+resume；repurpose 前先 clear；restart 测试隔离 named session。
-**list/doctor 默认 scope=当前 workspace**（--all 扩大）；name 唯一性 per-machine，输出显式标注 machine/workspace/tab/pane/cwd/agent。
+1. scope 只决定恢复哪些 label（默认当前 workspace，--workspace/--all）。2. name 占用扫整台 machine，跨 workspace 同名 exit6。3. pre-flight 检测冲突/占用/startup pending/stale/非法。4. 不自动选 winner：同 role 多 pane 全歧义 exit6+候选，--pick 只恢复被选者。5. 默认 adopt：非空不等价 name 改 role；--no-adopt 只填无名；--dry-run；非 hao- 需 --force。6. 幂等+部分失败报告；startup pending 等待/重试/报告。doctor 列 stale/invalid/dup+resume；repurpose 前先 clear；restart 测试隔离 named session。list/doctor 默认当前 workspace（--all 扩大），输出显式 machine/workspace/tab/pane/cwd/agent，name 唯一性 per-machine 标注不误导。
 
 ## 8. 等待协议
-### 8.1 canonical 完成 + 匹配器（防回显/防 false-negative/防 busy-loop）
-- canonical=peer 在**最终 assistant 消息**最后一行打印 HAO_DONE <token>。Bash tool stdout 不进 pane snapshot（forge 实测），hao done 经 tool 执行不可靠，文档注明仅当渲染到 pane 才有效。
+### 8.1 canonical 完成 + 匹配器（server 侧容忍正则为主，无单调游标）
+- canonical=peer 最终 assistant 消息最后一行打印 HAO_DONE <token>。Bash tool stdout 不进 pane snapshot（forge 实测），hao done 经 tool 执行 stdout 不可靠，但 **hao done 的台账/wake 副作用仍可用**（见 8.3）。
 - token=hao-<12–16hex>；task marker 短 id [TASK <shortid>] 不含完整 token；prompt 拆 token 两段令 peer 拼接；ask 扫描整个最终 prompt 含完整 token 则拒绝/改写。
-- **匹配用行游标防 busy-loop**：hao wait 维护 pane read 单调行游标，每轮只读游标之后的新行，对新行用严格正则 ^\s*(?:[⏺●✻│⎿]\s*)?HAO_DONE\s+<token>\s*$ 判定；命中即完成。**无效 token 出现（reasoning 引用/tool-call 源码行/非 HAO_DONE 邻接）→游标推进越过该行，不 re-arm 同一 wait-output**，避免反复命中 busy-loop。--match 完整 token 仅作快速预筛，最终判定以游标+严格正则+邻接为准。
-- **邻接判定**：同一 matched_line 同时含 HAO_DONE 与完整 token（允许 TUI 前缀/缩进）才算完成；**尾部 N=40 行**内；否则该命中无效→推进游标。baseline 旧 token（发送前快照已含）→exit9 协议错误不循环。
-- baseline 五步（旧 token 预检）：①生成 token→读快照确认不存在否则重生成；②发拆分 prompt；③可选等 [TASK shortid] 再读 baseline 确认 token 不存在；④游标轮询等待；⑤命中校验邻接+尾部+不在发送前快照。
+- **主检测=server 侧 pane wait-output --regex 容忍正则**（短超时循环兼顾 cancel）：`^\s*(?:[⏺●✻│⎿]\s*)?HAO_DONE\s+<token>[\s.。!！│]*$`。要求 HAO_DONE 与 token 邻接→**token-only 引用（reasoning/tool-call 源码）不匹配，天然无 busy-loop**；容忍 TUI 缩进/⏺ 前缀/尾部标点/代码框边框。**不依赖 pane read 单调游标**（pane read 无 offset/绝对行号，滚动窗口第 0 行会变，不能当单调游标）。
+- 命中后校验：同一 matched_line 含 HAO_DONE+完整 token（允许尾部 [.。!！] 与边框 │）、位于快照尾部 N=40 行；否则视为无效命中→改用 pane read 后缀重叠（上次窗口尾 K 行与新窗口对齐）推进越过该行，不 re-arm 同一匹配。
+- **滚动丢失 fallback**：sentinel 可能被大量输出顶出窗口；超时后 pane read --lines 大窗口重扫该正则；仍无→继续短轮询或 exit4。--match 完整 token 仅作可选 wakeup 预筛，每轮新行无条件跑邻接判定；预筛 miss 也 fallback 扫全窗口。
+- baseline 旧 token 预检：生成 token→读快照确认不存在否则重生成；发拆分 prompt；可选等 [TASK shortid] 再确认 token 不存在；命中若属发送前快照旧 token→exit9 不循环。
 ### 8.2 等待模式
 - sentinel（默认核心）：上述。
-- **lifecycle 同步专用**：--mode lifecycle **隐含 --wait，拒绝 async**。hao ask 内用 **agent prompt --wait** 完成提交+5s working/blocked 门槛+settled（门槛由 agent prompt --wait 执行，非裸 agent wait）。仅单轮、提交时 agent 从非 working 开始；已 working 不得把当前 turn 当本任务完成。若需 async 长任务用 sentinel+台账记录 submit_state/submit_seq，wait 要求观察到 working/blocked 转变否则 exit9。
-- **file local-only**：hao ask --mode file 创建 tasks/<shortid>/result.md（安全临时目录），**result_path 写入台账**；peer 原子写 temp+rename 或完成标记/长度校验防 partial；hao result <shortid> 优先用台账 result_path+realpath+防 symlink/穿越，peer 返回其他路径拒绝或需 --file 显式。**跨机器 result=experimental/不支持**（见 §10）。
-- metadata 旁路 experimental（需 --source）。不做可插拔框架。
+- **lifecycle 同步且可 cancel**：--mode lifecycle 隐含 --wait 拒绝 async。hao ask 用 **agent prompt（不带 --wait）提交**，然后**自实现门槛**：5s 内短轮询 agent get 要求观察到 working/blocked，否则 exit9；之后 **agent wait --timeout 5–10s 循环+每轮查台账**（可被 cancel）。仅单轮、提交时 agent 非 working；已 working 不得把当前 turn 当本任务完成。
+- file local-only：ask --mode file 创建 tasks/<shortid>/result.md，result_path 写台账（tombstone 保留）；peer 原子写 temp+rename 或完成标记/长度校验防 partial；hao result <shortid> 用台账 result_path+realpath+防 symlink/穿越，peer 返回其他路径拒绝或需 --file。跨机器 result experimental/不支持。
+- metadata 旁路 experimental。不做可插拔框架。
 ### 8.3 长等待与唤醒
-- ask 默认异步立即返回 token+shortid；--wait 内联（lifecycle 强制 --wait）。默认超时 30m，--timeout 0 无限；--progress 心跳 stderr。
-- 台账 caller-local+machine 键；跨机器 wake/cancel caller 侧 poll。
-- 唤醒：①--wake <caller-target> 完成注入**固定模板** [HAO_WAKE] <shortid> <status>（**不含 peer summary**，调用方自己 result/wait 读）；caller blocked→agent_blocked wake 丢失 best-effort；caller 不存在 exit3。②**宿主 scheduler**（ScheduleWakeup）定时复查 hao wait --timeout 短（主 fallback）。③hao watch **experimental**：--once/超时/幂等/清理，非隐性 daemon，无验收不承诺。
+- ask 默认异步立即返回 token+shortid；--wait 内联（lifecycle 强制）。默认超时 30m，--timeout 0 无限；--progress 心跳 stderr。台账 caller-local+machine 键。
+- **--wake 生效条件**：仅当 peer 运行 hao done（或等价 completion hook）**且能访问 caller-local 台账（同机）**时，hao done 写台账 status=done 并注入固定模板 [HAO_WAKE] <shortid> <status>（不含 peer summary）到 caller。**最终消息打印哨兵只是 wait 信号，不产生 wake**。跨机器 caller-local 台账不可达→peer 无法 wake，**只能 caller 侧 poll**。
+- **主 fallback=宿主 scheduler（ScheduleWakeup）定时复查 hao wait --timeout 短 + caller 侧短轮询**；token 稳定可重复 wait。hao watch experimental（--once/超时/幂等/清理，非隐性 daemon，无验收不承诺）。caller blocked→agent_blocked wake 丢失 best-effort；caller 不存在 exit3。
 ### 8.4 终止与超时（全模式可 cancel）
-- **所有模式统一短超时轮询+每轮查台账**：sentinel 用 pane read 游标轮询；lifecycle 用 agent wait --timeout 5–10s 循环；file 用文件轮询循环。cancel 能停下任一阻塞 wait。ask --wait --mode lifecycle 同样可被 cancel。
-- **cancelled wait exit10**（别于 timeout4）。cancel <token|shortid> 只标台账 cancelled（幂等，不碰 peer）；waiter 停；迟到哨兵忽略；cancel 后 done 不得标 done；cancel token 不存在 exit3。
-- abort <token> [--interrupt]：cancel+可选发键 send-keys esc→ctrl+c。**blocked 下 --interrupt 需用户级授权**：HAO_ABORT_ALLOW=1（用户设）或 TTY 二次确认，或仅允许非 blocked abort；--force 是 CLI flag 不构成用户授权，agent 必须先获用户同意（文档明示 esc/ctrl+c 可能丢审批）。abort blocked 无授权 exit5。不关 pane 不停 server。cancel 与 abort 语义分开。
-- 超时 exit4+状态+尾部→编排者决定重试/cancel/abort；blocked exit5→交用户审批或 abort，绝不自动点审批；exited/closed exit3。一 pane 一 task best-effort（台账 busy，无分布式锁）；无 --queue。
-- hao done --token T [--summary]：先 summary 后哨兵 stdout 最后一行；须 peer pane 且渲染才有效；done 不在 pane/无法渲染 exit8；远端无 hao 手动打印。
+- 所有模式短超时轮询+每轮查台账：sentinel 用 wait-output --regex 短循环；lifecycle 用 agent wait --timeout 5–10s 循环；file 文件轮询循环。cancel 停任一阻塞 wait。cancelled exit10（别于 timeout4）。
+- cancel <token|shortid> 只标台账 cancelled（幂等不碰 peer）；waiter 停；迟到哨兵忽略；cancel 后 done 不得标 done；token 不存在 exit3。
+- abort <token> [--interrupt]：cancel+可选发键 send-keys esc→ctrl+c。**blocked 下 --interrupt 只认用户级授权：TTY 二次确认，或用户拥有的 0600 approval 文件/独立 approval token**；HAO_ABORT_ALLOW=1 仅是“用户预先授权”约定**不是安全边界**（agent 可在自己 shell 设 env，甚至直接 herdr send-keys 绕过 hao）。文档明示：abort 授权是 guardrail 非 security boundary；esc/ctrl+c 可能丢审批。abort blocked 无授权 exit5。不关 pane 不停 server。cancel 与 abort 分开。
+- 超时 exit4+状态+尾部→编排者决定重试/cancel/abort；blocked exit5→交用户审批或 abort，绝不自动点审批；exited/closed exit3。一 pane 一 task best-effort（台账 busy 无分布式锁）；无 --queue。
+- hao done --token T [--summary]：先 summary 后哨兵 stdout 最后一行；写台账 done+tombstone result_path；同机有 --wake 则注入；stdout 可能不可见但副作用可用；done 不在 pane/无法渲染 exit8；远端无 hao 手动打印（仅 wait 信号）。
+- **status** 默认 target=当前 pane（HERDR_PANE_ID），输出 agent 状态/label/mode/outstanding shortid；**say** fire-forget 无哨兵不写台账，对 blocked exit5、对 working best-effort 提交（agent prompt 语义）；**result** 按 shortid 读 tombstone result_path。
 
 ## 9. 错误码
-0 成功/2 用法（invalid_agent_name·mode 非法·result 路径被拒·别名未知）/3 target 不存在·exited·closed·result 文件不存在·cancel token 不存在·wake caller 不存在/4 超时/5 blocked·abort blocked 无授权/6 冲突·歧义·name taken/7 machine 不可用/8 herdr·server 错误（prompt_stalled·remote failure·agent_not_ready·agent_pane_not_found·stale_pane_target·invalid_agent_timeout·watch 失败·台账损坏/不可写·done 不在 pane）/9 协议错误（baseline 旧 token·lifecycle 未观察到 working 转变）/10 cancelled。startup pending 可重试。解析 herdr JSON error.code/stderr 不透传；mutating 不盲重试。
+0 成功/2 用法（invalid_agent_name·mode 非法·result 路径被拒·别名未知·--file 非法·HAO_ABORT_ALLOW 格式错）/3 target 不存在·exited·closed·result 文件不存在·cancel token 不存在·wake caller 不存在/4 超时/5 blocked·abort blocked 无授权·say 对 blocked/6 冲突·歧义·name taken·say 对 working 拒绝（若严格）/7 machine 不可用/8 herdr·server 错误（prompt_stalled·remote failure·agent_not_ready·agent_pane_not_found·stale_pane_target·invalid_agent_timeout·watch 失败·台账损坏/不可写·done 不在 pane）/9 协议错误（baseline 旧 token·lifecycle 未观察 working 转变）/10 cancelled。startup pending 可重试。解析 herdr JSON error.code/stderr 不透传；mutating 不盲重试。
 
 ## 10. 跨机器
-本机 machine list=[] 仅 stub 标注未验证。--machine 不与 --session/--remote 组合，不传 --current/本地 ID。name/clear/suggest/list/restore/ask/wait/cancel/abort 支持 --machine，target 远端解析。**result 跨机器=experimental/不支持**（file local-only；--machine 下仅支持 peer 最终消息已含内容，否则不承诺）。doctor --machine 用 machine status；无/未知 profile exit7。台账 caller-local+machine 键 caller 侧 poll。远端 server 须运行 API 兼容；连接失败≠未发生。
+本机 machine list=[] 仅 stub 标注未验证。--machine 不与 --session/--remote 组合，不传 --current/本地 ID。name/clear/suggest/list/restore/ask/wait/cancel/abort 支持 --machine，target 远端解析。result 跨机器 experimental/不支持（file local-only；--machine 仅 peer 最终消息已含内容）。**wake 跨机器不支持**（caller-local 台账不可达→caller 侧 poll/宿主 scheduler）。doctor --machine 用 machine status；无/未知 profile exit7。台账 caller-local+machine 键 caller 侧 poll。远端 server 须运行 API 兼容；连接失败≠未发生。
 
 ## 11. suggest
 每组中英文关键词别名+确定性打分；组耗尽→相邻组/--custom。未占用=per-machine 所有 live names+所有 label role+stale。排除保留字（全命令面）；--suggest 非交互；--json 候选/组/理由；验收 3–5 中英文 task。
 
 ## 12. 五维
-功能：name/restore/ask/wait/done/list/suggest/clear/doctor/status/say/result/cancel/abort+target 归一化+稳定回显+--json+短别名。延后 broadcast/export-import；去掉可插拔框架/names.local/hook/交互式 input/--queue。**watch/metadata/file 跨机器/result 跨机器/wake 跨机器=experimental，无验收不承诺，不影响 sentinel 主路径**。
-性能：server 侧 wait-output/agent wait 短超时轮询（兼顾 cancel）；pane read 游标只读新行；--lines 限界；restore 单遍 pre-flight；suggest 静态索引；rename 循环非 batch。
-容灾：防回显+防 false-negative+防 busy-loop（游标）+旧 token 预检；blocked/exited/closed 立即返回；超时给状态尾部；mutating 不盲重试；restore 幂等+部分失败报告；cancel 全模式幂等停阻塞+忽略迟到哨兵；台账原子写+锁+清理+TTL+写失败降级；doctor 检 stale/invalid/dup+resume。
+功能：name/restore/ask/wait/done/list/suggest/clear/doctor/status/say/result/cancel/abort+target 归一化+稳定回显+--json+短别名。延后 broadcast/export-import；去掉可插拔框架/names.local/hook/交互式 input/--queue。watch/metadata/file 跨机器/result 跨机器/wake 跨机器=experimental 无验收不承诺不影响 sentinel 主路径。
+性能：server 侧 wait-output --regex/agent wait 短超时轮询（兼顾 cancel）；--lines 限界；restore 单遍 pre-flight；suggest 静态索引；rename 循环非 batch。
+容灾：防回显+防 false-negative+容忍正则天然防 busy-loop+旧 token 预检+滚动丢失重扫 fallback；blocked/exited/closed 立即返回；超时给状态尾部；mutating 不盲重试；restore 幂等+部分失败报告；cancel 全模式幂等停阻塞+忽略迟到哨兵；台账原子写+锁+tombstone+TTL 按 updated 不清 running+写失败降级；doctor 检 stale/invalid/dup+resume。
 扩展性：--custom（过校验）；三模式；多 machine；agent-kind 无关；保留字过滤覆盖全命令面。
-易用性：无参=帮助+roster；name 必填+--suggest；短别名无歧义；错误带下一步；mutating 全 --dry-run；doctor 可执行修复；--progress stderr；list/doctor 显式 machine/workspace scope。
+易用性：无参=帮助+roster；name 必填+--suggest；短别名无歧义；错误带下一步；mutating 全 --dry-run；doctor 可执行修复；--progress stderr；list/doctor 显式 scope。
 
 ## 13. 安全
-不碰 server stop/不主动关 pane；只改 hao- label+显式 target name；restore 默认当前 workspace+adopt 可控；非 hao- 需 --force；跨机器校验 profile 不猜 SSH；不自动点审批（abort blocked 需用户级授权 HAO_ABORT_ALLOW/TTY）；result 限安全临时目录 realpath；wake 固定模板不注入 summary；不 kill 任意 PID。
+不碰 server stop/不主动关 pane；只改 hao- label+显式 target name；restore 默认当前 workspace+adopt 可控；非 hao- 需 --force；跨机器校验 profile 不猜 SSH；不自动点审批（abort blocked 需 TTY/0600 approval，guardrail 非 security boundary）；result 限安全临时目录 realpath；wake 固定模板不注入 summary；不 kill 任意 PID。
 
 ## 14. 敏感审查
 test_names.py 只断言可判定集合：完整性+显式 deny+保留字（覆盖当前完整命令面含 watch/cancel/abort/say/result/status）。对外口径=无显式 deny 词+无保留字，不声称无灰色词全覆盖。
@@ -85,16 +86,16 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 4. 两 hao-hawk→都歧义 exit6 不 rename；--pick 只恢复被选
 5. hao-hawk-api/hao-hawk-web→name hawk 冲突 exit6
 6. 另一 workspace 有 live hawk→本 workspace restore/name exit6
-7. 预置哨兵/prompt 回显 wait 不成功；真实最终消息（TUI 缩进/⏺）命中；Bash tool hao done→wait 看不到（已知限制）；**无效 token 引用不 busy-loop（游标推进）**
-8. machine fixture：list 两 shape/unknown/remote down/machine+session；本机无 profile 标注；result 跨机器 experimental
+7. 预置哨兵/prompt 回显 wait 不成功；真实最终消息（TUI 缩进/⏺/尾部标点/代码框）命中；Bash tool hao done stdout→wait 看不到（已知限制）但台账/wake 副作用可用；token-only 引用不 busy-loop（正则要求邻接）；滚动顶出→超时重扫 fallback
+8. machine fixture：list 两 shape/unknown/remote down/machine+session；本机无 profile 标注；result/wake 跨机器 experimental/不支持
 9. suggest 3–5 中英文 task；live 重名扫 names+labels+stale
-10. cancel 全模式停阻塞 wait exit10+幂等+迟到哨兵忽略+done-after-cancel 拒绝+token 不存在 exit3；abort blocked 无 HAO_ABORT_ALLOW/TTY exit5；超时 exit4 带状态尾部；blocked exit5
-11. lifecycle 同步：提交后未观察 working 不算完成 exit9；拒绝 async lifecycle
-12. file：partial 不提前返回（原子写/标记）；result 用台账 result_path+realpath，路径穿越被拒；shortid 12hex 防碰撞
-13. wake 固定模板不含 summary；caller blocked best-effort 丢失；caller 不存在 exit3
-14. 台账 0700/0600+原子写+锁+完成/取消清理+TTL/doctor stale+写失败降级；不 kill PID
-15. **status/say/result 逐条验收**：output/exit code/JSON schema（protocol.md）；say fire-forget 无哨兵；result 读安全临时目录
-16. test_names：完整性+保留字（全命令面）+显式 deny；list/doctor 默认当前 workspace 标注 per-machine
+10. cancel 全模式停阻塞 wait exit10+幂等+迟到哨兵忽略+done-after-cancel 拒绝+token 不存在 exit3；abort blocked 无 TTY/0600 approval exit5（HAO_ABORT_ALLOW 不算）；超时 exit4 带状态尾部；blocked exit5
+11. lifecycle 同步可 cancel：agent prompt 提交+自实现 5s working 门槛（未观察 exit9）+agent wait 短循环查台账；拒绝 async
+12. file：partial 不提前返回；result 用台账 tombstone result_path+realpath，穿越被拒；shortid 12hex 防碰撞；completion 清理后 result 仍可读（tombstone）
+13. wake 仅同机 hao done+台账可达生效，固定模板不含 summary；最终消息打印不产生 wake；caller blocked best-effort 丢失；caller 不存在 exit3；跨机器 caller 侧 poll
+14. 台账 0700/0600+原子写+锁+tombstone 保 result_path+TTL 按 updated 不清 running+写失败降级；不 kill PID
+15. status 默认当前 pane/say fire-forget 不写台账（blocked exit5/working best-effort）/result 读 tombstone；逐条 output/exit/JSON schema（protocol.md，含 done 例外）
+16. test_names：完整性+保留字（全命令面）+显式 deny；list/doctor 默认当前 workspace+per-machine 标注
 
 ## 16. 词表（40×40，round-4 后）
 | # | 分工 | 主题 | 40 候选 |
@@ -478,5 +479,5 @@ allow-list：文学/叙事 myth saga fable tale verse prose story lyric sonnet r
 </details>
 
 ## 18. 实测记录
-r1 forge 14m52s 复现哨兵回显误命中；r2 9m29s 编排者 ^HAO_DONE 等真实行超时（TUI 缩进 false-negative）→v3 --match；r3 7m4s --match 命中最终消息（修复成立）+实测 Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过，余 9 条边界细化→v5 收口（lifecycle 同步/游标防 busy-loop/result_path/abort 用户授权/result 跨机器 experimental/cancel 全模式/错误码别名 N=40）。
-agent wait 长任务超时→异步 ask+唤醒+短轮询。w2:t1:p9 vs w2:p9→归一化。agent get <label>→not_found→先解析。forge 核实 herdr 0.9.5 命令面/label 持久化/词表完整性/agent name 规则/wait-output ^ 按行匹配。
+r1 14m52s 哨兵回显误命中；r2 9m29s ^HAO_DONE TUI 缩进 false-negative→--match；r3 7m4s --match 命中+Bash tool stdout 不进 snapshot→canonical 最终消息；r4 5m17s 词表/匹配器全过余 9 条→v5；r5 4m0s 余 7 条（tombstone/wake 跨机器/lifecycle 阻塞矛盾/无 offset 游标/正则过严/abort env 非授权/TTL 误清）→v6 收口（server 侧容忍正则为主无游标、lifecycle 自实现门槛可 cancel、wake 限同机、abort TTY/0600、tombstone+TTL updated）。
+forge 核实 herdr 0.9.5 命令面/label 持久化/词表完整性/agent name 规则/wait-output ^ 按行匹配/pane read 无 offset。
