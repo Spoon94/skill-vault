@@ -264,3 +264,48 @@ def current_state(target):
         return json.loads(out)["result"]["agent"].get("agent_status", "unknown")
     except Exception:
         return "unknown"
+
+
+def cmd_status(target):
+    pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
+    if not pane:
+        return 3
+    rc, out, _ = run_herdr(["agent", "get", pane])
+    if rc != 0:
+        rc2, out2, _ = run_herdr(["pane", "get", pane])
+        print(out2)
+        return 0
+    print(out)
+    return 0
+
+
+def cmd_say(target, text):
+    pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
+    if not pane:
+        return 3
+    rc, _, _ = run_herdr(["agent", "prompt", pane, text])
+    return 0 if rc == 0 else 5
+
+
+def cmd_result(shortid):
+    from ledger import Ledger
+    rec = Ledger().get(shortid)
+    if not rec or rec.get("status") != "done":
+        return 3
+    rp = rec.get("result_path")
+    if not rp:
+        return 3
+    if not safe_result_path(shortid, rp):
+        return 2
+    print(open(rp).read())
+    return 0
+
+
+def cmd_list(workspace):
+    rc, out, _ = run_herdr(["pane", "list", "--workspace", workspace])
+    for p in json.loads(out)["result"]["panes"]:
+        lbl = p.get("label") or ""
+        m = HAO_LABEL_RE.match(lbl)
+        if m:
+            print(p["pane_id"], lbl, p.get("agent"), p.get("cwd"))
+    return 0
