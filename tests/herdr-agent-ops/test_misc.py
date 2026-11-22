@@ -13,8 +13,8 @@ cmd_say = hao.cmd_say
 
 
 class TestMisc(unittest.TestCase):
-    def test_status_no_agent(self):
-        self.assertEqual(cmd_status("w2:pX"), 0)  # shell-only pane -> shell info exit0
+    def test_status_nonexistent(self):
+        self.assertEqual(cmd_status("w2:pZZZZ"), 3)  # nonexistent -> exit 3
 
     def test_result_no_path(self):
         self.assertEqual(cmd_result("nonexistent"), 3)

@@ -52,9 +52,11 @@ def normalize_id(id_or_token):
     s = id_or_token or ""
     if s.startswith("hao-"):
         h = s[4:]
-        if not re.fullmatch(r"[0-9a-f]+", h):
-            return s
-        return h[:12] if len(h) > 12 else h
+        if not re.fullmatch(r"[0-9a-f]{12,16}", h):
+            raise ValueError(f"invalid token: {s!r}")
+        return h[:12]
+    if not re.fullmatch(r"[a-z0-9_-]{1,64}", s):
+        raise ValueError(f"invalid id: {s!r}")
     return s
 
 
@@ -75,6 +77,8 @@ def label_scope(label):
 
 def cmd_name(target, name, scope, force, dry_run, machine=None):
     if not validate_name(name):
+        return 2
+    if scope and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,11}", scope):
         return 2
     pane = resolve_target(target, machine)
     rc, out, _ = run_herdr(["agent", "list"], machine)
@@ -168,17 +172,19 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
                 continue
             if not p.get("agent"):
                 continue  # shell-only pane: skip
-            if not adopt:
-                continue  # --no-adopt: never touch a named agent
+            if not adopt and p.get("agent_name"):
+                continue  # --no-adopt: only fill agents with no existing name
             if dry_run:
                 print(f"would restore {role} on {p['pane_id']} (scope={label_scope(p.get('label'))})")
                 continue
             scope = label_scope(p.get("label"))
-            run_herdr(["pane", "rename", p["pane_id"], make_label(role, scope)], machine)
+            r1, _, _ = run_herdr(["pane", "rename", p["pane_id"], make_label(role, scope)], machine)
+            if r1 != 0:
+                failures.append(p["pane_id"] + ":pane")
+                continue
             rr, _, _ = run_herdr(["agent", "rename", p["pane_id"], role], machine)
             if rr != 0:
-                failures.append(p["pane_id"])
-    _led.Ledger()  # ensure state dir exists
+                failures.append(p["pane_id"] + ":agent")
     if failures:
         print("partial failures:", failures)
         return 6
@@ -196,6 +202,12 @@ def _load_module(name, filename):
     except NameError:
         # hao itself loaded via SourceFileLoader: derive from this code object
         base = os.path.dirname(os.path.abspath(_load_module.__code__.co_filename))
+    try:
+        _self = os.path.join(base, "hao")
+        if os.path.islink(_self):
+            base = os.path.dirname(os.path.realpath(_self))
+    except Exception:
+        pass
     loader = SourceFileLoader(name, os.path.join(base, filename))
     mod = types.ModuleType(loader.name)
     mod.__file__ = loader.get_filename()
@@ -212,7 +224,10 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
     if label_roles is None:
         rc, out, _ = run_herdr(["pane", "list"], machine)
         label_roles = [p.get("label") for p in json.loads(out)["result"]["panes"] if p.get("label")]
-    live = set(live_names or []) | set(label_roles or [])
+    def _role(lbl):
+        m2 = HAO_LABEL_RE.match(lbl or "")
+        return m2.group(1) if m2 else lbl
+    live = set(live_names or []) | set(_role(r) for r in (label_roles or []))
 
     def kw_score(info):
         s = 0
@@ -268,6 +283,12 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
     token = "hao-" + hexpart
     shortid = hexpart[:12]
     pane = resolve_target(target, machine)
+    if mode == "lifecycle" and not wait:
+        return 2
+    if mode == "lifecycle":
+        st = current_state(pane, machine)
+        if st in ("working", "blocked", "unknown"):
+            return 6
     result_path = None
     if mode == "file":
         result_path = os.path.join(_led.state_dir(), shortid, "result.md")
@@ -317,24 +338,28 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
 
 
 def _sentinel_check(pane, token, machine):
-    """Quick pane wait-output probe; returns matched line or None."""
+    """Quick probe; returns (matched_line | None, error_rc | None)."""
     rc, out, err = run_herdr(
         ["pane", "wait-output", pane, "--regex", SENTINEL_RE.pattern, "--timeout", "1000"],
         machine)
     if rc != 0:
-        # timeout is the normal "not yet" answer; anything else bubbles up
         try:
             code = json.loads(err).get("error", {}).get("code")
         except Exception:
             code = None
-        if code != "timeout":
-            return None
+        if code == "timeout":
+            return None, None  # normal "not yet"
+        return None, herdr_error_rc(err, 8)
     try:
         ml = json.loads(out).get("result", {}).get("matched_line", "") or ""
     except Exception:
         ml = out
     m = SENTINEL_RE.search(ml)
-    return ml if (m and m.group(1) == token) else None
+    if not m:
+        return None, None
+    matched = m.group(1)
+    tok = token if token.startswith("hao-") else "hao-" + token
+    return (ml, None) if matched == tok else (None, None)
 
 
 def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown):
@@ -351,7 +376,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         gate = _agent_gate(pane, machine, no_agent, accept_unknown)
         if gate is not None:
             return gate
-        ml = _sentinel_check(pane, token, machine)
+        ml, errc = _sentinel_check(pane, token, machine)
+        if errc is not None:
+            return errc
         if ml:
             l.write_done(sid, matched_line=ml)
             return {"status": "done", "matched_line": ml}
@@ -378,7 +405,9 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             run_herdr(["agent", "wait", pane,
                        "--until", "idle", "--until", "done", "--until", "blocked",
                        "--timeout", "8000"], machine)
-        ml = _sentinel_check(pane, token, machine)
+        ml, errc = _sentinel_check(pane, token, machine)
+        if errc is not None:
+            return errc
         if ml:
             l.write_done(sid, matched_line=ml)
             return {"status": "done", "matched_line": ml}
@@ -400,7 +429,7 @@ def _wait_file(pane, sid, token, timeout, machine):
         if kind == "cancelled":
             return 10
         l.heartbeat(sid)
-        if rp and os.path.exists(rp) and os.path.getsize(rp) > 0:
+        if rp and os.path.isfile(rp) and os.path.getsize(rp) > 0:
             l.write_done(sid, result_path=rp)
             return {"status": "done", "result_path": rp}
         time.sleep(0.5)
@@ -410,7 +439,10 @@ def _wait_file(pane, sid, token, timeout, machine):
 def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
              no_agent=False, accept_unknown=False):
     pane = resolve_target(target, machine)
-    sid = normalize_id(token)
+    try:
+        sid = normalize_id(token)
+    except ValueError:
+        return 2
     if mode == "file":
         return _wait_file(pane, sid, token, timeout, machine)
     if mode == "lifecycle":
@@ -425,7 +457,7 @@ def cmd_done(token, summary, final=False):
     rec = l.get(sid)
     if rec and rec.get("status") == "cancelled":
         return 6
-    if final:
+    if final and (not rec or rec.get("status") != "done"):
         target = rec.get("target") if rec else None
         if target and current_state(target) not in ("idle", "done"):
             return 5
@@ -442,12 +474,19 @@ def cmd_done(token, summary, final=False):
 
 def cmd_cancel(shortid):
     _led = _load_module("hao_ledger", "ledger.py")
-    return _led.Ledger().cancel(normalize_id(shortid))
+    try:
+        sid = normalize_id(shortid)
+    except ValueError:
+        return 2
+    return _led.Ledger().cancel(sid)
 
 
 def cmd_abort(shortid, interrupt):
     _led = _load_module("hao_ledger", "ledger.py")
-    sid = normalize_id(shortid)
+    try:
+        sid = normalize_id(shortid)
+    except ValueError:
+        return 2
     l = _led.Ledger()
     rec = l.get(sid)
     if rec is None:
@@ -501,18 +540,12 @@ def safe_read(shortid, path):
             fd = os.open(part, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW, dir_fd=fds[-1])
             fds.append(fd)
         fdf = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fds[-1])
-        try:
-            st = os.fstat(fdf)
-            if not _stat.S_ISREG(st.st_mode):
-                return None
-            with os.fdopen(fdf, "rb") as f:
-                return f.read().decode("utf-8", "replace")
-        except Exception:
-            try:
-                os.close(fdf)
-            except OSError:
-                pass
-            raise
+        st = os.fstat(fdf)
+        if not _stat.S_ISREG(st.st_mode):
+            os.close(fdf)
+            return None
+        with os.fdopen(fdf, "rb") as f:
+            return f.read().decode("utf-8", "replace")
     except Exception:
         return None
     finally:
@@ -554,6 +587,8 @@ def cmd_status(target):
     rc, out, _ = run_herdr(["agent", "get", pane])
     if rc != 0:
         rc2, out2, _ = run_herdr(["pane", "get", pane])
+        if rc2 != 0:
+            return 3
         print(out2)
         return 0
     print(out)
