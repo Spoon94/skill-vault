@@ -218,3 +218,49 @@ def cmd_abort(shortid, interrupt):
         run_herdr(["agent", "send-keys", target, "esc"])
         run_herdr(["agent", "send-keys", target, "ctrl+c"])
     return 0
+
+
+def lifecycle_gate(submit_seq, final):
+    # Activity gate: submit_seq advanced + final idle/done (fast coverage).
+    # NOT a completion signal; completion requires sentinel/ledger done.
+    return final in ("idle", "done")
+
+
+def safe_result_path(shortid, path):
+    from ledger import STATE
+    root = os.path.realpath(os.path.join(STATE, shortid))
+    rp = os.path.realpath(path)
+    return rp.startswith(root + os.sep)
+
+
+def lifecycle_wait(target, token):
+    from ledger import Ledger
+    l = Ledger()
+    submit_seq = current_seq(target)
+    while True:
+        rec = l.get(token)
+        if rec and rec.get("status") == "done":
+            return rec
+        if rec and rec.get("status") == "cancelled":
+            return 10
+        if current_seq(target) > submit_seq and current_state(target) in ("idle", "done"):
+            l.write_done(token)
+            return l.get(token)
+        run_herdr(["agent", "wait", target, "--until", "idle/done/blocked", "--timeout", "8000"])
+        time.sleep(0.5)
+
+
+def current_seq(target):
+    rc, out, _ = run_herdr(["agent", "get", target])
+    try:
+        return json.loads(out)["result"]["agent"].get("state_change_seq", 0)
+    except Exception:
+        return 0
+
+
+def current_state(target):
+    rc, out, _ = run_herdr(["agent", "get", target])
+    try:
+        return json.loads(out)["result"]["agent"].get("agent_status", "unknown")
+    except Exception:
+        return "unknown"
