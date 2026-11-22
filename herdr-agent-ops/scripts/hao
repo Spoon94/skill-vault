@@ -60,3 +60,48 @@ def cmd_clear(target, force):
         return 8
     rc2, _, _ = run_herdr(["agent", "rename", pane, "--clear"])
     return 0 if rc2 == 0 else 8
+
+
+def name_taken(name, agents):
+    return any(a.get("name") == name for a in agents)
+
+
+def preflight(panes, agents, workspace):
+    conflicts, ambiguous, plan = set(), False, []
+    roles = {}
+    for p in panes:
+        lbl = p.get("label") or ""
+        m = HAO_LABEL_RE.match(lbl)
+        if not m:
+            continue
+        role = m.group(1)
+        roles.setdefault(role, []).append(p)
+    for role, ps in roles.items():
+        if len(ps) > 1:
+            ambiguous = True
+        if name_taken(role, agents):
+            conflicts.add(role)
+        plan.append((role, ps))
+    return {"conflicts": sorted(conflicts), "ambiguous": ambiguous, "plan": plan}
+
+
+def cmd_restore(workspace, all_, adopt, dry_run, pick):
+    rc, out, _ = run_herdr(["agent", "list"])
+    agents = json.loads(out)["result"]["agents"] if out else []
+    rc2, out2, _ = run_herdr(["pane", "list", "--workspace", workspace])
+    panes = json.loads(out2)["result"]["panes"]
+    plan = preflight(panes, agents, workspace)
+    if plan["conflicts"]:
+        return 6
+    if plan["ambiguous"] and not pick:
+        return 6
+    for role, ps in plan["plan"]:
+        for p in ps:
+            if pick and p["pane_id"] != pick:
+                continue
+            if dry_run:
+                print(f"would restore {role} on {p['pane_id']}")
+                continue
+            run_herdr(["pane", "rename", p["pane_id"], make_label(role)])
+            run_herdr(["agent", "rename", p["pane_id"], role])
+    return 0
