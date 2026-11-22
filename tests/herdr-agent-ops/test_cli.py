@@ -114,15 +114,43 @@ class TestFileWait(unittest.TestCase):
                 os.makedirs(os.path.dirname(rp), exist_ok=True)
                 open(rp, "w").close()  # empty file
                 l.write_running(sid, result_path=rp)
-                # empty file -> timeout (short deadline)
-                r = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 0.3, None)
-                self.assertEqual(r, 4)
-                # write content -> done
-                with open(rp, "w") as f:
-                    f.write("result body")
-                r2 = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 6, None)
-                self.assertEqual(r2["status"], "done")
-                self.assertEqual(r2["result_path"], rp)
+                # simulate an existing pane WITHOUT an agent (r6#2):
+                # agent get -> agent_not_found, pane get -> exists
+                orig = hao.run_herdr
+
+                def stub(args, machine=None):
+                    if args[:2] == ["agent", "get"]:
+                        return 1, "", '{"error":{"code":"agent_not_found"}}'
+                    if args[:2] == ["pane", "get"]:
+                        return 0, '{"result":{"pane":{"pane_id":"w2:pX"}}}', ""
+                    return orig(args, machine)
+
+                hao.run_herdr = stub
+                try:
+                    # empty file -> timeout (short deadline)
+                    r = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 0.3, None)
+                    self.assertEqual(r, 4)
+                    # write content -> done after size stabilizes
+                    with open(rp, "w") as f:
+                        f.write("result body")
+                    r2 = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 6, None)
+                    self.assertEqual(r2["status"], "done")
+                    self.assertEqual(r2["result_path"], rp)
+                finally:
+                    hao.run_herdr = orig
+            finally:
+                sys.path.pop(0)
+
+    def test_wait_file_missing_pane_exit3(self):
+        # r6#2 + error-map fix: nonexistent pane must stop the wait with 3
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
+            try:
+                from ledger import Ledger
+                Ledger().write_running("feed99998888")
+                r = hao._wait_file("w2:pX", "feed99998888", "hao-feed9999888890", 3, None)
+                self.assertEqual(r, 3)
             finally:
                 sys.path.pop(0)
 

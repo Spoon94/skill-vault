@@ -27,7 +27,10 @@ def _path(shortid):
 
 class Ledger:
     def __init__(self):
-        os.makedirs(state_dir(), mode=0o700, exist_ok=True)
+        # lazy on purpose: constructing a Ledger must not fail on a
+        # read-only/missing state dir — waits degrade gracefully and
+        # _rw creates the directory on demand
+        pass
 
     def _rw(self, shortid, fn):
         p = _path(shortid)
@@ -95,6 +98,8 @@ class Ledger:
     def cleanup(self, ttl_s=86400):
         now = time.time()
         base = state_dir()
+        if not os.path.isdir(base):
+            return  # nothing to clean
         lock_path = os.path.join(base, ".cleanup.lock")
         with open(lock_path, "w") as lf:
             fcntl.flock(lf, fcntl.LOCK_EX)

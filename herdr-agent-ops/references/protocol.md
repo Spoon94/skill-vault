@@ -21,6 +21,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 ## 等待协议
 
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。Bash tool stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
+- **peer 调用时机**：`hao done` 必须在最终答复正文**全部输出之后**才调用——台账 done 会立即释放等待方，早于正文调用会让等待方从 pane 读不到结论。
 - **防回显**：token 拆分两段，prompt 不含完整 token；`[TASK <shortid>]` 用独立短 id。
 - **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。
 - **完成确认**：必须有任务级证据（哨兵 `HAO_DONE <token>` 或台账 `status=done`），可降级（台账不可写时哨兵仍可确认）。`state_change_seq` 仅活动门槛，不作完成信号。

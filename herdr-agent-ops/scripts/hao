@@ -227,9 +227,6 @@ def _load_module(name, filename):
     """Load a sibling module by absolute path (works via CLI or SourceFileLoader)."""
     import types
     from importlib.machinery import SourceFileLoader
-    cached = sys.modules.get(name)
-    if cached is not None:
-        return cached
     try:
         base = os.path.dirname(os.path.abspath(__file__))
     except NameError:
@@ -241,7 +238,11 @@ def _load_module(name, filename):
             base = os.path.dirname(os.path.realpath(_self))
     except Exception:
         pass
-    loader = SourceFileLoader(name, os.path.join(base, filename))
+    path = os.path.realpath(os.path.join(base, filename))
+    cached = sys.modules.get(name)
+    if cached is not None and getattr(cached, "__file__", None) == path:
+        return cached
+    loader = SourceFileLoader(name, path)
     mod = types.ModuleType(loader.name)
     mod.__file__ = loader.get_filename()
     loader.exec_module(mod)
@@ -305,6 +306,7 @@ def build_prompt(task, token, result_path=None):
         f"完成时，将令牌的两段拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}。",
         "在最终消息最后一行打印：HAO_DONE 加一个空格，再拼接这两段"
         "（格式：HAO_DONE + 空格 + hao- + 第一段 + 第二段）。",
+        "若改用 hao done 上报：先输出全部正文，最后才调用——台账 done 会让等待方立即返回。",
     ]
     if result_path:
         lines.append(f"请先把最终结果完整写入文件 {result_path}，写完后再打印完成行。")
@@ -341,6 +343,28 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
         return cmd_wait(pane, token, timeout, mode, machine)
     return {"token": token, "shortid": shortid,
             "next": f"hao wait {pane} --token {token}"}
+
+
+_LEDGER_WARNED = False
+
+
+def _wait_round_rec(l, sid):
+    """Fresh record for this wait round: heartbeat (locked read+merge+write)
+    with read-only fallback. Ledger unavailable must never kill a wait —
+    pane sentinel evidence stays authoritative (graceful degradation)."""
+    global _LEDGER_WARNED
+    try:
+        return l.heartbeat(sid)
+    except Exception as e:
+        if not _LEDGER_WARNED:
+            print(f"hao: warning: ledger unavailable ({e}); "
+                  f"degrading to pane evidence", file=sys.stderr)
+            _LEDGER_WARNED = True
+        try:
+            rec = l.get(sid)
+            return rec if rec is not None else {}
+        except Exception:
+            return {}
 
 
 def _wait_common_check(rec):
@@ -465,7 +489,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(l.heartbeat(sid))
+        kind, payload = _wait_common_check(_wait_round_rec(l, sid))
         if kind == "done":
             return payload
         if kind == "cancelled":
@@ -515,7 +539,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     deadline = None if timeout == 0 else start + (timeout or 1800)
     saw_activity = False
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(l.heartbeat(sid))
+        kind, payload = _wait_common_check(_wait_round_rec(l, sid))
         if kind == "done":
             return payload
         if kind == "cancelled":
@@ -567,16 +591,20 @@ def _wait_file(pane, sid, token, timeout, machine):
     deadline = None if timeout == 0 else time.time() + (timeout or 1800)
     last_size = None
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(l.heartbeat(sid))
+        kind, payload = _wait_common_check(_wait_round_rec(l, sid))
         if kind == "done":
             return payload
         if kind == "cancelled":
             return 10
         rc, out, err = run_herdr(["agent", "get", pane], machine)
         if rc != 0:
-            # agent_not_found = shell pane without agent: skip the gate;
-            # anything else (pane gone -> 3, server error -> 8) stops the wait
-            if _herdr_err_code(err) != "agent_not_found":
+            if _herdr_err_code(err) == "agent_not_found":
+                # herdr returns agent_not_found for missing panes too:
+                # confirm the pane itself still exists before skipping the gate
+                rcp, _, errp = run_herdr(["pane", "get", pane], machine)
+                if rcp != 0:
+                    return herdr_error_rc(errp, 3)
+            else:
                 return herdr_error_rc(err, 8)
         else:
             try:
@@ -625,7 +653,8 @@ def cmd_done(token, summary, final=False):
         return 6
     if final and (not rec or rec.get("status") != "done"):
         target = rec.get("target") if rec else None
-        if target and current_state(target) not in ("idle", "done"):
+        mach = rec.get("machine") if rec else None
+        if target and current_state(target, mach) not in ("idle", "done"):
             return 5
     l.write_done(sid, summary=summary)
     # same-machine wake: fixed template, no peer summary injection;
@@ -704,8 +733,12 @@ def cmd_abort(shortid, interrupt):
     if not target:
         return 3
     mach = rec.get("machine")
-    run_herdr(["agent", "send-keys", target, "esc"], mach)
-    run_herdr(["agent", "send-keys", target, "ctrl+c"], mach)
+    r1, _, e1 = run_herdr(["agent", "send-keys", target, "esc"], mach)
+    if r1 != 0:
+        return herdr_error_rc(e1, 8)
+    r2, _, e2 = run_herdr(["agent", "send-keys", target, "ctrl+c"], mach)
+    if r2 != 0:
+        return herdr_error_rc(e2, 8)
     return 0
 
 
@@ -863,7 +896,11 @@ ERR = {
 
 
 def map_herdr_error(err):
-    return ERR.get((err or {}).get("code"), 8)
+    # herdr CLI stderr JSON is {"error": {"code": ...}, "id": ...};
+    # accept the nested form (canonical) and a flat {"code": ...} too
+    err = err or {}
+    e = err.get("error") or {}
+    return ERR.get(e.get("code") or err.get("code"), 8)
 
 
 def cmd_doctor(machine=None):
