@@ -7,6 +7,7 @@
 - herdr ≥ 0.9.5
 - 在 herdr pane 内运行，`HERDR_ENV=1`
 - python3 ≥ 3.9（仅标准库，无第三方依赖）
+- 调用方式：未安装到 PATH 时，用 `python3 <skill目录>/scripts/hao` 代替下文的 `hao`；或直接复制 alias：`alias hao='python3 ~/.claude/skills/herdr-agent-ops/scripts/hao'`。
 
 ## 目录
 
