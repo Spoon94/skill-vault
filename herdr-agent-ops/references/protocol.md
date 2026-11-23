@@ -58,7 +58,9 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 | status | 紧凑 JSON | stdout JSON 追加 `"ok":true` |
 | result | 结果正文 | stdout `{"ok":true,"shortid","content"}` |
 | suggest / list | 单行人读/列表 | 仅 JSON |
-| ask / wait | 恒 JSON | 恒 JSON（无 flag） |
+| ask / wait | 恒 JSON | 恒 JSON；`--json` 为 no-op |
 | done | 哨兵为 stdout 最后一行 | 哨兵仍最后；JSON 走 stderr |
+| say | 静默成功 | stdout `{"ok":true,"pane_id"}` |
+| doctor | 检查行文本 | stdout `{"ok":bool,"checks":[...]}` |
 
-所有错误路径保留 A1 的 stderr 原因行；`--json` 不改变退出码。
+所有命令均接受 `--json`；`ask`/`wait` 恒 JSON，该 flag 为 no-op。所有错误路径保留 A1 的 stderr 原因行；`--json` 不改变退出码。

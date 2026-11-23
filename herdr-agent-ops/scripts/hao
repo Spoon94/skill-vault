@@ -1217,7 +1217,11 @@ def cmd_say(target, text, strict=False):
     if strict and current_state(pane) == "working":
         return fail(6, f"agent {pane} is working; --strict refuses")
     rc, _, err = run_herdr(["agent", "prompt", pane, text])
-    return 0 if rc == 0 else herdr_error_rc(err, 8)
+    if rc != 0:
+        return herdr_error_rc(err, 8)
+    if _JSON_OUTPUT:
+        _json_out({"ok": True, "pane_id": pane})
+    return 0
 
 
 def _mark_result_consumed(led, sid):
@@ -1335,7 +1339,7 @@ _ERROR_DETAIL = None
 _JSON_OUTPUT = False
 _JSON_HANDLED = False
 _JSON_COMMANDS = {"name", "clear", "restore", "cancel", "abort",
-                  "status", "result", "done", "suggest", "list"}
+                  "status", "result", "done", "suggest", "list", "say", "doctor"}
 
 
 def _json_out(obj):
@@ -1366,11 +1370,17 @@ def _emit_error(cmd, rc):
 
 
 def cmd_doctor(machine=None):
+    global _JSON_HANDLED
     if machine:
         rc, out, _ = run_herdr(["machine", "status", machine, "--json"])
-        if rc != 0:
+        ok = rc == 0
+        if _JSON_OUTPUT:
+            _json_out({"ok": ok, "checks": [{"name": "machine", "ok": ok}]})
+            _JSON_HANDLED = True
+        if not ok:
             return fail(7, f"machine {machine} unavailable")
-        print(out)
+        if not _JSON_OUTPUT:
+            print(out)
         return 0
     xdg = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
 
@@ -1387,9 +1397,17 @@ def cmd_doctor(machine=None):
         ("HERDR_ENV", os.environ.get("HERDR_ENV") == "1"),
         ("XDG default", os.path.isdir(os.path.join(xdg, "hao", "tasks"))),
     ]
-    for k, ok in checks:
-        print(k, "ok" if ok else "MISSING")
-    return 0 if all(ok for _, ok in checks) else 8
+    ok = all(v for _, v in checks)
+    if _JSON_OUTPUT:
+        _json_out({"ok": ok,
+                   "checks": [{"name": k, "ok": v} for k, v in checks]})
+        _JSON_HANDLED = True
+    else:
+        for k, v in checks:
+            print(k, "ok" if v else "MISSING")
+    if not ok:
+        return fail(8, "one or more doctor checks failed")
+    return 0
 
 
 # ---------------------------------------------------------------- CLI
@@ -1463,6 +1481,7 @@ def build_parser():
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
     sp.add_argument("--strict-ledger", dest="strict_ledger", action="store_true",
                     help="fail instead of degrading when the ledger write fails")
+    sp.add_argument("--json", action="store_true", help="accepted; ask always emits JSON")
 
     def _wait_run(a):
         tok = a.token or a.token_opt
@@ -1488,6 +1507,7 @@ def build_parser():
                     help="skip agent status gates for shell panes")
     sp.add_argument("--accept-unknown", dest="accept_unknown", action="store_true",
                     help="accept unknown agent status in the sentinel gate")
+    sp.add_argument("--json", action="store_true", help="accepted; wait always emits JSON")
 
     def _done_run(a):
         tok = a.token or a.token_opt
@@ -1557,6 +1577,7 @@ def build_parser():
              "Send a plain prompt to a pane, without creating a task.")
     sp.add_argument("args", nargs="+", metavar="TEXT", help="target and text, or just text")
     sp.add_argument("--strict", action="store_true", help="refuse to send while working")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
     sp = add("result", lambda a: cmd_result(a.shortid, a.target, a.file,
                                               a.allow_any_path), ["rs"],
@@ -1571,6 +1592,7 @@ def build_parser():
     sp = add("doctor", lambda a: cmd_doctor(a.machine), [],
              "Check python3, herdr, HERDR_ENV, XDG state, and optional machine.")
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--json", action="store_true", help="emit JSON check results")
 
     return p
 

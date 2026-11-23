@@ -101,7 +101,7 @@ hao wait w2:p9 --token <shortid>
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（179 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（184 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
