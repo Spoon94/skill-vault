@@ -20,7 +20,7 @@ ${CLAUDE_SKILL_DIR}/scripts/hao restore --dry-run
 1. **命名**：`hao name <target> <name> [--scope S]`，或 `hao suggest "<task>" [--scope S] [--custom NAME]` 从词表选名/校验自定义名。
 2. **持久化/恢复**：`hao restore [--workspace W|--all]`（默认当前 workspace），agent 退出/重启后从 `hao-` label 恢复名字。
 3. **派活与等待**：`hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`hao wait <target> --token <t>`；`hao done --token <t> --summary "<结果载荷>"`；`hao cancel <t>` / `hao abort <t> [--interrupt]`。
-4. **其它**：`hao list/status/say/result/doctor`。
+4. **其它**：`hao list` / `hao status [target]` / `hao say` / `hao result` / `hao doctor`。
 
 ## 长任务：异步 + 唤醒
 

@@ -38,7 +38,7 @@ herdr-agent-ops/
 | `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；summary 是结果载荷 |
 | `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | 取消/中断（blocked 需用户授权） |
 | `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
-| `hao status [--text] [--json]` | pane/agent/任务概览 |
+| `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
 | `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
 | `hao result <t> [--target PANE] [--file PATH] [--allow-any-path] [--json]` | 读取结果；`--allow-any-path` 需显式担责 |
 | `hao doctor [--machine M] [--json]` | 环境/机器自检 |
@@ -122,7 +122,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（185 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（186 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
