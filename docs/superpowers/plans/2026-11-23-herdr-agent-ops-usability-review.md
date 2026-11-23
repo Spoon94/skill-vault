@@ -122,3 +122,9 @@ hao name w2:p9 forge（已带 -ops scope）→ scope 被静默丢弃
 ### D3 heartbeat 不造空桩 + 集成隔离
 - **要求**：`Ledger.heartbeat` 仅刷新已存在记录，不创建 `{updated}` 空桩；`hao wait` 对不存在 id 纯靠 pane 证据等待。集成测试使用临时 `XDG_STATE_HOME`，不写用户真实台账。
 - **验收**：heartbeat 缺失记录返回 None、无 JSON 文件；集成后用户台账不变。
+
+
+### D4 结果摘要载荷
+- **问题**：`ask --wait` 完成返回 `summary:null`，调用方拿不到答复正文。
+- **要求**：prompt 要求 peer 调 `hao done --token <完整令牌> --summary "<关键结论/答复正文>"`，summary ≤600 字且包含任务答复本身；wait 返回体经台账携带 summary；protocol/README 同步。
+- **验收**：`done --summary` 后 `wait` 返回体 summary 相等。

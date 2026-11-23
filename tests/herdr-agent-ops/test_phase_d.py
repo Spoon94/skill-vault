@@ -1,3 +1,6 @@
+import contextlib
+import io
+import json
 import os
 import sys
 import tempfile
@@ -27,7 +30,44 @@ class TestD1Prompt(unittest.TestCase):
         self.assertLess(end, protocol)
         self.assertIn("无论任务要求只回复多少字", prompt)
         self.assertIn("不属于任务正文", prompt)
+        self.assertIn("--summary", prompt)
+        self.assertIn("结果载荷", prompt)
+        self.assertIn("≤600", prompt)
         self.assertNotIn(token, prompt)
+
+
+class TestD4Summary(unittest.TestCase):
+    def test_done_summary_is_returned_by_wait(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            try:
+                sid = "abcd12345678"
+                token = "hao-" + sid + "9900"
+                Ledger().write_running(sid, token=token, target="w2:p9")
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(hao.cmd_done(token, "answer body"), 0)
+                result = hao.cmd_wait("w2:p9", token, 1)
+                self.assertEqual(result["status"], "done")
+                self.assertEqual(result["summary"], "answer body")
+            finally:
+                os.environ.pop("XDG_STATE_HOME", None)
+
+    def test_done_summary_roundtrip_via_cli(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_STATE_HOME"] = d
+            try:
+                sid = "abcd12345678"
+                token = "hao-" + sid + "9900"
+                Ledger().write_running(sid, token=token, target="w2:p9")
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(hao.main(["done", token, "--summary", "cli body"]), 0)
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    self.assertEqual(hao.main(["wait", "w2:p9", token]), 0)
+                result = json.loads(out.getvalue().strip().splitlines()[-1])
+                self.assertEqual(result["summary"], "cli body")
+            finally:
+                os.environ.pop("XDG_STATE_HOME", None)
 
 
 class TestD2Diagnostics(unittest.TestCase):

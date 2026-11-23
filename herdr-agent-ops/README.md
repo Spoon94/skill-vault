@@ -50,7 +50,7 @@ hao suggest "审查 PR"            # → 验证审阅: hawk, lens, prism
 hao name w2:p9 hawk --scope api  # → agent hawk + label hao-hawk-api
 
 # 2. 派活并等完成
-hao ask w2:p9 "审查 PR 7" --wait  # → 哨兵确认后返回
+hao ask w2:p9 "审查 PR 7" --wait  # → {"status":"done","summary":"审查结论：...","matched_line":"HAO_DONE ..."}
 
 # 3. 重启后恢复
 hao restore --dry-run              # 预览
@@ -85,7 +85,7 @@ hao restore                        # 从 label 恢复
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（164 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（166 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
