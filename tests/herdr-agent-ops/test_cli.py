@@ -97,7 +97,7 @@ class TestLedgerFlow(unittest.TestCase):
             os.environ["XDG_STATE_HOME"] = d
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
-                self.assertEqual(cmd_cancel("zzzz99999999"), 3)
+                self.assertEqual(cmd_cancel("deadbeef0000"), 3)
             finally:
                 sys.path.pop(0)
 

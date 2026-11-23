@@ -41,5 +41,5 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - `hao ask`（异步）：`{"token": str, "shortid": str, "next": str, "result_path": str?（file 模式，台账写失败时仍在）}`
 - `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?}`
 - `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
-- `hao status`：`{"agent": {...}}` 或 shell/pane 信息。
+- `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
 - **`hao done` 例外**：哨兵走 **stdout 最后一行**（`HAO_DONE <token>`），JSON 结果走 **stderr**（避免污染哨兵行）。

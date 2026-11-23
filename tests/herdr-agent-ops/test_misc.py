@@ -20,7 +20,7 @@ class TestMisc(unittest.TestCase):
         self.assertEqual(cmd_status("w2:pZZZZ"), 3)  # nonexistent -> exit 3
 
     def test_result_no_path(self):
-        self.assertEqual(cmd_result("nonexistent"), 3)
+        self.assertEqual(cmd_result("deadbeef0000"), 3)
 
     def test_say_no_env(self):
         saved = os.environ.pop("HERDR_PANE_ID", None)

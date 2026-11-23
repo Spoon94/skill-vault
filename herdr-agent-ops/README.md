@@ -39,7 +39,7 @@ herdr-agent-ops/
 
 ```bash
 # 1. 给 agent 取名
-hao suggest "审查 PR"            # → 验证审阅 [hawk, lens, prism]
+hao suggest "审查 PR"            # → 验证审阅: hawk, lens, prism
 hao name w2:p9 hawk --scope api  # → agent hawk + label hao-hawk-api
 
 # 2. 派活并等完成
@@ -61,7 +61,7 @@ hao restore                        # 从 label 恢复
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（101 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（130 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

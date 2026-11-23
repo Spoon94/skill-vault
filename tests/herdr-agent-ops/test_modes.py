@@ -23,11 +23,11 @@ class TestModes(unittest.TestCase):
         self.assertTrue(lifecycle_gate(submit_seq=5, current_seq=6, final="done"))
 
     def test_file_partial_rejected(self):
-        self.assertFalse(safe_result_path("abc", "/etc/passwd"))
-        self.assertTrue(safe_result_path("abc", os.path.join(state_dir(), "abc", "result.md")))
+        self.assertFalse(safe_result_path("deadbeef0000", "/etc/passwd"))
+        self.assertTrue(safe_result_path("deadbeef0000", os.path.join(state_dir(), "deadbeef0000", "result.md")))
 
     def test_file_traversal_rejected(self):
-        self.assertFalse(safe_result_path("abc", "/tmp/hao/tasks/abc/../../etc/passwd"))
+        self.assertFalse(safe_result_path("deadbeef0000", "/tmp/hao/tasks/deadbeef0000/../../etc/passwd"))
 
 
 if __name__ == "__main__":

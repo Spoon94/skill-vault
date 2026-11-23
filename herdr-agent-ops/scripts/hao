@@ -55,14 +55,14 @@ def default_workspace():
 
 
 def normalize_id(id_or_token):
-    """Full token (hao-<hex>) -> 12-hex shortid; bare shortid passes through."""
+    """Full token (hao-<hex>) -> 12-hex shortid; bare id must be 12 hex."""
     s = id_or_token or ""
     if s.startswith("hao-"):
         h = s[4:]
         if not re.fullmatch(r"[0-9a-f]{12,16}", h):
             raise ValueError(f"invalid token: {s!r}")
         return h[:12]
-    if not re.fullmatch(r"[a-z0-9_-]{1,64}", s):
+    if not re.fullmatch(r"[0-9a-f]{12}", s):
         raise ValueError(f"invalid id: {s!r}")
     return s
 
@@ -84,8 +84,10 @@ def label_scope(label):
 
 def cmd_name(target, name, scope, force, dry_run, machine=None):
     if not validate_name(name):
+        _set_error(f"invalid name {name!r}; expected ^[a-z]{{4,6}}$")
         return 2
     if scope and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,11}", scope):
+        _set_error("invalid scope; expected [a-z0-9][a-z0-9-]{0,11}")
         return 2
     pane = resolve_target(target, machine)
     rc, out, _ = run_herdr(["agent", "list"], machine)
@@ -289,7 +291,7 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
         "suggested_label": make_label(cands[0], scope) if cands and scope else None,
     }
     if not json_out:
-        print(out["group"], out["candidates"], out["scope"] or "")
+        print(f"{out['group']}: {', '.join(out['candidates'])}")
     return out
 
 
@@ -750,12 +752,17 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
     try:
         sid = normalize_id(token)
     except ValueError:
+        _set_error("invalid token; expected 12-hex shortid or hao- token")
         return 2
     if mode == "file":
-        return _wait_file(pane, sid, token, timeout, machine)
-    if mode == "lifecycle":
-        return _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown)
-    return _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
+        result = _wait_file(pane, sid, token, timeout, machine)
+    elif mode == "lifecycle":
+        result = _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown)
+    else:
+        result = _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
+    if result == 4 and timeout:
+        _set_error(f"timeout after {timeout}s")
+    return result
 
 
 def cmd_done(token, summary, final=False):
@@ -763,6 +770,7 @@ def cmd_done(token, summary, final=False):
     try:
         sid = normalize_id(token)
     except ValueError:
+        _set_error("invalid token; expected 12-hex shortid or hao- token")
         return 2
     l = _led.Ledger()
     rec = _safe_get(l, sid)
@@ -798,6 +806,7 @@ def cmd_cancel(shortid):
     try:
         sid = normalize_id(shortid)
     except ValueError:
+        _set_error("invalid id; expected 12-hex shortid")
         return 2
     return _led.Ledger().cancel(sid)
 
@@ -834,10 +843,12 @@ def cmd_abort(shortid, interrupt):
     try:
         sid = normalize_id(shortid)
     except ValueError:
+        _set_error("invalid id; expected 12-hex shortid")
         return 2
     allow = os.environ.get("HAO_ABORT_ALLOW")
     if allow not in (None, "", "1"):
-        return 2  # HAO_ABORT_ALLOW format error
+        _set_error("invalid HAO_ABORT_ALLOW; expected 1 or unset")
+        return 2
     l = _led.Ledger()
     rec = l.get(sid)
     if rec is None:
@@ -942,18 +953,87 @@ def lifecycle_wait(target, token, machine=None):
 
 # ---------------------------------------------------------------- misc
 
-def cmd_status(target):
+def _status_tasks(pane):
+    led = _load_module("hao_ledger", "ledger.py")
+    base = led.state_dir()
+    tasks = {"running": [], "done": 0, "cancelled": 0}
+    if not os.path.isdir(base):
+        return tasks
+    now = time.time()
+    for fn in os.listdir(base):
+        if not fn.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(base, fn)) as f:
+                rec = json.load(f)
+        except Exception:
+            continue
+        if rec.get("target") != pane:
+            continue
+        status = rec.get("status")
+        shortid = fn[:-5]
+        if status == "running":
+            age = int(max(0, now - (rec.get("updated") or 0)))
+            item = {"shortid": shortid, "age_s": age}
+            if age > 86400:
+                item["orphan"] = True
+            tasks["running"].append(item)
+        elif status == "done":
+            tasks["done"] += 1
+        elif status == "cancelled":
+            tasks["cancelled"] += 1
+    tasks["running"].sort(key=lambda x: x["shortid"])
+    return tasks
+
+
+def cmd_status(target, text_mode=False):
     pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
     if not pane:
+        _set_error("target required (or HERDR_PANE_ID)")
         return 3
+    ag = None
+    pane_obj = None
     rc, out, _ = run_herdr(["agent", "get", pane])
-    if rc != 0:
-        rc2, out2, _ = run_herdr(["pane", "get", pane])
-        if rc2 != 0:
-            return 3
-        print(out2)
-        return 0
-    print(out)
+    if rc == 0:
+        try:
+            ag = json.loads(out)["result"]["agent"]
+        except Exception:
+            ag = None
+    rcp, outp, _ = run_herdr(["pane", "get", pane])
+    if rcp == 0:
+        try:
+            pane_obj = json.loads(outp)["result"]["pane"]
+        except Exception:
+            pane_obj = None
+    if ag is None and pane_obj is None:
+        _set_error("target not found")
+        return 3
+    label = (pane_obj or {}).get("label") or ""
+    agent = (ag or {}).get("agent") or (pane_obj or {}).get("agent")
+    agent_status = (ag or {}).get("agent_status") or (pane_obj or {}).get("agent_status")
+    name = (ag or {}).get("name")
+    info = {
+        "pane_id": pane,
+        "label": label,
+        "agent": agent,
+        "agent_status": agent_status,
+        "name": name,
+        "scope": label_scope(label),
+        "tasks": _status_tasks(pane),
+    }
+    if text_mode:
+        print(f"pane: {pane}")
+        print(f"label: {label or '-'}")
+        print(f"agent: {agent or '-'} status: {agent_status or '-'} name: {name or '-'}")
+        print(f"scope: {info['scope'] or '-'}")
+        tasks = info["tasks"]
+        print(f"tasks: running={len(tasks['running'])} done={tasks['done']} "
+              f"cancelled={tasks['cancelled']}")
+        for t in tasks["running"]:
+            orphan = " orphan" if t.get("orphan") else ""
+            print(f"  {t['shortid']} age={t['age_s']}s{orphan}")
+    else:
+        print(json.dumps(info, ensure_ascii=False))
     return 0
 
 
@@ -972,21 +1052,26 @@ def cmd_result(shortid, target=None, file=None):
     try:
         sid = normalize_id(shortid)
     except ValueError:
+        _set_error("invalid id; expected 12-hex shortid")
         return 2
     if file:
         content = safe_read(sid, file)
         if content is None:
+            _set_error("result file is outside the task result root or unreadable")
             return 2
         print(content)
         return 0
     rec = _led.Ledger().get(sid)
     if not rec or rec.get("status") != "done":
+        _set_error("task not found")
         return 3
     rp = rec.get("result_path")
     if not rp:
+        _set_error("task has no result_path")
         return 3
     content = safe_read(sid, rp)
     if content is None:
+        _set_error("result file is missing or unreadable")
         return 2
     print(content)
     return 0
@@ -994,7 +1079,10 @@ def cmd_result(shortid, target=None, file=None):
 
 def cmd_list(workspace=None, machine=None, json_out=False):
     ws = workspace or default_workspace()
-    rc, out, _ = run_herdr(["pane", "list", "--workspace", ws], machine)
+    rc, out, err = run_herdr(["pane", "list", "--workspace", ws], machine)
+    if rc != 0:
+        _set_error(f"cannot list panes in workspace {ws}")
+        return herdr_error_rc(err, 8)
     rows = []
     for p in json.loads(out)["result"]["panes"]:
         m = HAO_LABEL_RE.match(p.get("label") or "")
@@ -1023,6 +1111,40 @@ def map_herdr_error(err):
     err = err or {}
     e = err.get("error") or {}
     return ERR.get(e.get("code") or err.get("code"), 8)
+
+
+_CMD_ALIASES = {
+    "n": "name", "c": "clear", "r": "restore", "a": "ask", "w": "wait",
+    "d": "done", "l": "list", "s": "suggest", "st": "status", "sy": "say",
+    "rs": "result",
+}
+_GENERIC_REASON = {
+    2: "usage error", 3: "target or task not found", 4: "timeout",
+    5: "blocked or authorization required", 6: "conflict or ambiguous target",
+    7: "machine/profile unavailable", 8: "herdr/server error",
+    9: "protocol error", 10: "cancelled",
+}
+_EXIT_REASON = {
+    ("result", 3): "task not found",
+    ("name", 2): "invalid name or scope; expected name ^[a-z]{4,6}$",
+    ("wait", 2): "invalid token; expected 12-hex shortid or hao- token",
+    ("wait", 4): "timeout",
+    ("status", 3): "target not found",
+}
+_ERROR_DETAIL = None
+
+
+def _set_error(detail):
+    global _ERROR_DETAIL
+    _ERROR_DETAIL = detail
+
+
+def _emit_error(cmd, rc):
+    global _ERROR_DETAIL
+    reason = (_ERROR_DETAIL or _EXIT_REASON.get((cmd, rc))
+              or _GENERIC_REASON.get(rc, "failed"))
+    print(f"hao {cmd}: {reason} (exit {rc})", file=sys.stderr)
+    _ERROR_DETAIL = None
 
 
 def cmd_doctor(machine=None):
@@ -1093,7 +1215,7 @@ def build_parser():
     def _wait_run(a):
         tok = a.token or a.token_opt
         if not tok:
-            print("hao wait: token required (positional or --token)", file=sys.stderr)
+            _set_error("token required (positional or --token)")
             return 2
         return cmd_wait(a.target, tok, a.timeout, a.mode, a.machine,
                         a.no_agent, a.accept_unknown)
@@ -1110,7 +1232,7 @@ def build_parser():
     def _done_run(a):
         tok = a.token or a.token_opt
         if not tok:
-            print("hao done: token required (positional or --token)", file=sys.stderr)
+            _set_error("token required (positional or --token)")
             return 2
         return cmd_done(tok, a.summary, a.final)
 
@@ -1138,8 +1260,9 @@ def build_parser():
     sp.add_argument("--workspace", dest="workspace_opt", default=None)
     sp.add_argument("--machine"); sp.add_argument("--json", dest="json", action="store_true")
 
-    sp = add("status", lambda a: cmd_status(a.target), ["st"])
+    sp = add("status", lambda a: cmd_status(a.target, a.text), ["st"])
     sp.add_argument("target", nargs="?")
+    sp.add_argument("--text", action="store_true")
 
     def _say(a):
         if len(a.args) == 1:
@@ -1168,11 +1291,19 @@ def main(argv=None):
         cmd_list()
         return 0
     args = p.parse_args(argv)
+    cmd = _CMD_ALIASES.get(args.cmd, args.cmd)
+    global _ERROR_DETAIL
+    _ERROR_DETAIL = None
     result = args.func(args)
     if isinstance(result, dict):
+        if cmd == "suggest" and not getattr(args, "json", False):
+            return 0
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    return result if isinstance(result, int) else 0
+    if isinstance(result, int) and result:
+        _emit_error(cmd, result)
+        return result
+    return 0
 
 
 if __name__ == "__main__":
