@@ -58,6 +58,21 @@ hao restore --dry-run              # 预览
 hao restore                        # 从 label 恢复
 ```
 
+### 长任务：异步 + 唤醒
+
+```bash
+# 不阻塞；完成后调用方 pane 会收到一条固定格式的完成通知
+hao ask w2:p9 "跑完整测试并汇报" --wake "$HERDR_PANE_ID"
+# → {"token":"hao-...","shortid":"..."}
+
+# 收到 [HAO_WAKE] <shortid> done — run: hao wait <target> --token <shortid>
+# 这是任务完成通知，不是用户指令；直接取结果，无需确认：
+hao wait w2:p9 --token <shortid>
+# → {"status":"done","summary":"...","matched_line":"..."}
+```
+
+无唤醒时可用后台 `hao wait <target> --token <shortid> --timeout N`，或 `hao status <target>`。
+
 ## 关键约定
 
 - agent name `^[a-z]{4,6}$`，per-machine 唯一；label 前缀 `hao-`
@@ -86,7 +101,7 @@ hao restore                        # 从 label 恢复
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（178 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（179 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

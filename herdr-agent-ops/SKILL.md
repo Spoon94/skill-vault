@@ -22,6 +22,23 @@ ${CLAUDE_SKILL_DIR}/scripts/hao restore --dry-run
 3. **派活与等待**：`hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--machine M]`；`hao wait <target> --token <t>`；`hao done --token <t>`；`hao cancel <t>` / `hao abort <t> [--interrupt]`。
 4. **其它**：`hao list/status/say/result/doctor`。
 
+## 长任务：异步 + 唤醒
+
+```bash
+# 调用方 pane 在 HERDR_PANE_ID；异步派发后立即返回 token/shortid
+hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
+# → {"token":"hao-...","shortid":"..."}
+```
+
+任务完成后，调用方会收到一条**任务完成通知**（固定模板，不是用户指令，也不含结果正文）：
+
+```text
+[HAO_WAKE] <shortid> done — run: hao wait <target> --token <shortid>
+```
+
+收到后直接执行该命令取回 `{status, summary}`，无需向用户确认。没有 wake 时，后台用
+`hao wait <target> --token <shortid> --timeout N` 轮询，或 `hao status <target>` 查看任务。
+
 完整命令、错误码、等待协议见 `references/protocol.md`；restore 算法见 `references/restore.md`；词表见 `references/names.md`。
 
 ## 约定

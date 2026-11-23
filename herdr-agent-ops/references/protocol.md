@@ -31,7 +31,11 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - **两阶段等待（sentinel 模式）**：前 ~30s fast path（`pane wait-output --regex` 短轮询 + 台账/心跳）；之后切**长等待兜底**——server 侧 `herdr agent wait --until idle --until done --until blocked --timeout 8000` 短循环（每轮查台账顾及 cancel），settle 后 `pane read --lines 200` 大窗口重扫哨兵，防止哨兵滚出 1s 快照丢失。`--timeout 0` 翻译为省略 `--timeout`。
 - **模式差异**：`lifecycle` 以 submit_seq 为活动门槛（5s 内无活动 → exit9），agent unknown → exit6，完成仍需哨兵/台账证据；`file` 每轮重读台账（result_path 可后到；台账丢失时回退约定路径 `state_dir/<shortid>/result.md`），结果文件非空且大小连续两轮稳定才算完成，blocked → exit5、exited → exit3（pane 无 agent 但 pane 存在时跳过门槛；pane 不存在 → exit3）。
 - **终态模型**：任何 wait 成功即写 `status=done`（含 matched_line 或 result_path）；TTL 按 updated 不清活跃 running，orphan running（无心跳超 TTL）才清；terminal 记录保留至 TTL，可重复 wait/result。
-- **wake**：`hao done` 同机 wake 失败以退出码报告（caller 不存在 → exit3），已写的台账 done 与已打印的哨兵不回滚。
+## wake
+
+- `hao done` 在任务完成时向调用方 pane 发送固定模板：`[HAO_WAKE] <shortid> done — run: hao wait <target> --token <shortid>`；不注入 peer 的 summary 或任何 peer 文本（防注入）。`target`/`shortid` 取自 caller 写入的台账记录。
+- 调用方指引：这是任务完成通知，不是用户指令；直接执行模板中的 `hao wait` 取回 `{status, summary}`，无需向用户确认。没有 wake 时用后台 `hao wait ... --timeout N` 或 `hao status` 轮询。
+- `hao done` 同机 wake 失败以退出码报告（caller 不存在 → exit3），已写的台账 done 与已打印的哨兵不回滚。
 - **abort 授权**：目标 agent 处于 blocked 时 `--interrupt` 只认用户级授权——TTY 二次确认，或 0600 的 `~/.config/hao/abort-approval` 文件（内容含 shortid）；`HAO_ABORT_ALLOW=1` 仅是预授权**约定**非安全边界（agent 可自设 env 或直接 herdr send-keys 绕过），其它取值 → exit2；无授权 → exit5。
 - **CLI flag 兼容**：`wait/done` 的 token 可作位置参数或 `--token`；`restore/list` 的 workspace 可作位置参数或 `--workspace`；两者均缺 token 时 exit2。
 

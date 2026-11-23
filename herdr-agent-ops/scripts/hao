@@ -935,7 +935,11 @@ def cmd_done(token, summary, final=False):
     wake = rec.get("wake") if rec else None
     wake_rc = 0
     if wake:
-        rw, _, ew = run_herdr(["agent", "prompt", wake, f"[HAO_WAKE] {sid} done"])
+        target = rec.get("target") if rec else None
+        wake_msg = f"[HAO_WAKE] {sid} done"
+        if target:
+            wake_msg += f" — run: hao wait {target} --token {sid}"
+        rw, _, ew = run_herdr(["agent", "prompt", wake, wake_msg])
         if rw != 0:
             wake_rc = herdr_error_rc(ew, 8)
     if summary:
