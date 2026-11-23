@@ -91,8 +91,9 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
     pane = resolve_target(target, machine)
     rc, out, _ = run_herdr(["agent", "list"], machine)
     agents = json.loads(out)["result"]["agents"] if out else []
-    if any(a.get("name") == name and a.get("pane_id") != pane for a in agents):
-        return 6
+    for a in agents:
+        if a.get("name") == name and a.get("pane_id") != pane:
+            return fail(6, f"name {name!r} already taken by agent on {a.get('pane_id')}")
     # zero-registry: a hao-<name> label on any other pane reserves the name
     rcp, outp, _ = run_herdr(["pane", "list"], machine)
     if rcp == 0 and outp:
@@ -101,7 +102,7 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
                 continue
             m = HAO_LABEL_RE.match(pp.get("label") or "")
             if m and m.group(1) == name:
-                return 6
+                return fail(6, f"name {name!r} already reserved by label {m.group(0)} on {pp.get('pane_id')}")
     rcg, outg, _ = run_herdr(["pane", "get", pane], machine)
     cur = ""
     if rcg == 0 and outg:
@@ -122,7 +123,7 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
             print(f"would set label {label} and agent name {name} on {pane}{suffix}")
         return 0
     if cur and not HAO_LABEL_RE.match(cur) and not force:
-        return 6
+        return fail(6, f"pane {pane} has non-hao label {cur!r}; use --force")
     rc1, _, err1 = run_herdr(["pane", "rename", pane, label], machine)
     if rc1 != 0:
         return herdr_error_rc(err1)
@@ -148,7 +149,7 @@ def cmd_clear(target, force, dry_run=False, machine=None):
     if rcg == 0 and outg:
         cur = json.loads(outg)["result"]["pane"].get("label") or ""
     if cur and not HAO_LABEL_RE.match(cur) and not force:
-        return 6
+        return fail(6, f"pane {pane} has non-hao label {cur!r}; use --force")
     if dry_run:
         if _JSON_OUTPUT:
             _json_out({"ok": True, "dry_run": True, "pane_id": pane})
@@ -418,11 +419,11 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
     shortid = hexpart[:12]
     pane = resolve_target(target, machine)
     if mode == "lifecycle" and not wait:
-        return 2
+        return fail(2, "lifecycle mode requires --wait")
     if mode == "lifecycle":
         st = current_state(pane, machine)
         if st in ("working", "blocked", "unknown"):
-            return 6
+            return fail(6, f"lifecycle mode needs an idle agent; {pane} is {st}")
     result_path = None
     if mode == "file":
         result_path = os.path.join(_led.state_dir(), shortid, "result.md")
@@ -915,12 +916,14 @@ def cmd_done(token, summary, final=False):
     l = _led.Ledger()
     rec = _safe_get(l, sid)
     if rec and rec.get("status") == "cancelled":
-        return 6
+        return fail(6, f"task {sid} was cancelled; refusing to mark done")
     if final and (not rec or rec.get("status") != "done"):
         target = rec.get("target") if rec else None
         mach = rec.get("machine") if rec else None
-        if target and current_state(target, mach) not in ("idle", "done"):
-            return 5
+        if target:
+            st = current_state(target, mach)
+            if st not in ("idle", "done"):
+                return fail(5, f"agent {target} is {st}; --final requires idle or done")
     try:
         l.write_done(sid, summary=summary)
     except Exception as e:
@@ -957,6 +960,10 @@ def cmd_cancel(shortid):
         _set_error("invalid id; expected 12-hex shortid")
         return 2
     rc = _led.Ledger().cancel(sid)
+    if rc == 3:
+        return fail(3, f"task {sid} not found")
+    if rc == 6:
+        return fail(6, f"task {sid} is already done")
     if rc == 0 and _JSON_OUTPUT:
         _json_out({"ok": True, "shortid": sid})
     return rc
@@ -1003,22 +1010,26 @@ def cmd_abort(shortid, interrupt):
     l = _led.Ledger()
     rec = l.get(sid)
     if rec is None:
-        return 3
+        return fail(3, f"task {sid} not found")
     target = rec.get("target")
     if not interrupt:
         rc = _led.Ledger().cancel(sid)
+        if rc == 3:
+            return fail(3, f"task {sid} not found")
+        if rc == 6:
+            return fail(6, f"task {sid} is already done")
         if rc == 0 and _JSON_OUTPUT:
             _json_out({"ok": True, "shortid": sid, "interrupted": False})
         return rc
     # aborting a blocked agent may discard its approval UI: needs user auth
     if target and current_state(target, rec.get("machine")) == "blocked" \
             and not _abort_approved(sid):
-        return 5
+        return fail(5, f"task {sid} agent is blocked; interrupt requires TTY or 0600 approval")
     rc = cmd_cancel(sid)
     if rc != 0:
         return rc
     if not target:
-        return 3
+        return fail(3, f"task {sid} has no target pane")
     mach = rec.get("machine")
     r1, _, e1 = run_herdr(["agent", "send-keys", target, "esc"], mach)
     if r1 != 0:
@@ -1166,7 +1177,7 @@ def cmd_status(target, text_mode=False):
         return 3
     label = (pane_obj or {}).get("label") or ""
     agent = (ag or {}).get("agent") or (pane_obj or {}).get("agent")
-    agent_status = (ag or {}).get("agent_status") or (pane_obj or {}).get("agent_status")
+    agent_status = ag.get("agent_status") if ag is not None else None
     name = (ag or {}).get("name")
     info = {
         "pane_id": pane,
@@ -1198,9 +1209,9 @@ def cmd_status(target, text_mode=False):
 def cmd_say(target, text, strict=False):
     pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
     if not pane:
-        return 3
+        return fail(3, "target required (or HERDR_PANE_ID)")
     if strict and current_state(pane) == "working":
-        return 6
+        return fail(6, f"agent {pane} is working; --strict refuses")
     rc, _, err = run_herdr(["agent", "prompt", pane, text])
     return 0 if rc == 0 else herdr_error_rc(err, 8)
 
@@ -1332,6 +1343,11 @@ def _set_error(detail):
     _ERROR_DETAIL = detail
 
 
+def fail(rc, msg):
+    _set_error(msg)
+    return rc
+
+
 def _error_reason(cmd, rc):
     global _ERROR_DETAIL
     reason = (_ERROR_DETAIL or _EXIT_REASON.get((cmd, rc))
@@ -1349,7 +1365,7 @@ def cmd_doctor(machine=None):
     if machine:
         rc, out, _ = run_herdr(["machine", "status", machine, "--json"])
         if rc != 0:
-            return 7
+            return fail(7, f"machine {machine} unavailable")
         print(out)
         return 0
     xdg = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))

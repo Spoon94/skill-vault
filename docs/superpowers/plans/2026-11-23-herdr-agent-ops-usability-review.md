@@ -128,3 +128,9 @@ hao name w2:p9 forge（已带 -ops scope）→ scope 被静默丢弃
 - **问题**：`ask --wait` 完成返回 `summary:null`，调用方拿不到答复正文。
 - **要求**：prompt 要求 peer 调 `hao done --token <完整令牌> --summary "<关键结论/答复正文>"`，summary ≤600 字且包含任务答复本身；wait 返回体经台账携带 summary；protocol/README 同步。
 - **验收**：`done --summary` 后 `wait` 返回体 summary 相等。
+
+
+### D6 非零退出具体原因
+- **要求**：所有 `cmd_*` 非零整数 return 必须通过 `fail()` 或紧随 `_set_error`；补齐 name/clear/ask/done/abort/say/doctor 的误导性通用文案；AST 守卫测试防回归。
+- **state**：status 无 agent pane 的 `agent_status` 为 null（有 agent 但 unknown 仍为 unknown），protocol 同步。
+- **验收**：AST 扫描 0 违规；五类误导文案有具体目标/状态/--force/--wait 提示。

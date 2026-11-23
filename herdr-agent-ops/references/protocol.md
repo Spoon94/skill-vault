@@ -41,7 +41,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - `hao ask`（异步）：`{"token": str, "shortid": str, "next": str, "result_path": str?（file 模式，台账写失败时仍在）}`
 - `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?}`（`summary` 来自 peer 的 `hao done --summary` 结果载荷）
 - `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
-- `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
+- `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null（无 agent 时为 null，不是 unknown）, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
 - **`hao done` 例外**：哨兵走 **stdout 最后一行**（`HAO_DONE <token>`），JSON 结果走 **stderr**（避免污染哨兵行）；`--summary` 是给等待方的结果载荷，会写入台账并由 `wait` 返回。
 
 ## 输出模式矩阵
