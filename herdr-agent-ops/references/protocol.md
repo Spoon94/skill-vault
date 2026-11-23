@@ -43,3 +43,18 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
 - `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
 - **`hao done` 例外**：哨兵走 **stdout 最后一行**（`HAO_DONE <token>`），JSON 结果走 **stderr**（避免污染哨兵行）。
+
+## 输出模式矩阵
+
+| 命令 | 默认输出 | `--json` |
+|---|---|---|
+| name / clear | 文本/静默成功；错误 stderr | stdout `{"ok":true,...}`；错误 stdout `{"ok":false,...}` + stderr 原因 |
+| restore | 摘要文本 | stdout 结构化摘要 |
+| cancel / abort | 静默成功 | stdout 单行 JSON |
+| status | 紧凑 JSON | stdout JSON 追加 `"ok":true` |
+| result | 结果正文 | stdout `{"ok":true,"shortid","content"}` |
+| suggest / list | 单行人读/列表 | 仅 JSON |
+| ask / wait | 恒 JSON | 恒 JSON（无 flag） |
+| done | 哨兵为 stdout 最后一行 | 哨兵仍最后；JSON 走 stderr |
+
+所有错误路径保留 A1 的 stderr 原因行；`--json` 不改变退出码。

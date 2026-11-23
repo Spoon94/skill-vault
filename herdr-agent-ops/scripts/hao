@@ -103,14 +103,25 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
             m = HAO_LABEL_RE.match(pp.get("label") or "")
             if m and m.group(1) == name:
                 return 6
-    label = make_label(name, scope)
-    if dry_run:
-        print(f"would set label {label} and agent name {name} on {pane}")
-        return 0
     rcg, outg, _ = run_herdr(["pane", "get", pane], machine)
     cur = ""
     if rcg == 0 and outg:
         cur = json.loads(outg)["result"]["pane"].get("label") or ""
+    kept = False
+    if scope is None:
+        existing = label_scope(cur)
+        if existing:
+            scope = existing
+            kept = True
+    label = make_label(name, scope)
+    if dry_run:
+        if _JSON_OUTPUT:
+            _json_out({"ok": True, "dry_run": True, "pane_id": pane,
+                       "name": name, "scope": scope, "label": label, "kept": kept})
+        else:
+            suffix = f" (scope={scope} (kept))" if kept else ""
+            print(f"would set label {label} and agent name {name} on {pane}{suffix}")
+        return 0
     if cur and not HAO_LABEL_RE.match(cur) and not force:
         return 6
     rc1, _, err1 = run_herdr(["pane", "rename", pane, label], machine)
@@ -118,9 +129,17 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
         return herdr_error_rc(err1)
     rc2, _, _ = run_herdr(["agent", "get", pane], machine)
     if rc2 != 0:
+        if _JSON_OUTPUT:
+            _json_out({"ok": True, "pane_id": pane, "name": name,
+                       "scope": scope, "label": label, "kept": kept})
         return 0  # shell-only pane: label set, no agent to rename
     rc3, _, err3 = run_herdr(["agent", "rename", pane, name], machine)
-    return 0 if rc3 == 0 else herdr_error_rc(err3, 8)
+    if rc3 != 0:
+        return herdr_error_rc(err3, 8)
+    if _JSON_OUTPUT:
+        _json_out({"ok": True, "pane_id": pane, "name": name,
+                   "scope": scope, "label": label, "kept": kept})
+    return 0
 
 
 def cmd_clear(target, force, dry_run=False, machine=None):
@@ -132,16 +151,25 @@ def cmd_clear(target, force, dry_run=False, machine=None):
     if cur and not HAO_LABEL_RE.match(cur) and not force:
         return 6
     if dry_run:
-        print(f"would clear hao- label and agent name on {pane}")
+        if _JSON_OUTPUT:
+            _json_out({"ok": True, "dry_run": True, "pane_id": pane})
+        else:
+            print(f"would clear hao- label and agent name on {pane}")
         return 0
     rc1, _, err1 = run_herdr(["pane", "rename", pane, "--clear"], machine)
     if rc1 != 0:
         return herdr_error_rc(err1)
     rca, _, _ = run_herdr(["agent", "get", pane], machine)
     if rca != 0:
+        if _JSON_OUTPUT:
+            _json_out({"ok": True, "pane_id": pane})
         return 0  # no agent: label cleared is enough
     rc2, _, err2 = run_herdr(["agent", "rename", pane, "--clear"], machine)
-    return 0 if rc2 == 0 else herdr_error_rc(err2)
+    if rc2 != 0:
+        return herdr_error_rc(err2)
+    if _JSON_OUTPUT:
+        _json_out({"ok": True, "pane_id": pane})
+    return 0
 
 
 # ---------------------------------------------------------------- restore
@@ -169,6 +197,7 @@ def preflight(panes, agents, workspace):
 
 
 def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None, machine=None):
+    global _JSON_HANDLED
     _led = _load_module("hao_ledger", "ledger.py")
     ws = workspace or default_workspace()
     rc, out, err = run_herdr(["agent", "list"], machine)
@@ -182,43 +211,91 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
     all_panes = json.loads(outa)["result"]["panes"]
     full = preflight(all_panes, agents, ws)
     if full["conflicts"]:
-        print("name conflicts (per-machine):", full["conflicts"])
+        if not _JSON_OUTPUT:
+            print("name conflicts (per-machine):", full["conflicts"])
+        _set_error("name conflicts (per-machine): " + ", ".join(full["conflicts"]))
         return 6
     if full["ambiguous"] and not pick:
-        print("ambiguous roles across workspaces; rerun with --pick <pane>")
+        if not _JSON_OUTPUT:
+            print("ambiguous roles across workspaces; rerun with --pick <pane>")
+        _set_error("ambiguous roles across workspaces")
         return 6
     if all_:
         panes = all_panes
     else:
-        rc2, out2, _ = run_herdr(["pane", "list", "--workspace", ws], machine)
-        panes = json.loads(out2)["result"]["panes"] if rc2 == 0 and out2 else []
+        rc2, out2, err2 = run_herdr(["pane", "list", "--workspace", ws], machine)
+        if rc2 != 0:
+            if _herdr_err_code(err2) == "workspace_not_found":
+                panes = []
+            else:
+                return herdr_error_rc(err2, 8)
+        else:
+            panes = json.loads(out2)["result"]["panes"]
     plan = preflight(panes, agents, ws)
     if plan["ambiguous"] and not pick:
-        print("ambiguous roles; rerun with --pick <pane>")
+        if not _JSON_OUTPUT:
+            print("ambiguous roles; rerun with --pick <pane>")
+        _set_error("ambiguous roles")
         return 6
     agent_names = {a.get("pane_id"): a.get("name") for a in agents if a.get("name")}
+    stats = {"restored": 0, "skipped": 0, "shell_only": 0,
+             "named": 0, "failed": 0}
     failures = []
     for role, ps in plan["plan"]:
         for p in ps:
             if pick and p["pane_id"] != pick:
                 continue
             if not p.get("agent"):
-                continue  # shell-only pane: skip
+                stats["shell_only"] += 1
+                stats["skipped"] += 1
+                continue
             if not adopt and agent_names.get(p["pane_id"]):
-                continue  # --no-adopt: only fill agents with no existing name
+                stats["named"] += 1
+                stats["skipped"] += 1
+                continue
             if dry_run:
-                print(f"would restore {role} on {p['pane_id']} (scope={label_scope(p.get('label'))})")
+                stats["restored"] += 1
+                if not _JSON_OUTPUT:
+                    print(f"would restore {role} on {p['pane_id']} (scope={label_scope(p.get('label'))})")
                 continue
             scope = label_scope(p.get("label"))
             r1, _, _ = run_herdr(["pane", "rename", p["pane_id"], make_label(role, scope)], machine)
             if r1 != 0:
                 failures.append(p["pane_id"] + ":pane")
+                stats["failed"] += 1
                 continue
             rr, _, _ = run_herdr(["agent", "rename", p["pane_id"], role], machine)
             if rr != 0:
                 failures.append(p["pane_id"] + ":agent")
+                stats["failed"] += 1
+            else:
+                stats["restored"] += 1
+    if not plan["plan"]:
+        msg = (f"no hao- panes in workspace {ws}" if not all_
+               else "no hao- panes")
+        if _JSON_OUTPUT:
+            _json_out({"ok": True, "workspace": ws, "message": msg,
+                       **stats})
+        else:
+            print(msg)
+        return 0
+    summary = (f"restored {stats['restored']}, skipped {stats['skipped']} "
+               f"(shell-only {stats['shell_only']}, named {stats['named']}), "
+               f"failed {stats['failed']}")
+    if _JSON_OUTPUT:
+        payload = {"ok": not failures, "workspace": ws, **stats}
+        if failures:
+            payload.update({"error": "partial failures: " + ", ".join(failures),
+                            "exit": 6})
+        _json_out(payload)
+        if failures:
+            _JSON_HANDLED = True
+    else:
+        print(summary)
+        if failures:
+            print("partial failures:", failures)
     if failures:
-        print("partial failures:", failures)
+        _set_error("partial failures: " + ", ".join(failures))
         return 6
     return 0
 
@@ -252,9 +329,22 @@ def _load_module(name, filename):
     return mod
 
 
-def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machine=None):
+def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machine=None,
+                custom=None):
     nm = _load_module("names", "names.py")
     NAMES, RESERVED, GRAY = nm.NAMES, nm.RESERVED, nm.GRAY
+    if custom is not None:
+        if not validate_name(custom) or custom in RESERVED or custom in GRAY:
+            _set_error("invalid custom name; expected ^[a-z]{4,6}$ and not reserved/gray")
+            return 2
+        cands = [custom]
+        out = {"group": "custom", "reason": "custom name",
+               "candidates": cands, "scope": scope,
+               "suggested_label": make_label(custom, scope) if scope else None}
+        if json_out:
+            return out
+        print(f"custom: {custom}")
+        return 0
     if live_names is None:
         rc, out, _ = run_herdr(["agent", "list"], machine)
         live_names = [a.get("name") for a in json.loads(out)["result"]["agents"]] if out else []
@@ -290,9 +380,10 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
         "scope": scope,
         "suggested_label": make_label(cands[0], scope) if cands and scope else None,
     }
-    if not json_out:
-        print(f"{out['group']}: {', '.join(out['candidates'])}")
-    return out
+    if json_out:
+        return out
+    print(f"{out['group']}: {', '.join(out['candidates'])}")
+    return 0
 
 
 # ---------------------------------------------------------------- ask/wait/done
@@ -315,7 +406,8 @@ def build_prompt(task, token, result_path=None):
     return "\n".join(lines)
 
 
-def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
+def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
+            strict_ledger=False):
     _led = _load_module("hao_ledger", "ledger.py")
     hexpart = os.urandom(8).hex()          # exactly 16 hex
     token = "hao-" + hexpart
@@ -340,9 +432,13 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None):
     try:
         l.write_running(shortid, token=token, target=pane, machine=machine,
                         wake=wake, mode=mode, result_path=result_path,
+                        caller=os.environ.get("HERDR_PANE_ID"),
                         submit_seq=current_seq(pane, machine),
                         submit_state=current_state(pane, machine))
     except Exception as e:
+        if strict_ledger:
+            _set_error(f"ledger write failed: {e}")
+            return 8
         # r8#3: the task is already dispatched — the token MUST survive;
         # wake/cancel degrade to unavailable (spec: ledger best-effort)
         _ledger_warn(e)
@@ -570,7 +666,7 @@ FAST_PATH_SECONDS = 30
 
 def _finish_done(l, sid, ml):
     try:
-        l.write_done(sid, matched_line=ml)
+        l.write_done(sid, matched_line=ml, wait_consumed=True)
     except Exception as e:
         _ledger_warn(e)  # r7#1: confirmed completion must still be returned
     return {"status": "done", "matched_line": ml}
@@ -737,7 +833,7 @@ def _wait_file(pane, sid, token, timeout, machine):
             sz = os.path.getsize(rp)
             if sz > 0 and sz == last_size:
                 try:
-                    l.write_done(sid, result_path=rp)
+                    l.write_done(sid, result_path=rp, wait_consumed=True)
                 except Exception as e:
                     _ledger_warn(e)  # r7#1: stable file is the evidence
                 return {"status": "done", "result_path": rp}
@@ -760,6 +856,12 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
         result = _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     else:
         result = _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
+    if isinstance(result, dict) and result.get("status") == "done":
+        try:
+            _led = _load_module("hao_ledger", "ledger.py")
+            _led.Ledger().write_done(sid, wait_consumed=True)
+        except Exception:
+            pass
     if result == 4 and timeout:
         _set_error(f"timeout after {timeout}s")
     return result
@@ -798,6 +900,14 @@ def cmd_done(token, summary, final=False):
     if summary:
         print(summary, flush=True)
     print(f"HAO_DONE {rec.get('token', token) if rec else token}", flush=True)
+    if _JSON_OUTPUT:
+        payload = {"ok": wake_rc == 0, "token": rec.get("token", token) if rec else token,
+                   "exit": wake_rc}
+        if wake_rc:
+            payload["error"] = "wake failed"
+        print(json.dumps(payload, ensure_ascii=False), file=sys.stderr)
+        global _JSON_HANDLED
+        _JSON_HANDLED = True
     return wake_rc
 
 
@@ -808,7 +918,10 @@ def cmd_cancel(shortid):
     except ValueError:
         _set_error("invalid id; expected 12-hex shortid")
         return 2
-    return _led.Ledger().cancel(sid)
+    rc = _led.Ledger().cancel(sid)
+    if rc == 0 and _JSON_OUTPUT:
+        _json_out({"ok": True, "shortid": sid})
+    return rc
 
 
 def _abort_approved(sid):
@@ -855,7 +968,10 @@ def cmd_abort(shortid, interrupt):
         return 3
     target = rec.get("target")
     if not interrupt:
-        return cmd_cancel(sid)
+        rc = _led.Ledger().cancel(sid)
+        if rc == 0 and _JSON_OUTPUT:
+            _json_out({"ok": True, "shortid": sid, "interrupted": False})
+        return rc
     # aborting a blocked agent may discard its approval UI: needs user auth
     if target and current_state(target, rec.get("machine")) == "blocked" \
             and not _abort_approved(sid):
@@ -872,6 +988,8 @@ def cmd_abort(shortid, interrupt):
     r2, _, e2 = run_herdr(["agent", "send-keys", target, "ctrl+c"], mach)
     if r2 != 0:
         return herdr_error_rc(e2, 8)
+    if _JSON_OUTPUT:
+        _json_out({"ok": True, "shortid": sid, "interrupted": True})
     return 0
 
 
@@ -1021,6 +1139,8 @@ def cmd_status(target, text_mode=False):
         "scope": label_scope(label),
         "tasks": _status_tasks(pane),
     }
+    if _JSON_OUTPUT and not text_mode:
+        info["ok"] = True
     if text_mode:
         print(f"pane: {pane}")
         print(f"label: {label or '-'}")
@@ -1047,7 +1167,16 @@ def cmd_say(target, text, strict=False):
     return 0 if rc == 0 else herdr_error_rc(err, 8)
 
 
-def cmd_result(shortid, target=None, file=None):
+def _mark_result_consumed(led, sid):
+    try:
+        l = led.Ledger()
+        if l.get(sid):
+            l.write_done(sid, result_consumed=True)
+    except Exception as e:
+        _ledger_warn(e)
+
+
+def cmd_result(shortid, target=None, file=None, allow_any_path=False):
     _led = _load_module("hao_ledger", "ledger.py")
     try:
         sid = normalize_id(shortid)
@@ -1055,11 +1184,25 @@ def cmd_result(shortid, target=None, file=None):
         _set_error("invalid id; expected 12-hex shortid")
         return 2
     if file:
-        content = safe_read(sid, file)
-        if content is None:
-            _set_error("result file is outside the task result root or unreadable")
-            return 2
-        print(content)
+        if allow_any_path:
+            print(f"hao result: warning: reading arbitrary path {file!r}",
+                  file=sys.stderr)
+            try:
+                with open(file, "rb") as f:
+                    content = f.read().decode("utf-8", "replace")
+            except Exception:
+                _set_error("result file is unreadable")
+                return 2
+        else:
+            content = safe_read(sid, file)
+            if content is None:
+                _set_error("result file is outside the task result root or unreadable")
+                return 2
+        _mark_result_consumed(_led, sid)
+        if _JSON_OUTPUT:
+            _json_out({"ok": True, "shortid": sid, "content": content})
+        else:
+            print(content)
         return 0
     rec = _led.Ledger().get(sid)
     if not rec or rec.get("status") != "done":
@@ -1073,7 +1216,11 @@ def cmd_result(shortid, target=None, file=None):
     if content is None:
         _set_error("result file is missing or unreadable")
         return 2
-    print(content)
+    _mark_result_consumed(_led, sid)
+    if _JSON_OUTPUT:
+        _json_out({"ok": True, "shortid": sid, "content": content})
+    else:
+        print(content)
     return 0
 
 
@@ -1132,6 +1279,14 @@ _EXIT_REASON = {
     ("status", 3): "target not found",
 }
 _ERROR_DETAIL = None
+_JSON_OUTPUT = False
+_JSON_HANDLED = False
+_JSON_COMMANDS = {"name", "clear", "restore", "cancel", "abort",
+                  "status", "result", "done", "suggest", "list"}
+
+
+def _json_out(obj):
+    print(json.dumps(obj, ensure_ascii=False))
 
 
 def _set_error(detail):
@@ -1139,12 +1294,17 @@ def _set_error(detail):
     _ERROR_DETAIL = detail
 
 
-def _emit_error(cmd, rc):
+def _error_reason(cmd, rc):
     global _ERROR_DETAIL
     reason = (_ERROR_DETAIL or _EXIT_REASON.get((cmd, rc))
               or _GENERIC_REASON.get(rc, "failed"))
-    print(f"hao {cmd}: {reason} (exit {rc})", file=sys.stderr)
     _ERROR_DETAIL = None
+    return reason
+
+
+def _emit_error(cmd, rc):
+    print(f"hao {cmd}: {_error_reason(cmd, rc)} (exit {rc})",
+          file=sys.stderr)
 
 
 def cmd_doctor(machine=None):
@@ -1177,40 +1337,73 @@ def cmd_doctor(machine=None):
 # ---------------------------------------------------------------- CLI
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="hao", description="herdr-agent-ops CLI")
-    sub = p.add_subparsers(dest="cmd")
+    p = argparse.ArgumentParser(
+        prog="hao",
+        description="herdr-agent-ops: names, labels, task wait and status.",
+        epilog=("Examples: hao suggest \"review PR\"; hao name w2:p9 hawk --scope api; "
+                "hao ask w2:p9 \"review\" --wait; hao status w2:p9 --json. "
+                "Exit codes: references/protocol.md"),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = p.add_subparsers(title="commands", dest="cmd")
 
-    def add(name, func, aliases=()):
-        sp = sub.add_parser(name, aliases=list(aliases))
+    def add(name, func, aliases=(), desc=None):
+        sp = sub.add_parser(name, aliases=list(aliases), description=desc, help=desc)
         sp.set_defaults(func=func)
         return sp
 
-    sp = add("name", lambda a: cmd_name(a.target, a.name, a.scope, a.force, a.dry_run, a.machine), ["n"])
-    sp.add_argument("target"); sp.add_argument("name")
-    sp.add_argument("--scope"); sp.add_argument("--force", action="store_true")
-    sp.add_argument("--dry-run", action="store_true"); sp.add_argument("--machine")
+    sp = add("name", lambda a: cmd_name(a.target, a.name, a.scope, a.force,
+                                         a.dry_run, a.machine), ["n"],
+             "Rename an agent and set its hao- pane label; keeps existing scope unless overridden.")
+    sp.add_argument("target", help="pane id, label, or agent name")
+    sp.add_argument("name", help="new agent name matching ^[a-z]{4,6}$")
+    sp.add_argument("--scope", metavar="SCOPE",
+                    help="label scope; omit to keep current scope, empty string to clear")
+    sp.add_argument("--force", action="store_true", help="allow replacing a non-hao label")
+    sp.add_argument("--dry-run", action="store_true", help="show the planned label/name only")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
-    sp = add("clear", lambda a: cmd_clear(a.target, a.force, a.dry_run, a.machine), ["c"])
-    sp.add_argument("target"); sp.add_argument("--force", action="store_true")
-    sp.add_argument("--dry-run", action="store_true"); sp.add_argument("--machine")
+    sp = add("clear", lambda a: cmd_clear(a.target, a.force, a.dry_run, a.machine), ["c"],
+             "Clear the hao- label and agent name on a pane.")
+    sp.add_argument("target", help="pane id, label, or agent name")
+    sp.add_argument("--force", action="store_true", help="allow clearing a non-hao label")
+    sp.add_argument("--dry-run", action="store_true", help="show what would be cleared")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
     sp = add("restore", lambda a: cmd_restore(a.workspace or a.workspace_opt, a.all,
-                                                a.adopt, a.dry_run, a.pick, a.machine), ["r"])
-    sp.add_argument("workspace", nargs="?", default=None)
-    sp.add_argument("--workspace", dest="workspace_opt", default=None)
-    sp.add_argument("--all", action="store_true")
-    sp.add_argument("--adopt", dest="adopt", action="store_true", default=True)
-    sp.add_argument("--no-adopt", dest="adopt", action="store_false")
-    sp.add_argument("--dry-run", action="store_true")
-    sp.add_argument("--pick"); sp.add_argument("--machine")
+                                                a.adopt, a.dry_run, a.pick, a.machine), ["r"],
+             "Restore agent names from hao- pane labels after restart.")
+    sp.add_argument("workspace", nargs="?", default=None,
+                    help="workspace id (positional alternative to --workspace)")
+    sp.add_argument("--workspace", dest="workspace_opt", metavar="WORKSPACE",
+                    help="workspace id; default HERDR_WORKSPACE_ID or w1")
+    sp.add_argument("--all", action="store_true", help="restore across all workspaces")
+    sp.add_argument("--adopt", dest="adopt", action="store_true", default=True,
+                    help="adopt/rename agents to match labels (default)")
+    sp.add_argument("--no-adopt", dest="adopt", action="store_false",
+                    help="only fill unnamed agents")
+    sp.add_argument("--dry-run", action="store_true", help="preview without renaming")
+    sp.add_argument("--pick", metavar="PANE", help="choose one pane when roles are ambiguous")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--json", action="store_true", help="emit one JSON summary line")
 
-    sp = add("ask", lambda a: cmd_ask(a.target, a.text, a.wait, a.mode, a.wake, a.timeout, a.machine), ["a"])
-    sp.add_argument("target"); sp.add_argument("text")
-    sp.add_argument("--wait", action="store_true")
-    sp.add_argument("--mode", default="sentinel", choices=["sentinel", "lifecycle", "file"])
-    sp.add_argument("--wake")
-    sp.add_argument("--timeout", type=int, default=1800)
-    sp.add_argument("--machine")
+    sp = add("ask", lambda a: cmd_ask(a.target, a.text, a.wait, a.mode, a.wake,
+                                       a.timeout, a.machine, a.strict_ledger), ["a"],
+             "Dispatch a task to an agent, optionally waiting for completion.")
+    sp.add_argument("target", help="pane id, label, or agent name")
+    sp.add_argument("text", help="task text to send")
+    sp.add_argument("--wait", action="store_true", help="wait inline for completion")
+    sp.add_argument("--mode", metavar="MODE", default="sentinel",
+                    choices=["sentinel", "lifecycle", "file"],
+                    help="completion mode: sentinel, lifecycle, or file")
+    sp.add_argument("--wake", metavar="TARGET", help="same-machine target to wake on completion")
+    sp.add_argument("--timeout", type=int, default=1800, metavar="SECONDS",
+                    help="wait timeout in seconds; 0 means no timeout")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--strict-ledger", dest="strict_ledger", action="store_true",
+                    help="fail instead of degrading when the ledger write fails")
 
     def _wait_run(a):
         tok = a.token or a.token_opt
@@ -1220,14 +1413,22 @@ def build_parser():
         return cmd_wait(a.target, tok, a.timeout, a.mode, a.machine,
                         a.no_agent, a.accept_unknown)
 
-    sp = add("wait", _wait_run, ["w"])
-    sp.add_argument("target"); sp.add_argument("token", nargs="?")
-    sp.add_argument("--token", dest="token_opt", default=None)
-    sp.add_argument("--timeout", type=int, default=1800)
-    sp.add_argument("--mode", default="sentinel", choices=["sentinel", "lifecycle", "file"])
-    sp.add_argument("--machine")
-    sp.add_argument("--no-agent", dest="no_agent", action="store_true")
-    sp.add_argument("--accept-unknown", dest="accept_unknown", action="store_true")
+    sp = add("wait", _wait_run, ["w"],
+             "Wait for a task sentinel or ledger completion.")
+    sp.add_argument("target", help="pane id, label, or agent name")
+    sp.add_argument("token", nargs="?", help="task token or 12-hex shortid")
+    sp.add_argument("--token", dest="token_opt", metavar="TOKEN",
+                    help="task token or 12-hex shortid (alternative to positional)")
+    sp.add_argument("--timeout", type=int, default=1800, metavar="SECONDS",
+                    help="timeout in seconds; 0 means no timeout")
+    sp.add_argument("--mode", metavar="MODE", default="sentinel",
+                    choices=["sentinel", "lifecycle", "file"],
+                    help="completion mode: sentinel, lifecycle, or file")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--no-agent", dest="no_agent", action="store_true",
+                    help="skip agent status gates for shell panes")
+    sp.add_argument("--accept-unknown", dest="accept_unknown", action="store_true",
+                    help="accept unknown agent status in the sentinel gate")
 
     def _done_run(a):
         tok = a.token or a.token_opt
@@ -1236,48 +1437,81 @@ def build_parser():
             return 2
         return cmd_done(tok, a.summary, a.final)
 
-    sp = add("done", _done_run, ["d"])
-    sp.add_argument("token", nargs="?")
-    sp.add_argument("--token", dest="token_opt", default=None)
-    sp.add_argument("--summary")
-    sp.add_argument("--final", action="store_true")
+    sp = add("done", _done_run, ["d"],
+             "Mark a task done, print its sentinel, and wake the caller.")
+    sp.add_argument("token", nargs="?", help="task token or 12-hex shortid")
+    sp.add_argument("--token", dest="token_opt", metavar="TOKEN",
+                    help="task token or 12-hex shortid (alternative to positional)")
+    sp.add_argument("--summary", metavar="TEXT", help="summary to store/print")
+    sp.add_argument("--final", action="store_true",
+                    help="require the agent to be idle/done before writing done")
+    sp.add_argument("--json", action="store_true",
+                    help="write JSON result to stderr; sentinel stays last stdout line")
 
-    sp = add("cancel", lambda a: cmd_cancel(a.shortid))
-    sp.add_argument("shortid")
+    sp = add("cancel", lambda a: cmd_cancel(a.shortid), [],
+             "Cancel a running task; idempotent for cancelled tasks, exit 6 for done.")
+    sp.add_argument("shortid", help="task token or 12-hex shortid")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
-    sp = add("abort", lambda a: cmd_abort(a.shortid, a.interrupt))
-    sp.add_argument("shortid"); sp.add_argument("--interrupt", action="store_true")
+    sp = add("abort", lambda a: cmd_abort(a.shortid, a.interrupt), [],
+             "Cancel a task and optionally interrupt a blocked agent.")
+    sp.add_argument("shortid", help="task token or 12-hex shortid")
+    sp.add_argument("--interrupt", action="store_true",
+                    help="send esc/ctrl+c after cancel (blocked agents need approval)")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
     sp = add("suggest", lambda a: cmd_suggest(a.task, a.scope, a.json,
-                                               a.live_names, a.label_roles, a.machine), ["s"])
-    sp.add_argument("task"); sp.add_argument("--scope")
-    sp.add_argument("--json", dest="json", action="store_true")
-    sp.add_argument("--live-names", nargs="*"); sp.add_argument("--label-roles", nargs="*")
-    sp.add_argument("--machine")
+                                               a.live_names, a.label_roles,
+                                               a.machine, a.custom), ["s"],
+             "Suggest short agent names from a keyword-matched pool.")
+    sp.add_argument("task", help="task description used for keyword matching")
+    sp.add_argument("--scope", metavar="SCOPE", help="optional label scope")
+    sp.add_argument("--json", action="store_true", help="emit JSON only")
+    sp.add_argument("--live-names", nargs="*", metavar="NAME",
+                    help="names already live; overrides automatic lookup")
+    sp.add_argument("--label-roles", nargs="*", metavar="LABEL",
+                    help="labels already in use; overrides automatic lookup")
+    sp.add_argument("--custom", metavar="NAME", help="validate and return a custom name")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
 
-    sp = add("list", lambda a: cmd_list(a.workspace or a.workspace_opt, a.machine, a.json), ["l"])
-    sp.add_argument("workspace", nargs="?", default=None)
-    sp.add_argument("--workspace", dest="workspace_opt", default=None)
-    sp.add_argument("--machine"); sp.add_argument("--json", dest="json", action="store_true")
+    sp = add("list", lambda a: cmd_list(a.workspace or a.workspace_opt, a.machine, a.json), ["l"],
+             "List hao- labeled panes.")
+    sp.add_argument("workspace", nargs="?", default=None,
+                    help="workspace id (positional alternative to --workspace)")
+    sp.add_argument("--workspace", dest="workspace_opt", metavar="WORKSPACE",
+                    help="workspace id; default HERDR_WORKSPACE_ID or w1")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
+    sp.add_argument("--json", action="store_true", help="emit JSON only")
 
-    sp = add("status", lambda a: cmd_status(a.target, a.text), ["st"])
-    sp.add_argument("target", nargs="?")
-    sp.add_argument("--text", action="store_true")
+    sp = add("status", lambda a: cmd_status(a.target, a.text), ["st"],
+             "Show compact pane, agent, and outstanding task status.")
+    sp.add_argument("target", nargs="?", help="pane id; default HERDR_PANE_ID")
+    sp.add_argument("--text", action="store_true", help="human multi-line output")
+    sp.add_argument("--json", action="store_true", help="emit JSON with ok=true")
 
     def _say(a):
         if len(a.args) == 1:
             return cmd_say(None, a.args[0], a.strict)
         return cmd_say(a.args[0], " ".join(a.args[1:]), a.strict)
 
-    sp = add("say", _say, ["sy"])
-    sp.add_argument("args", nargs="+")
-    sp.add_argument("--strict", action="store_true")
+    sp = add("say", _say, ["sy"],
+             "Send a plain prompt to a pane, without creating a task.")
+    sp.add_argument("args", nargs="+", metavar="TEXT", help="target and text, or just text")
+    sp.add_argument("--strict", action="store_true", help="refuse to send while working")
 
-    sp = add("result", lambda a: cmd_result(a.shortid, a.target, a.file), ["rs"])
-    sp.add_argument("shortid"); sp.add_argument("--target"); sp.add_argument("--file")
+    sp = add("result", lambda a: cmd_result(a.shortid, a.target, a.file,
+                                              a.allow_any_path), ["rs"],
+             "Read a completed task result, or an explicitly allowed file.")
+    sp.add_argument("shortid", help="task token or 12-hex shortid")
+    sp.add_argument("--target", metavar="PANE", help="pane id for future derivation")
+    sp.add_argument("--file", metavar="PATH", help="result file path under the task root")
+    sp.add_argument("--allow-any-path", dest="allow_any_path", action="store_true",
+                    help="allow --file outside the task result root (user responsibility)")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
-    sp = add("doctor", lambda a: cmd_doctor(a.machine))
-    sp.add_argument("--machine")
+    sp = add("doctor", lambda a: cmd_doctor(a.machine), [],
+             "Check python3, herdr, HERDR_ENV, XDG state, and optional machine.")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
 
     return p
 
@@ -1292,17 +1526,28 @@ def main(argv=None):
         return 0
     args = p.parse_args(argv)
     cmd = _CMD_ALIASES.get(args.cmd, args.cmd)
-    global _ERROR_DETAIL
+    global _ERROR_DETAIL, _JSON_OUTPUT, _JSON_HANDLED
     _ERROR_DETAIL = None
+    _JSON_OUTPUT = bool(getattr(args, "json", False))
+    _JSON_HANDLED = False
     result = args.func(args)
     if isinstance(result, dict):
-        if cmd == "suggest" and not getattr(args, "json", False):
-            return 0
         print(json.dumps(result, ensure_ascii=False))
+        _JSON_OUTPUT = False
+        _JSON_HANDLED = False
         return 0
     if isinstance(result, int) and result:
-        _emit_error(cmd, result)
+        reason = _error_reason(cmd, result)
+        if _JSON_OUTPUT and cmd in _JSON_COMMANDS and not _JSON_HANDLED:
+            dest = sys.stderr if cmd == "done" else sys.stdout
+            print(json.dumps({"ok": False, "error": reason, "exit": result},
+                             ensure_ascii=False), file=dest)
+        print(f"hao {cmd}: {reason} (exit {result})", file=sys.stderr)
+        _JSON_OUTPUT = False
+        _JSON_HANDLED = False
         return result
+    _JSON_OUTPUT = False
+    _JSON_HANDLED = False
     return 0
 
 
