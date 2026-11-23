@@ -83,6 +83,11 @@ hao name w2:p9 forge（已带 -ops scope）→ scope 被静默丢弃
 | 台账 `caller` 字段 | ask 记录 `HERDR_PANE_ID` 为 caller（诊断/未来 wake 回退） | P2 |
 | `wait_consumed` / `result_consumed` | wait 成功 / result 读取置位（spec 终态模型） | P3 |
 
+### B6 `ask` write-ahead 台账
+- **现状**：先发 prompt 后写台账；strict 写失败返回 8 时任务已派出，形成孤儿任务。
+- **要求**：先采样 submit_seq/submit_state 并 `write_running`，再 `agent prompt`。strict 写失败 → `_set_error` + exit 8，不派发；非 strict → warning 后派发并返回 token；记录已写但 prompt 失败 → 标 cancelled 并返回 herdr 错误码。
+- **验收/测试**：strict 不可写不调用 prompt；非 strict 不可写仍派发并返回 token+warning；prompt 失败台账 status=cancelled。
+
 ---
 
 ## Phase C — P3 文档与打磨

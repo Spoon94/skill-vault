@@ -259,7 +259,7 @@ class TestPhaseBRestore(unittest.TestCase):
         with mock.patch.object(hao, "run_herdr", side_effect=stub):
             rc, out, _ = run_cli(["restore", "--dry-run"])
         self.assertEqual(rc, 0)
-        self.assertIn("restored 1, skipped 0", out)
+        self.assertIn("would restore 1, skipped 0", out)
 
 
 class TestPhaseBCustom(unittest.TestCase):

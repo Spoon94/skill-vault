@@ -2,6 +2,12 @@
 
 用 `hao` CLI 管理 herdr agent 的命名、持久化与任务协作。解决三个痛点：**任务级等待缺失**（herdr 原生只有生命周期级）、**agent/pane 名字重启即丢**、**给 agent 取短名难**。
 
+## 前置条件
+
+- herdr ≥ 0.9.5
+- 在 herdr pane 内运行，`HERDR_ENV=1`
+- python3 ≥ 3.9（仅标准库，无第三方依赖）
+
 ## 目录
 
 ```
@@ -35,9 +41,10 @@ herdr-agent-ops/
 
 等待模式：`sentinel`（默认，文本哨兵；~30s 后自动切 herdr agent wait 兜底 + 大窗口重扫）· `lifecycle`（agent wait 短循环 + 活动门槛）· `file`（结果文件稳定即完成）
 
-## 快速开始
+## 30 秒上手
 
 ```bash
+hao doctor                         # 0. 自检
 # 1. 给 agent 取名
 hao suggest "审查 PR"            # → 验证审阅: hawk, lens, prism
 hao name w2:p9 hawk --scope api  # → agent hawk + label hao-hawk-api
@@ -57,11 +64,28 @@ hao restore                        # 从 label 恢复
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）
 
+## 退出码速查
+
+| 码 | 含义 |
+|---|---|
+| 0 | 成功 |
+| 2 | 用法/参数错误 |
+| 3 | target/task/result 不存在 |
+| 4 | 超时 |
+| 5 | blocked 或缺少中断授权 |
+| 6 | 冲突、歧义、name taken |
+| 7 | machine/profile 不可用 |
+| 8 | herdr/server 错误 |
+| 9 | 协议错误 |
+| 10 | cancelled |
+
+完整错误码见 `references/protocol.md`。
+
 ## 测试
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（155 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（159 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

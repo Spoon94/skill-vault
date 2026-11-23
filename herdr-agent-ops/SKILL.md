@@ -29,4 +29,5 @@ ${CLAUDE_SKILL_DIR}/scripts/hao restore --dry-run
 - 名字 `^[a-z]{4,6}$`（per-machine 唯一），label 前缀 `hao-`。
 - 零注册表：名字持久化只用 `hao-` label；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）。
 - 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
+- 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
 - 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器先校验 `herdr machine` profile。
