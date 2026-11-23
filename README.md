@@ -108,7 +108,7 @@ cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commi
 |------|------|
 | [tmux](./tmux) | 脚本化驱动 tmux：后台会话/send-keys/capture-pane |
 | [herdr](./herdr) | Herdr CLI 控制终端多路复用器，协调 agent |
-| [herdr-agent-ops](./herdr-agent-ops) | hao：herdr agent 命名/持久化/任务级等待（哨兵+台账+agent wait 兜底） |
+| [herdr-agent-ops](./herdr-agent-ops) | hao：herdr agent 命名/持久化/任务级协作——哨兵+台账+agent wait 兜底、异步唤醒、结果 summary、全命令 --json |
 | [opencli](./opencli) | 把网站/Electron 应用/外部 CLI 变成统一操作面 |
 | [mcp2cli](./mcp2cli) | 把 MCP/OpenAPI/GraphQL 变成 CLI |
 | [anthropics/skills/mcp-builder](./anthropics/skills/mcp-builder) | 构建高质量 MCP 服务器 |

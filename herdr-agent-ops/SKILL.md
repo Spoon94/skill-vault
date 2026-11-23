@@ -17,9 +17,9 @@ ${CLAUDE_SKILL_DIR}/scripts/hao restore --dry-run
 
 ## 工作流
 
-1. **命名**：`hao name <target> <name> [--scope S]`，或 `hao suggest "<task>"` 从词表选名。
+1. **命名**：`hao name <target> <name> [--scope S]`，或 `hao suggest "<task>" [--scope S] [--custom NAME]` 从词表选名/校验自定义名。
 2. **持久化/恢复**：`hao restore [--workspace W|--all]`（默认当前 workspace），agent 退出/重启后从 `hao-` label 恢复名字。
-3. **派活与等待**：`hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--machine M]`；`hao wait <target> --token <t>`；`hao done --token <t>`；`hao cancel <t>` / `hao abort <t> [--interrupt]`。
+3. **派活与等待**：`hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`hao wait <target> --token <t>`；`hao done --token <t> --summary "<结果载荷>"`；`hao cancel <t>` / `hao abort <t> [--interrupt]`。
 4. **其它**：`hao list/status/say/result/doctor`。
 
 ## 长任务：异步 + 唤醒
@@ -47,4 +47,5 @@ hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 - 零注册表：名字持久化只用 `hao-` label；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）。
 - 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
 - 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
+- 任何命令可加 `--json` 取结构化输出（ask/wait 恒 JSON，flag 为 no-op）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
 - 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器先校验 `herdr machine` profile。

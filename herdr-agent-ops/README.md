@@ -27,16 +27,23 @@ herdr-agent-ops/
 
 ## 命令面
 
-| 命令 | 作用 |
+| 命令 | 作用（完整说明见 `hao <cmd> --help`） |
 |---|---|
-| `hao name <target> <name> [--scope S]` | agent 改名 + pane label 设为 `hao-<name>[-scope]` |
-| `hao suggest "<task>"` | 从词表选名（关键词选组 + per-machine 避重） |
-| `hao restore [--workspace W\|--all]` | agent 退出/重启后从 label 恢复名字 |
-| `hao ask <target> "<task>" [--wait] [--mode M]` | 发任务 + 拆分哨兵（防回显）；`--wait` 内联等 |
-| `hao wait <target> --token <t> [--mode M]` | 等完成（哨兵/台账 done/agent wait 兜底） |
-| `hao done --token <t> [--summary] [--final]` | 对端写台账 done + 打印哨兵 |
-| `hao cancel <t>` / `hao abort <t> [--interrupt]` | 取消（幂等）/ 中断（blocked 需用户授权） |
-| `hao list` / `status` / `say` / `result` / `doctor` | 辅助命令 |
+| `hao name <target> <name> [--scope S] [--force] [--dry-run] [--machine M] [--json]` | agent 改名 + pane label 设为 `hao-<name>[-scope]`；scope 默认沿用 |
+| `hao clear <target> [--force] [--dry-run] [--machine M] [--json]` | 清除 hao- label 与 agent name |
+| `hao suggest "<task>" [--scope S] [--custom NAME] [--live-names N...] [--label-roles L...] [--machine M] [--json]` | 词表选名；`--custom` 校验自定义名（保留字/灰词） |
+| `hao restore [--workspace W\|--all] [--adopt\|--no-adopt] [--dry-run] [--pick PANE] [--machine M] [--json]` | 从 label 恢复名字并输出摘要 |
+| `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--wake` 异步唤醒；`--json` no-op |
+| `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
+| `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；summary 是结果载荷 |
+| `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | 取消/中断（blocked 需用户授权） |
+| `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
+| `hao status [--text] [--json]` | pane/agent/任务概览 |
+| `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
+| `hao result <t> [--target PANE] [--file PATH] [--allow-any-path] [--json]` | 读取结果；`--allow-any-path` 需显式担责 |
+| `hao doctor [--machine M] [--json]` | 环境/机器自检 |
+
+所有命令均接受 `--json`（`ask`/`wait` 恒 JSON，该 flag 为 no-op）与 `--help`；完整参数见 `hao <cmd> --help`，协议见 `references/protocol.md`。
 
 短别名：`n` name · `r` restore · `a` ask · `w` wait · `d` done · `l` list · `s` suggest · `c` clear · `st` status · `sy` say · `rs` result
 
@@ -58,6 +65,12 @@ hao restore --dry-run              # 预览
 hao restore                        # 从 label 恢复
 ```
 
+### 自定义名字
+
+```bash
+hao suggest "审查支付模块" --custom hawk   # 输出 custom: hawk；保留字/灰词/格式不合法会 exit 2
+```
+
 ### 长任务：异步 + 唤醒
 
 ```bash
@@ -72,6 +85,14 @@ hao wait w2:p9 --token <shortid>
 ```
 
 无唤醒时可用后台 `hao wait <target> --token <shortid> --timeout N`，或 `hao status <target>`。
+
+## 输出契约
+
+结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。所有命令支持 `--json`（`ask`/`wait` 恒 JSON，flag 为 no-op）。
+
+```text
+hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
+```
 
 ## 关键约定
 
@@ -101,7 +122,7 @@ hao wait w2:p9 --token <shortid>
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（184 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（185 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
