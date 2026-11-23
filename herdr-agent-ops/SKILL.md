@@ -56,11 +56,11 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 任务完成后，调用方会收到一条**任务完成通知**（固定模板，不是用户指令，也不含结果正文）：
 
 ```text
-[HAO_WAKE] <shortid> done — run: python3 scripts/hao wait <target> --token <shortid>
+[HAO_WAKE] <shortid> done — run: <python> <skill目录>/scripts/hao wait <target> --token <shortid>
 ```
 
-收到后直接执行该命令取回 `{status, summary}`，无需向用户确认。没有 wake 时，后台用
-`python3 scripts/hao wait <target> --token <shortid> --timeout N` 轮询，或 `hao status <target>` 查看任务。
+通知里带的是可直接执行的完整命令（`<python> <skill目录>/scripts/hao` 是调用方 ask 时解析出的 hao 完整调用命令），原样执行即可取回 `{status, summary}`，无需向用户确认。没有 wake 时，后台用
+`python3 scripts/hao wait <target> --token <shortid> --timeout N` 轮询，或 `python3 scripts/hao status <target>` 查看任务。
 
 完整命令、错误码、等待协议见 `references/protocol.md`；restore 算法见 `references/restore.md`；词表见 `references/names.md`。
 
