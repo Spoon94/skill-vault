@@ -4,10 +4,12 @@
 
 ## 前置条件
 
+- POSIX（macOS/Linux；台账依赖 `fcntl`，Windows 原生不适用）
 - herdr ≥ 0.9.5
 - 在 herdr pane 内运行，`HERDR_ENV=1`
 - python3 ≥ 3.9（仅标准库，无第三方依赖）
-- 调用方式：未安装到 PATH 时，用 `python3 <skill目录>/scripts/hao` 代替下文的 `hao`；或直接复制 alias：`alias hao='python3 ~/.claude/skills/herdr-agent-ops/scripts/hao'`。
+- 适用任何 herdr 支持的 CLI agent（`herdr agent start --help` 列出种类）
+- 调用方式：未安装到 PATH 时，用 `python3 <skill目录>/scripts/hao` 代替下文的 `hao`；或复制 alias：`alias hao='python3 /path/to/herdr-agent-ops/scripts/hao'`（各 agent 平台的 skill 目录见仓库 `INSTALL.md`）。
 
 ## 目录
 
@@ -99,6 +101,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 - agent name `^[a-z]{4,6}$`，per-machine 唯一；label 前缀 `hao-`
 - **零注册表**：名字持久化只用 pane label（herdr session.json 会保存）；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
+- `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）
 
 ## 退出码速查
@@ -122,7 +125,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（186 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（192 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

@@ -3,14 +3,29 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 
 HAO_LABEL_RE = re.compile(r"^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$")
 PANE_ID_RE = re.compile(r"^w\w+:p\w+$")
+_PREFIX_CHARS = r"⏺●✻│⎿`>*+\-•·#┃┆┇┊┄┈─━└┘✓✔"
+_TAIL_CHARS = r"\s.。!！│`*|┃┆┇┊┄┈─━└┘✓✔"
 SENTINEL_RE = re.compile(
-    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE:?\s+((?:hao-)?[0-9a-f]{12,32})[\s.。!！│`*|]*$")
+    rf"^\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE:?\s+((?:hao-)?[0-9a-f]{{12,32}})[{_TAIL_CHARS}]*$")
+
+
+def hao_command():
+    """Bare hao when on PATH, else exact python + script invocation."""
+    if shutil.which("hao"):
+        return "hao"
+    try:
+        path = os.path.realpath(__file__)
+    except NameError:
+        path = os.path.realpath(hao_command.__code__.co_filename)
+    py = sys.executable or "python3"
+    return f'{py} "{path}"'
 
 
 def run_herdr(args, machine=None):
@@ -401,8 +416,9 @@ def build_prompt(task, token, result_path=None):
         "",
         "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
         f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
-        "首选完成上报：输出完最终答复的全部正文后，调用 hao done --token <完整令牌> "
+        f"首选完成上报：输出完最终答复的全部正文后，执行：{hao_command()} done --token <完整令牌> "
         '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
+        "；若无法执行该命令（如跨机器），仅打印备份信号。"
         "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
         "同时在最终消息最后一行打印作为备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
     ]
@@ -522,6 +538,9 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
         return None
     rc, out, err = run_herdr(["agent", "get", pane], machine)
     if rc != 0:
+        if _herdr_err_code(err) == "agent_not_found":
+            _set_error(f"agent {pane} not found; for a shell pane use --no-agent (or --mode file)")
+            return 3
         return herdr_error_rc(err, 8)
     st = json.loads(out)["result"]["agent"].get("agent_status")
     if st == "blocked":
@@ -529,6 +548,7 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
     if st in ("exited", "closed"):
         return 3
     if st == "unknown" and not accept_unknown:
+        _set_error(f"agent {pane} status unknown; add --accept-unknown")
         return 9
     return None
 
@@ -594,10 +614,10 @@ def _sentinel_check(pane, token, sid, machine):
 
 
 _PREFIX_LINE_RE = re.compile(
-    r"^(?P<head>\s*(?:[⏺●✻│⎿`>*+\-•·#]|\d+\.|\|)*\s*HAO_DONE[:\s.。!！│`*|]*)"
-    r"(?P<pre>hao-)?(?P<frag>[0-9a-f]{0,11})(?P<tail>[\s.。!！│`*|]*)$")
+    rf"^(?P<head>\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE[{_TAIL_CHARS}]*)"
+    rf"(?P<pre>hao-)?(?P<frag>[0-9a-f]{{0,11}})(?P<tail>[{_TAIL_CHARS}]*)$")
 _HEX_CONT_RE = re.compile(
-    r"^\s*(?:[⏺●✻│⎿`>*+\-•·#]|\|)*\s*(hao-)?([0-9a-f]{1,32})[\s.。!！│`*|]*$")
+    rf"^\s*(?:[{_PREFIX_CHARS}]|\|)*\s*(hao-)?([0-9a-f]{{1,32}})[{_TAIL_CHARS}]*$")
 
 
 def _join_wrapped_sentinels(lines):

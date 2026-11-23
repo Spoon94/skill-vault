@@ -10,10 +10,10 @@ description: Manage named herdr agents and coordinate task handoffs. Use when th
 入口先跑（只读预览，不改状态）：
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/hao restore --dry-run
+python3 <skill目录>/scripts/hao restore --dry-run
 ```
 
-调用路径：`${CLAUDE_SKILL_DIR}/scripts/hao`（Claude Code）或 PATH 安装后直接 `hao`。
+调用路径：`scripts/hao`（与本文件同目录，按加载本 skill 的路径解析；shell 中用 `python3 <skill目录>/scripts/hao`），或 PATH/alias 安装后直接 `hao`。
 
 ## 工作流
 
@@ -48,4 +48,5 @@ hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 - 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
 - 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
 - 任何命令可加 `--json` 取结构化输出（ask/wait 恒 JSON，flag 为 no-op）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
+- `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器先校验 `herdr machine` profile。
