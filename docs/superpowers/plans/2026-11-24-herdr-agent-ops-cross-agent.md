@@ -83,22 +83,24 @@ pi 真实渲染字形清单（采样自 wG:p1）：`│ ┃ ─ └`（边框）
 - 明确"一律经解释器调用，不裸跑"；alias/包装器同样经 `python3`。
 - frontmatter 加 `license: MIT` 与 `compatibility: "Requires herdr >= 0.9.5 with HERDR_ENV=1, python3 >= 3.9, POSIX (macOS/Linux)."`。
 
-### H2（P1）`hao install`：一条命令装到 PATH
-- `hao install [--dir DIR]`：在 DIR（默认 `~/.local/bin`）写入包装器 `hao`：`#!/bin/sh` + 标记注释 `# hao wrapper: herdr-agent-ops` + `exec "<python>" "<abs hao>" "$@"`（不依赖脚本可执行位）。幂等；DIR 不在 PATH 时输出 `export PATH` 提示。`--print-alias` 只打印不写文件；`hao uninstall`。
-- `hao_command()`：PATH 上的 `hao` 仅当文件内容含 wrapper 标记（或即本脚本）才信任，否则回退绝对路径（防同名程序）。
-- `doctor` 增加 `hao on PATH` 检查，未装则提示 `hao install`。
-- 测试：临时目录安装→包装器可用；幂等；陌生同名 `hao` 不被信任；`--print-alias`。
+### H2 ~~`hao install`~~ —— 已取消（用户硬约束）
+**用户要求：hao 位于 skill 内，禁止安装到 skill 之外。** 本项原计划往 PATH 目录写包装器，已整体取消并回退：
+- 不提供 `install` / `uninstall` / `--print-alias`，不创建包装器或软链，不向 skill 目录以外写任何文件。
+- `hao_command()` **始终**输出 skill 内脚本的绝对路径调用（`"<python>" "<skill目录>/scripts/hao"`），不信任 PATH 上的同名程序（skill 外的同名 `hao` 来源不可信）。
+- 文档不推荐 alias/PATH 安装；入口写明"`hao` 始终位于 skill 内，不复制、链接或安装到其他位置"。
+- 约束已记入 SKILL.md 与 README。
 
 ### H3（P2）README
-- 30 秒上手第 0 步改为 `python3 <skill目录>/scripts/hao install`，alias 作为备选；命令面表加 `install`/`uninstall`；一句话写明相对路径约定并指向 INSTALL.md。
+- 30 秒上手第 0 步改为 `python3 <skill目录>/scripts/hao doctor`；删除 alias 建议；命令面表里的 `hao` 明确标注为该命令的简写；一句话写明相对路径约定并指向 INSTALL.md。
 
-### H4（P2）peer prompt
-- 已装 → `hao done …`；未装 → 绝对路径。两种形态均经解释器。
+### H4（P2）peer prompt 与唤醒通知
+- prompt 内嵌 `hao_command()` 的完整调用命令（经解释器、skill 内绝对路径）；唤醒通知同样内嵌完整命令，接收方原样执行即可。两种形态均不依赖 PATH。
+
 
 ### H5（P3）INSTALL.md Gemini 行修正
 - 改为：`~/.gemini/skills/` 或项目内 `.gemini/skills/`（官方支持 `SKILL.md`）。只改这一行。
 
 ## 验收（Claude）
 - SKILL.md：无仅限 `${CLAUDE_SKILL_DIR}` 的调用形式；含相对路径形式、定位说明、可用脚本清单、前置条件。
-- `hao install --dir <临时目录>` → 包装器可执行且 `hao doctor` 正常；`hao_command()` 随之输出裸 `hao`。
-- 跨 agent 复测：以临时 PATH 目录起一次性 pi，prompt 应为短命令 `hao done …`，任务经台账完成。
+- 硬约束：代码无 install 类命令；`hao` 不在 PATH、skill 目录外无任何文件；`hao_command()` 始终输出 skill 内脚本绝对路径；文档无 alias/PATH 安装表述。
+- 跨 agent 复测：一次性 pi（cwd 在 /tmp、未装 skill、hao 不在 PATH）执行 prompt 内嵌的完整命令，任务经台账完成并带 summary。
