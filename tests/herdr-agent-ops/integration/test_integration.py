@@ -8,6 +8,7 @@ Cleans up the test pane it created.
 """
 import json
 import os
+import tempfile
 import types
 from importlib.machinery import SourceFileLoader
 
@@ -17,6 +18,20 @@ _loader.exec_module(hao)
 
 
 def main():
+    with tempfile.TemporaryDirectory() as d:
+        saved = os.environ.get("XDG_STATE_HOME")
+        os.environ["XDG_STATE_HOME"] = d
+        os.makedirs(os.path.join(d, "hao", "tasks"), exist_ok=True)
+        try:
+            return _main()
+        finally:
+            if saved is None:
+                os.environ.pop("XDG_STATE_HOME", None)
+            else:
+                os.environ["XDG_STATE_HOME"] = saved
+
+
+def _main():
     assert hao.cmd_doctor() == 0, "doctor should pass"
 
     # create a shell pane

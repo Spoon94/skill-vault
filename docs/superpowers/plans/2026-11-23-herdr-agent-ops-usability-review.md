@@ -104,3 +104,21 @@ hao name w2:p9 forge（已带 -ops scope）→ scope 被静默丢弃
 2. 每项改动带测试；全程 101 → ≥130 绿；集成冒烟通过。
 3. 每阶段一个 conventional commit（`feat(hao): …` / `fix(hao): …`），commit message 引用本文件编号（A1…C3）。
 4. 简报格式：每项一行「编号 状态 要点」，末尾测试计数；≤40 行；正文输出完再 `hao done`。
+
+
+---
+
+## Phase D — end-to-end hardening
+
+### D1 完成协议优先于任务正文
+- **问题**：对抗性任务“只回复一个字：好”压过 prompt 内完成协议，peer 只回“好”，不打印哨兵/不调 hao done。
+- **要求**：任务正文用 `--- 任务开始 ---` / `--- 任务结束 ---` 包住；完成协议置于任务之后，并声明其不属于任务正文、无论任务要求多少字都必须执行；保持 prompt 不含完整 token。
+- **验收**：同一对抗任务 `ask --wait` 能完成（台账 done 或哨兵命中）。
+
+### D2 wait 超时诊断
+- **要求**：sentinel/lifecycle 等待记录派发后是否观察到 agent working 及最后状态；超时 stderr 追加诊断，例如未观察到 working 时提示 peer 可能跳过完成协议；观察过则给 last status。不动匹配器。
+- **验收**：timeout 消息包含 `agent_status` 与 `never observed working`/`observed working`。
+
+### D3 heartbeat 不造空桩 + 集成隔离
+- **要求**：`Ledger.heartbeat` 仅刷新已存在记录，不创建 `{updated}` 空桩；`hao wait` 对不存在 id 纯靠 pane 证据等待。集成测试使用临时 `XDG_STATE_HOME`，不写用户真实台账。
+- **验收**：heartbeat 缺失记录返回 None、无 JSON 文件；集成后用户台账不变。

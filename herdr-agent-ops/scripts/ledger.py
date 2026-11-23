@@ -32,7 +32,7 @@ class Ledger:
         # _rw creates the directory on demand
         pass
 
-    def _rw(self, shortid, fn, lock_timeout=5.0):
+    def _rw(self, shortid, fn, lock_timeout=5.0, create=True):
         p = _path(shortid)
         os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
         with open(p + ".lock", "w") as lf:
@@ -46,9 +46,13 @@ class Ledger:
                         raise TimeoutError(f"ledger lock timeout: {shortid}")
                     time.sleep(0.05)
             rec = {}
-            if os.path.exists(p):
+            exists = os.path.exists(p)
+            if exists:
                 with open(p) as f:
                     rec = json.load(f)
+            if not exists and not create:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+                return None
             fn(rec)
             tmp = p + ".tmp"
             with open(tmp, "w") as f:
@@ -76,9 +80,12 @@ class Ledger:
         self._rw(shortid, go)
 
     def heartbeat(self, shortid):
-        # field-level merge of updated only (active-waiter heartbeat);
-        # returns the fresh record so wait loops need one locked read per round
-        return self._rw(shortid, lambda rec: rec.__setitem__("updated", time.time()))
+        # field-level merge of updated only; never creates a stub record.
+        if not os.path.exists(_path(shortid)):
+            return None
+        return self._rw(shortid,
+                        lambda rec: rec.__setitem__("updated", time.time()),
+                        create=False)
 
     def get(self, shortid):
         p = _path(shortid)

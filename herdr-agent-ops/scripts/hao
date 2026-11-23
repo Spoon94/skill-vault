@@ -394,8 +394,11 @@ def build_prompt(task, token, result_path=None):
     shortid = h[:12]
     lines = [
         f"[TASK {shortid}]",
+        "--- 任务开始 ---",
         task,
+        "--- 任务结束 ---",
         "",
+        "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
         f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
         "首选完成上报：输出完最终答复的全部正文后，调用 hao done 并传入完整令牌"
         "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
@@ -458,6 +461,17 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
 
 
 _LEDGER_WARNED = False
+_WAIT_DIAG = None
+
+
+def _timeout_detail(observed_working, last_status, timeout):
+    state = last_status or "unknown"
+    if observed_working:
+        tail = f"agent_status={state}, observed working since dispatch"
+    else:
+        tail = (f"agent_status={state}, never observed working since dispatch "
+                f"— peer may have skipped the completion protocol")
+    return f"timeout after {timeout}s; {tail}"
 
 
 def _ledger_warn(err):
@@ -482,7 +496,8 @@ def _wait_round_rec(l, sid):
     with read-only fallback. Ledger unavailable must never kill a wait —
     pane sentinel evidence stays authoritative (graceful degradation)."""
     try:
-        return l.heartbeat(sid)
+        rec = l.heartbeat(sid)
+        return rec if rec is not None else {}
     except Exception as e:
         _ledger_warn(e)
         rec = _safe_get(l, sid)
@@ -689,6 +704,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     l = _led.Ledger()
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
+    observed_working = False
+    last_status = None
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
         token = rec.get("token") or token  # ledger holds the full token
@@ -697,6 +714,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             return payload
         if kind == "cancelled":
             return 10
+        last_status = current_state(pane, machine)
+        if last_status == "working":
+            observed_working = True
         gate = _agent_gate(pane, machine, no_agent, accept_unknown)
         if gate is not None:
             # before giving up, rescan: sentinel may have arrived right before exit
@@ -737,6 +757,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
         if conf:
             return _finish_done(l, sid, conf)
+    global _WAIT_DIAG
+    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout)
     return 4
 
 
@@ -750,6 +772,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
     saw_activity = False
+    observed_working = False
+    last_status = None
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
         token = rec.get("token") or token  # ledger holds the full token
@@ -763,6 +787,9 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             return herdr_error_rc(err, 8)
         ag = json.loads(out)["result"]["agent"]
         st = ag.get("agent_status")
+        last_status = st
+        if st == "working":
+            observed_working = True
         seq = ag.get("state_change_seq") or 0
         if st == "unknown":
             return 6  # lifecycle does not support unknown agents
@@ -793,6 +820,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
         run_herdr(["agent", "wait", pane,
                    "--until", "idle", "--until", "done", "--until", "blocked",
                    "--timeout", "8000"], machine)
+    global _WAIT_DIAG
+    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout)
     return 4
 
 
@@ -856,6 +885,8 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
     except ValueError:
         _set_error("invalid token; expected 12-hex shortid or hao- token")
         return 2
+    global _WAIT_DIAG
+    _WAIT_DIAG = None
     if mode == "file":
         result = _wait_file(pane, sid, token, timeout, machine)
     elif mode == "lifecycle":
@@ -869,7 +900,7 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
         except Exception:
             pass
     if result == 4 and timeout:
-        _set_error(f"timeout after {timeout}s")
+        _set_error(_WAIT_DIAG or f"timeout after {timeout}s")
     return result
 
 
