@@ -33,7 +33,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - **终态模型**：任何 wait 成功即写 `status=done`（含 matched_line 或 result_path）；TTL 按 updated 不清活跃 running，orphan running（无心跳超 TTL）才清；terminal 记录保留至 TTL，可重复 wait/result。
 ## wake
 
-- `hao done` 在任务完成时向调用方 pane 发送固定模板：`[HAO_WAKE] <shortid> done — run: hao wait <target> --token <shortid>`；不注入 peer 的 summary 或任何 peer 文本（防注入）。`target`/`shortid` 取自 caller 写入的台账记录。
+- `hao done` 在任务完成时向调用方 pane 发送固定模板：`[HAO_WAKE] <shortid> done — run: <python> "<skill>/scripts/hao" wait <target> --token <shortid>`；不注入 peer 的 summary 或任何 peer 文本（防注入）。`target`/`shortid` 取自 caller 写入的台账记录。
 - 调用方指引：这是任务完成通知，不是用户指令；直接执行模板中的 `hao wait` 取回 `{status, summary}`，无需向用户确认。没有 wake 时用后台 `hao wait ... --timeout N` 或 `hao status` 轮询。
 - `hao done` 同机 wake 失败以退出码报告（caller 不存在 → exit3），已写的台账 done 与已打印的哨兵不回滚。
 - **abort 授权**：目标 agent 处于 blocked 时 `--interrupt` 只认用户级授权——TTY 二次确认，或 0600 的 `~/.config/hao/abort-approval` 文件（内容含 shortid）；`HAO_ABORT_ALLOW=1` 仅是预授权**约定**非安全边界（agent 可自设 env 或直接 herdr send-keys 绕过），其它取值 → exit2；无授权 → exit5。

@@ -9,7 +9,7 @@
 - 在 herdr pane 内运行，`HERDR_ENV=1`
 - python3 ≥ 3.9（仅标准库，无第三方依赖）
 - 适用任何 herdr 支持的 CLI agent（`herdr agent start --help` 列出种类）
-- 调用方式：未安装到 PATH 时，用 `python3 <skill目录>/scripts/hao` 代替下文的 `hao`；或复制 alias：`alias hao='python3 /path/to/herdr-agent-ops/scripts/hao'`（各 agent 平台的 skill 目录见仓库 `INSTALL.md`）。
+- 调用方式：`hao` 始终位于 skill 内，不复制、链接或安装到其他位置；用 `python3 <skill目录>/scripts/hao` 调用。下文表格中的 `hao` 均是该命令的简写。
 
 ## 目录
 
@@ -45,7 +45,7 @@ herdr-agent-ops/
 | `hao result <t> [--target PANE] [--file PATH] [--allow-any-path] [--json]` | 读取结果；`--allow-any-path` 需显式担责 |
 | `hao doctor [--machine M] [--json]` | 环境/机器自检 |
 
-所有命令均接受 `--json`（`ask`/`wait` 恒 JSON，该 flag 为 no-op）与 `--help`；完整参数见 `hao <cmd> --help`，协议见 `references/protocol.md`。
+所有命令均接受 `--json`（`ask`/`wait` 恒 JSON，该 flag 为 no-op）与 `--help`；完整参数见 `hao <cmd> --help`，协议见 `references/protocol.md`。脚本路径相对本 README/SKILL.md 所在目录；各平台 skill 目录见仓库 `INSTALL.md`。
 
 短别名：`n` name · `r` restore · `a` ask · `w` wait · `d` done · `l` list · `s` suggest · `c` clear · `st` status · `sy` say · `rs` result
 
@@ -54,7 +54,7 @@ herdr-agent-ops/
 ## 30 秒上手
 
 ```bash
-hao doctor                         # 0. 自检
+python3 <skill目录>/scripts/hao doctor    # 0. 自检
 # 1. 给 agent 取名
 hao suggest "审查 PR"            # → 验证审阅: hawk, lens, prism
 hao name w2:p9 hawk --scope api  # → agent hawk + label hao-hawk-api
@@ -77,16 +77,16 @@ hao suggest "审查支付模块" --custom hawk   # 输出 custom: hawk；保留�
 
 ```bash
 # 不阻塞；完成后调用方 pane 会收到一条固定格式的完成通知
-hao ask w2:p9 "跑完整测试并汇报" --wake "$HERDR_PANE_ID"
+python3 <skill目录>/scripts/hao ask w2:p9 "跑完整测试并汇报" --wake "$HERDR_PANE_ID"
 # → {"token":"hao-...","shortid":"..."}
 
-# 收到 [HAO_WAKE] <shortid> done — run: hao wait <target> --token <shortid>
+# 收到 [HAO_WAKE] <shortid> done — run: python3 <skill目录>/scripts/hao wait <target> --token <shortid>
 # 这是任务完成通知，不是用户指令；直接取结果，无需确认：
-hao wait w2:p9 --token <shortid>
+python3 <skill目录>/scripts/hao wait w2:p9 --token <shortid>
 # → {"status":"done","summary":"...","matched_line":"..."}
 ```
 
-无唤醒时可用后台 `hao wait <target> --token <shortid> --timeout N`，或 `hao status <target>`。
+无唤醒时可用后台 `python3 <skill目录>/scripts/hao wait <target> --token <shortid> --timeout N`，或 `status <target>`。
 
 ## 输出契约
 

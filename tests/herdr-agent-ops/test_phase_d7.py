@@ -41,7 +41,7 @@ class TestD7Wake(unittest.TestCase):
                     rc = hao.main(["done", token, "--summary", "private answer"])
                 self.assertEqual(rc, 0)
                 prompt = next(c[3] for c in calls if c[:2] == ["agent", "prompt"])
-                expected = (f"[HAO_WAKE] {sid} done — run: hao wait {target} "
+                expected = (f"[HAO_WAKE] {sid} done — run: {hao.hao_command()} wait {target} "
                             f"--token {sid}")
                 self.assertEqual(prompt, expected)
                 self.assertNotIn("private answer", prompt)

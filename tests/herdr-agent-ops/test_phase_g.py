@@ -23,9 +23,8 @@ class TestG1HaoCommand(unittest.TestCase):
         self.assertIn("若无法执行该命令", prompt)
         self.assertNotIn(token, prompt)
 
-    def test_fallback_command_has_script_path(self):
-        with mock.patch.object(hao.shutil, "which", return_value=None):
-            cmd = hao.hao_command()
+    def test_command_has_script_path(self):
+        cmd = hao.hao_command()
         self.assertIn(sys.executable or "python3", cmd)
         self.assertIn("scripts/hao", cmd)
 

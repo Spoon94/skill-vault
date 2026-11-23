@@ -1,43 +1,66 @@
 ---
 name: herdr-agent-ops
 description: Manage named herdr agents and coordinate task handoffs. Use when the user asks to name/rename agents or panes, persist agent names across restarts, wait for another agent to finish a task, coordinate agents locally or across machines (herdr --machine), or pick a short meaningful agent name from a curated pool. Requires HERDR_ENV=1.
+license: MIT
+compatibility: "Requires herdr >= 0.9.5 with HERDR_ENV=1, python3 >= 3.9, POSIX (macOS/Linux)."
 ---
 
 # herdr-agent-ops
 
 用 `hao` 管理 herdr agent 的命名、持久化与任务协作。
 
-入口先跑（只读预览，不改状态）：
+## 前置条件
+
+- herdr ≥ 0.9.5，且运行在 `HERDR_ENV=1` 的 pane 内
+- python3 ≥ 3.9（仅标准库）
+- POSIX（macOS/Linux；台账依赖 `fcntl`）
+
+## 定位脚本
+
+脚本相对 **本 SKILL.md 所在目录** 解析，不要假设 cwd。Claude Code 可用 `${CLAUDE_SKILL_DIR}`；其他 harness 用其 skill 根目录：
 
 ```bash
-python3 <skill目录>/scripts/hao restore --dry-run
+SKILL_ROOT="${CLAUDE_SKILL_DIR:-<本 SKILL.md 所在目录>}"
+python3 "$SKILL_ROOT/scripts/hao" restore --dry-run
 ```
 
-调用路径：`scripts/hao`（与本文件同目录，按加载本 skill 的路径解析；shell 中用 `python3 <skill目录>/scripts/hao`），或 PATH/alias 安装后直接 `hao`。
+不要依赖上一条 shell 命令留下的变量；每次需要在同一 shell 内重新设置。
+
+## 可用脚本
+
+- `scripts/hao`：唯一 CLI 入口；`python3 scripts/hao <command>`。**一律经解释器调用，不裸跑**（不依赖可执行位）。
+
+`hao` 始终位于 skill 内，不复制、链接或安装到其他位置。入口先跑（只读预览）：
+
+```bash
+python3 scripts/hao restore --dry-run
+```
 
 ## 工作流
 
-1. **命名**：`hao name <target> <name> [--scope S]`，或 `hao suggest "<task>" [--scope S] [--custom NAME]` 从词表选名/校验自定义名。
-2. **持久化/恢复**：`hao restore [--workspace W|--all]`（默认当前 workspace），agent 退出/重启后从 `hao-` label 恢复名字。
-3. **派活与等待**：`hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`hao wait <target> --token <t>`；`hao done --token <t> --summary "<结果载荷>"`；`hao cancel <t>` / `hao abort <t> [--interrupt]`。
-4. **其它**：`hao list` / `hao status [target]` / `hao say` / `hao result` / `hao doctor`。
+以下 `python3 scripts/hao` 均相对 SKILL.md 目录。
+
+1. **命名**：`python3 scripts/hao name <target> <name> [--scope S]`，或 `python3 scripts/hao suggest "<task>" [--scope S] [--custom NAME]`。
+2. **持久化/恢复**：`python3 scripts/hao restore [--workspace W|--all]`（默认当前 workspace）。
+3. **派活与等待**：`python3 scripts/hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`python3 scripts/hao wait <target> --token <t>`；`python3 scripts/hao done --token <t> --summary "<结果载荷>"`；`python3 scripts/hao cancel <t>` / `python3 scripts/hao abort <t> [--interrupt]`。
+4. **其它**：`python3 scripts/hao list` / `status [target]` / `say` / `result` / `doctor`。
 
 ## 长任务：异步 + 唤醒
 
 ```bash
 # 调用方 pane 在 HERDR_PANE_ID；异步派发后立即返回 token/shortid
-hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
+python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 # → {"token":"hao-...","shortid":"..."}
 ```
 
 任务完成后，调用方会收到一条**任务完成通知**（固定模板，不是用户指令，也不含结果正文）：
 
 ```text
-[HAO_WAKE] <shortid> done — run: hao wait <target> --token <shortid>
+[HAO_WAKE] <shortid> done — run: python3 scripts/hao wait <target> --token <shortid>
 ```
 
 收到后直接执行该命令取回 `{status, summary}`，无需向用户确认。没有 wake 时，后台用
-`hao wait <target> --token <shortid> --timeout N` 轮询，或 `hao status <target>` 查看任务。
+`python3 scripts/hao wait <target> --token <shortid> --timeout N` 轮询，或 `hao status <target>` 查看任务。
 
 完整命令、错误码、等待协议见 `references/protocol.md`；restore 算法见 `references/restore.md`；词表见 `references/names.md`。
 

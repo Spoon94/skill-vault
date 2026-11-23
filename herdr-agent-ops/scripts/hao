@@ -3,7 +3,6 @@
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -16,16 +15,17 @@ SENTINEL_RE = re.compile(
     rf"^\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE:?\s+((?:hao-)?[0-9a-f]{{12,32}})[{_TAIL_CHARS}]*$")
 
 
-def hao_command():
-    """Bare hao when on PATH, else exact python + script invocation."""
-    if shutil.which("hao"):
-        return "hao"
+def _hao_script():
     try:
-        path = os.path.realpath(__file__)
+        return os.path.realpath(__file__)
     except NameError:
-        path = os.path.realpath(hao_command.__code__.co_filename)
+        return os.path.realpath(hao_command.__code__.co_filename)
+
+
+def hao_command():
+    """Always invoke the skill-local script through the interpreter."""
     py = sys.executable or "python3"
-    return f'{py} "{path}"'
+    return f'{py} "{_hao_script()}"'
 
 
 def run_herdr(args, machine=None):
@@ -958,7 +958,7 @@ def cmd_done(token, summary, final=False):
         target = rec.get("target") if rec else None
         wake_msg = f"[HAO_WAKE] {sid} done"
         if target:
-            wake_msg += f" — run: hao wait {target} --token {sid}"
+            wake_msg += f" — run: {hao_command()} wait {target} --token {sid}"
         rw, _, ew = run_herdr(["agent", "prompt", wake, wake_msg])
         if rw != 0:
             wake_rc = herdr_error_rc(ew, 8)
@@ -1425,6 +1425,7 @@ def cmd_doctor(machine=None):
     else:
         for k, v in checks:
             print(k, "ok" if v else "MISSING")
+
     if not ok:
         return fail(8, "one or more doctor checks failed")
     return 0
