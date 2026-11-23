@@ -54,3 +54,51 @@ pi 真实渲染字形清单（采样自 wG:p1）：`│ ┃ ─ └`（边框）
 1. G3 只改装饰符常量与夹具，不改合并/校验逻辑。
 2. 每项带测试；全绿 + 集成冒烟；文档受 D9/D10 守卫保护。
 3. 一个 conventional commit：`feat(hao): cross-agent portability (G1-G5)`，push 后简报 ≤20 行再 `hao done`。
+
+---
+
+# 第二轮（H1–H5）：对齐官方规范与仓库惯例
+
+## 调研结论（仓库内 + 外部官方文档）
+
+| 来源 | 约定 |
+|---|---|
+| Agent Skills 官方规范（agentskills.io/skill-creation/using-scripts） | 用**相对 skill 根目录的路径**引用脚本（`python3 scripts/x.py`），agent 自动解析；在 SKILL.md 里**列出可用脚本**；前置条件写进 SKILL.md，运行环境要求用 `compatibility` 前置字段（≤500 字符） |
+| OpenCode 官方文档 | "Paths written inside the skill are relative to the directory containing `SKILL.md`" |
+| Codex / Copilot CLI / pi / VS Code | 均实现 Agent Skills 规范，相对路径；pi 区分"可直接执行（shebang+可执行位）"与"需经解释器"的脚本 |
+| Gemini CLI 官方文档 | 直接支持 `SKILL.md`（`~/.gemini/skills/` 或 `.gemini/skills/`）；激活后模型可访问整个 skill 目录。**不需要 `GEMINI.md`** |
+| 仓库 `superpowers/writing-skills` | **经解释器调用脚本，绝不裸跑**——某些 harness 打包器会抹掉可执行位 |
+| 仓库 `diagram/diagram-image` | `SKILL_ROOT="${CLAUDE_SKILL_DIR:-<Codex skill 元数据里的绝对路径>}"; python3 "$SKILL_ROOT/scripts/…"`；"不要假设 cwd 或上一条命令的 shell 变量还在" |
+| 仓库 INSTALL.md | 各平台 skill 目录表；但 Gemini 行写"参考 `GEMINI.md`"——仓库 0 个 skill 有该文件，属过时约定 |
+
+**结论**：当前 SKILL.md 的 `python3 <skill目录>/scripts/hao` 方向对，但缺三样——规范要求的"可用脚本"清单、per-harness 的路径解析说明（`SKILL_ROOT` 惯用法）、经解释器调用的明确约束；frontmatter 缺 `license`/`compatibility`。此外 peer 侧仍依赖长绝对路径命令——装到 PATH 是对任何 agent 都最短最稳的形态。
+
+## 修复项
+
+### H1（P1）SKILL.md 对齐官方规范与仓库惯例
+- 调用形式统一为 `python3 scripts/hao …`（相对 SKILL.md 所在目录）。
+- 加「定位脚本」小节（借 diagram-image 写法）：各平台按 SKILL.md 所在目录解析；Claude Code 为 `${CLAUDE_SKILL_DIR}`；shell 的 cwd 不在 skill 目录时用一行 `SKILL_ROOT="${CLAUDE_SKILL_DIR:-<本 SKILL.md 所在目录>}"; python3 "$SKILL_ROOT/scripts/hao" …`；写明不要假设 cwd 或上一条 shell 变量还在。
+- 加「可用脚本」清单：`scripts/hao`。
+- 前置条件写进正文：herdr ≥ 0.9.5、`HERDR_ENV=1`、python3 ≥ 3.9、POSIX。
+- 明确"一律经解释器调用，不裸跑"；alias/包装器同样经 `python3`。
+- frontmatter 加 `license: MIT` 与 `compatibility: "Requires herdr >= 0.9.5 with HERDR_ENV=1, python3 >= 3.9, POSIX (macOS/Linux)."`。
+
+### H2（P1）`hao install`：一条命令装到 PATH
+- `hao install [--dir DIR]`：在 DIR（默认 `~/.local/bin`）写入包装器 `hao`：`#!/bin/sh` + 标记注释 `# hao wrapper: herdr-agent-ops` + `exec "<python>" "<abs hao>" "$@"`（不依赖脚本可执行位）。幂等；DIR 不在 PATH 时输出 `export PATH` 提示。`--print-alias` 只打印不写文件；`hao uninstall`。
+- `hao_command()`：PATH 上的 `hao` 仅当文件内容含 wrapper 标记（或即本脚本）才信任，否则回退绝对路径（防同名程序）。
+- `doctor` 增加 `hao on PATH` 检查，未装则提示 `hao install`。
+- 测试：临时目录安装→包装器可用；幂等；陌生同名 `hao` 不被信任；`--print-alias`。
+
+### H3（P2）README
+- 30 秒上手第 0 步改为 `python3 <skill目录>/scripts/hao install`，alias 作为备选；命令面表加 `install`/`uninstall`；一句话写明相对路径约定并指向 INSTALL.md。
+
+### H4（P2）peer prompt
+- 已装 → `hao done …`；未装 → 绝对路径。两种形态均经解释器。
+
+### H5（P3）INSTALL.md Gemini 行修正
+- 改为：`~/.gemini/skills/` 或项目内 `.gemini/skills/`（官方支持 `SKILL.md`）。只改这一行。
+
+## 验收（Claude）
+- SKILL.md：无仅限 `${CLAUDE_SKILL_DIR}` 的调用形式；含相对路径形式、定位说明、可用脚本清单、前置条件。
+- `hao install --dir <临时目录>` → 包装器可执行且 `hao doctor` 正常；`hao_command()` 随之输出裸 `hao`。
+- 跨 agent 复测：以临时 PATH 目录起一次性 pi，prompt 应为短命令 `hao done …`，任务经台账完成。
