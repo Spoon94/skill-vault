@@ -425,23 +425,29 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
         os.makedirs(os.path.dirname(result_path), mode=0o700, exist_ok=True)
     prompt = build_prompt(text, token, result_path)
     assert token not in prompt, "full token must not appear in prompt (echo guard)"
-    rc, _, err = run_herdr(["agent", "prompt", pane, prompt], machine)
-    if rc != 0:
-        return herdr_error_rc(err)
     l = _led.Ledger()
+    wrote = False
     try:
         l.write_running(shortid, token=token, target=pane, machine=machine,
                         wake=wake, mode=mode, result_path=result_path,
                         caller=os.environ.get("HERDR_PANE_ID"),
                         submit_seq=current_seq(pane, machine),
                         submit_state=current_state(pane, machine))
+        wrote = True
     except Exception as e:
         if strict_ledger:
             _set_error(f"ledger write failed: {e}")
             return 8
-        # r8#3: the task is already dispatched — the token MUST survive;
-        # wake/cancel degrade to unavailable (spec: ledger best-effort)
+        # B6: non-strict still dispatches, but the token must survive.
         _ledger_warn(e)
+    rc, _, err = run_herdr(["agent", "prompt", pane, prompt], machine)
+    if rc != 0:
+        if wrote:
+            try:
+                l.cancel(shortid)
+            except Exception as ce:
+                _ledger_warn(ce)
+        return herdr_error_rc(err)
     if wait:
         return cmd_wait(pane, token, timeout, mode, machine)
     out = {"token": token, "shortid": shortid,
