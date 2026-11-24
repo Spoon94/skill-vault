@@ -616,7 +616,7 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
 
 # ---------------------------------------------------------------- ask/wait/done
 
-def build_prompt(task, token, result_path=None):
+def build_prompt(task, token, result_path=None, text_only=False):
     h = token[4:]
     half = len(h) // 2
     shortid = h[:12]
@@ -628,19 +628,27 @@ def build_prompt(task, token, result_path=None):
         "",
         "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
         f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
-        "完成顺序：先输出最终答复的全部正文；随后在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
-        f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token <完整令牌> "
-        '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
-        "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。",
-        "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
     ]
+    if text_only:
+        lines += [
+            "完成顺序：输出完最终答复的全部正文后，在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
+            "不要调用任何命令；只输出最终答复和最后一行哨兵。",
+        ]
+    else:
+        lines += [
+            "完成顺序：先输出最终答复的全部正文；随后在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
+            f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token <完整令牌> "
+            '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
+            "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。",
+            "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
+        ]
     if result_path:
         lines.append(f"请先把最终结果完整写入文件 {result_path}，写完后再做完成上报。")
     return "\n".join(lines)
 
 
 def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
-            strict_ledger=False):
+            strict_ledger=False, text_only=False):
     _led = _load_module("hao_ledger", "ledger.py")
     hexpart = os.urandom(8).hex()          # exactly 16 hex
     token = "hao-" + hexpart
@@ -661,7 +669,7 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
     if mode == "file":
         result_path = os.path.join(_led.state_dir(), shortid, "result.md")
         os.makedirs(os.path.dirname(result_path), mode=0o700, exist_ok=True)
-    prompt = build_prompt(text, token, result_path)
+    prompt = build_prompt(text, token, result_path, text_only=text_only)
     assert token not in prompt, "full token must not appear in prompt (echo guard)"
     l = _led.Ledger()
     wrote = False
@@ -957,6 +965,34 @@ def _strip_tui_line(line):
     return line
 
 
+_PROTOCOL_ECHO_PREFIXES = (
+    "以下完成上报", "完成时，将令牌", "完成顺序：", "首选完成上报",
+    "同时在最终消息", "只有确认下面", "若无法执行", "——台账副作用",
+    "请先把最终结果", "不要调用任何命令",
+)
+
+
+def _is_harness_noise(raw, cleaned):
+    low = cleaned.lower()
+    if cleaned.startswith(_PROTOCOL_ECHO_PREFIXES):
+        return True
+    if low.startswith("thought for") or low.startswith("update available"):
+        return True
+    if raw.lstrip()[:1] in set("✻●⏺") and " for " in low:
+        return True
+    if not cleaned:
+        return True
+    if re.fullmatch(r"[-─━═_=]{3,}", cleaned):
+        return True
+    return cleaned in (">", "❯", "$", "%")
+
+
+def _set_blocked_hint(pane):
+    _set_error(f"agent {pane} is blocked; peer may be approval-gated: "
+               f"ask the user to approve that command once, or re-dispatch "
+               f"with: hao ask {pane} \"<task>\" --text-only")
+
+
 def _tail_from_pane_text(text, token, sid):
     """Text before the last matching sentinel, stripped and capped."""
     lines = text.splitlines()
@@ -977,7 +1013,17 @@ def _tail_from_pane_text(text, token, sid):
                 break
     if start is None:
         return ""
-    cleaned = [_strip_tui_line(line) for line in lines[:start]]
+    raw = lines[:start]
+    cleaned = [_strip_tui_line(line) for line in raw]
+    last_task = None
+    for i, line in enumerate(cleaned):
+        if "--- 任务结束 ---" in line:
+            last_task = i
+    if last_task is not None:
+        raw = raw[last_task + 1:]
+        cleaned = cleaned[last_task + 1:]
+    cleaned = [line for line, orig in zip(cleaned, raw)
+               if not _is_harness_noise(orig, line)]
     while cleaned and not cleaned[0]:
         cleaned.pop(0)
     while cleaned and not cleaned[-1]:
@@ -1113,6 +1159,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                 return _finish_done(
                     l, sid, last,
                     _completion_tail(pane, token, sid, machine))
+            if gate == 5 and not sentinel_seen:
+                _set_blocked_hint(pane)
             return gate
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
@@ -1224,6 +1272,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
                                      seen_record)
+            if gate == 5 and not sentinel_seen:
+                _set_blocked_hint(pane)
             return gate
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
@@ -1328,7 +1378,10 @@ def _wait_file(pane, sid, token, timeout, machine):
             except Exception:
                 st = None
             if st == "blocked":
-                return 4 if _deadline_passed(deadline) else 5
+                if _deadline_passed(deadline):
+                    return 4
+                _set_blocked_hint(pane)
+                return 5
             if st in ("exited", "closed"):
                 return 4 if _deadline_passed(deadline) else 3
         rec = _safe_get(l, sid) or {}
@@ -2279,7 +2332,8 @@ def build_parser():
     sp.add_argument("--json", action="store_true", help="emit one JSON summary line")
 
     sp = add("ask", lambda a: cmd_ask(a.target, a.text, a.wait, a.mode, a.wake,
-                                       a.timeout, a.machine, a.strict_ledger), ["a"],
+                                       a.timeout, a.machine, a.strict_ledger,
+                                       a.text_only), ["a"],
              "Dispatch a task to an agent, optionally waiting for completion.")
     sp.add_argument("target", help="pane id, label, or agent name")
     sp.add_argument("text", help="task text to send")
@@ -2293,6 +2347,8 @@ def build_parser():
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
     sp.add_argument("--strict-ledger", dest="strict_ledger", action="store_true",
                     help="fail instead of degrading when the ledger write fails")
+    sp.add_argument("--text-only", dest="text_only", action="store_true",
+                    help="omit the hao done command; completion via text sentinel only")
     sp.add_argument("--json", action="store_true", help="accepted; ask always emits JSON")
 
     def _wait_run(a):
