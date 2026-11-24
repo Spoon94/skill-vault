@@ -104,6 +104,74 @@ class TestR5RunningCleanup(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIsNotNone(Ledger().get(self.sid))
 
+    def test_clean_removes_when_pane_is_gone(self):
+        with mock.patch.object(
+                hao, "run_herdr", return_value=(
+                    1, "", '{"error":{"code":"pane_not_found"}}')):
+            rc, _out, _err = run_cli(["clean", "--ttl", "0", "--json"],
+                                     self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(Ledger().get(self.sid))
+
+    def test_clean_removes_when_agent_is_gone(self):
+        with mock.patch.object(
+                hao, "run_herdr", return_value=(
+                    1, "", '{"error":{"code":"agent_not_found"}}')):
+            rc, _out, _err = run_cli(["clean", "--ttl", "0", "--json"],
+                                     self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(Ledger().get(self.sid))
+
+    def test_clean_removes_when_pane_has_no_agent(self):
+        with mock.patch.object(
+                hao, "run_herdr",
+                return_value=(0, json.dumps({"result": {"agent": None}}), "")):
+            rc, _out, _err = run_cli(["clean", "--ttl", "0", "--json"],
+                                     self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(Ledger().get(self.sid))
+
+    def test_clean_all_removes_when_pane_is_gone(self):
+        with mock.patch.object(
+                hao, "run_herdr", return_value=(
+                    1, "", '{"error":{"code":"pane_not_found"}}')):
+            rc, _out, _err = run_cli(["clean", "--all", "--json"], self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(Ledger().get(self.sid))
+
+    def test_clean_all_keeps_working_agent(self):
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=status_stub("working")):
+            rc, _out, _err = run_cli(["clean", "--all", "--json"], self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNotNone(Ledger().get(self.sid))
+
+    def test_clean_removes_when_agent_key_is_absent(self):
+        with mock.patch.object(
+                hao, "run_herdr",
+                return_value=(0, json.dumps({"result": {}}), "")):
+            rc, _out, _err = run_cli(["clean", "--ttl", "0", "--json"],
+                                     self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(Ledger().get(self.sid))
+
+    def test_clean_keeps_unknown_agent_state(self):
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=status_stub("unknown")):
+            rc, _out, _err = run_cli(["clean", "--ttl", "0", "--json"],
+                                     self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNotNone(Ledger().get(self.sid))
+
+    def test_clean_keeps_other_herdr_errors(self):
+        with mock.patch.object(
+                hao, "run_herdr", return_value=(
+                    1, "", '{"error":{"code":"connection_failure"}}')):
+            rc, _out, _err = run_cli(["clean", "--ttl", "0", "--json"],
+                                     self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNotNone(Ledger().get(self.sid))
+
     def test_doctor_keeps_aged_running_while_working(self):
         run = SimpleNamespace(returncode=0, stdout="ok", stderr="")
         with mock.patch.object(hao, "run_herdr",
@@ -115,6 +183,16 @@ class TestR5RunningCleanup(unittest.TestCase):
         ledger = next(c for c in data["checks"] if c["name"] == "ledger")
         self.assertEqual(ledger["kept"], 1)
         self.assertIsNotNone(Ledger().get(self.sid))
+
+    def test_doctor_removes_when_pane_is_gone(self):
+        run = SimpleNamespace(returncode=0, stdout="ok", stderr="")
+        with mock.patch.object(
+                hao, "run_herdr", return_value=(
+                    1, "", '{"error":{"code":"pane_not_found"}}')), \
+                mock.patch.object(hao.subprocess, "run", return_value=run):
+            rc, _out, _err = run_cli(["doctor", "--json"], self.env)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(Ledger().get(self.sid))
 
     def test_doctor_removes_aged_running_when_idle(self):
         run = SimpleNamespace(returncode=0, stdout="ok", stderr="")

@@ -109,7 +109,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 - **cancel 不停止对方**：`cancel`/`abort`（不带 `--interrupt`）只作废等待；目标仍 working 时命令输出 `peer_running:true`、`next` 和 stderr 提示，要停对方执行 `abort <sid> --interrupt`。取消 tombstone 保留到 abort 完成、tidy 发现目标不 working、取消超过 1 小时或 `clean`；`wait` 看到 rc10 不删除。
 - **stop vs abort**：`stop <target>` 只停当前这一轮，不依赖/不读写任务记录；`abort <sid> --interrupt` 先作废任务再停对方。两者对 blocked 都要求 TTY/0600 授权。
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
-- running 记录过 TTL 后，`clean` / `doctor` 会先看 target 的 agent 状态；对方仍 working/blocked（或状态读不到）时保留，不删除。
+- running 记录过 TTL 后，`clean` / `doctor` 会先看 target 的 agent 状态；target pane/agent 已不存在时删除，agent 存在且 working/blocked/unknown 或状态读取异常时保留。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）
 

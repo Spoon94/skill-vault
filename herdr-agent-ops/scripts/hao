@@ -1090,16 +1090,34 @@ def _peer_is_working(rec):
 
 
 def _record_peer_active(rec):
-    """True when a running record's peer is still working/blocked, or its
-    live state cannot be read (conservative: keep the record)."""
+    """True when a running record's peer still exists and may be active.
+
+    pane_not_found/agent_not_found (or an explicit null agent) means the
+    target is gone: the record is safe to expire. Any other unreadable
+    state stays conservative and keeps the record.
+    """
     target = rec.get("target") if rec else None
     if not target:
         return False
     try:
-        state = current_state(target, rec.get("machine"))
+        rc, out, err = run_herdr(["agent", "get", target], rec.get("machine"))
     except Exception:
         return True
-    return state in ("working", "blocked", "unknown")
+    if rc != 0:
+        return _herdr_err_code(err) not in ("pane_not_found", "agent_not_found")
+    try:
+        result = json.loads(out)["result"]
+        if not isinstance(result, dict):
+            return True
+        agent = result.get("agent")
+    except Exception:
+        return True
+    if agent is None:
+        return False
+    if not isinstance(agent, dict):
+        return True
+    status = agent.get("agent_status", "unknown")
+    return status in ("working", "blocked", "unknown")
 
 
 def _peer_running_hint(label, sid):

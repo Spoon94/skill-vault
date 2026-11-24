@@ -312,13 +312,19 @@ class Ledger:
                 status = rec.get("status")
                 aged = now - rec.get("updated", 0) > ttl_s
                 if status == "running":
-                    keep = False
-                    if aged and not all_ and is_running is not None:
+                    active = None
+                    if is_running is not None and (aged or all_):
                         try:
-                            keep = bool(is_running(rec))
+                            active = bool(is_running(rec))
                         except Exception:
-                            keep = True  # unreadable peer state: conservative
-                    remove = aged and not all_ and not keep
+                            active = True  # unreadable peer state: conservative
+                    if all_:
+                        # --all may remove running records only when the
+                        # target is confirmed inactive/gone; active or
+                        # unreadable targets stay.
+                        remove = active is False
+                    else:
+                        remove = aged and active is not True
                     if not remove:
                         stats["kept_running"] += 1
                 elif status in ("done", "cancelled"):
