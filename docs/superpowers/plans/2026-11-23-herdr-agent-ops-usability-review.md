@@ -205,3 +205,21 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 
 - `hao stop`：working 的 agent → 停下；idle → 不发按键、rc=0；无 agent 的 pane → rc=3；blocked → 无授权 rc=5、有 0600 授权文件 rc=0（若能人为制造 blocked 状态）。
 - `ask` 对小于 40 列的 pane 给出警告，对宽 pane 不给。
+
+## 追加（R4–R6）：验收与真实使用中带出的三处
+
+### R4 `agent_status_after` 读得太早
+- 现象：`hao stop`（以及 `abort --interrupt`）发出按键后立刻回读状态，herdr 尚未更新，输出仍是 `working` / `blocked`，agent 读到会以为没停成功。
+- 修复：发送后每 0.3s 轮询一次，直到状态相对按键前发生变化或满 3s；输出最后观察到的 `agent_status_after`。3s 内未变化时 stderr 追加一句「状态 3s 内未变化，对方可能没有响应」。
+
+### R5 清理不得删除对方仍在工作的 running 记录
+- 现象：真实使用中，异步 + 唤醒的任务从派发起就没有等待方、也就没有心跳（实测一条任务 34 分钟无更新，对方仍在工作）。按现有 TTL 规则（running 且无心跳超过 24h 即清），超过 24h 的长任务其记录会在对方完成前被 `doctor` / `clean` 清掉，之后对方的 `hao done` 得到 exit 3、唤醒也不会发出，结果丢失。
+- 修复：`clean` / `doctor` / tidy 在删除 running 记录前检查其 target 的 agent 状态；对方仍 working 或 blocked 时**保留**该记录（不计入可清理）。台账不可读等异常情况维持原有保守行为。
+
+### R6 升级说明
+- 旧版本（PR #9 之前）的台账在 `~/.local/state/hao/tasks/`，新版本默认在系统临时目录。升级时若有旧版本派出、尚未取走的任务，用 `HAO_STATE_DIR=~/.local/state/hao/tasks` 运行 `hao wait` 即可读取。
+- README 增加一小节「从旧版本升级」写明这一点。
+
+## 验收（Claude）
+- R4：对工作中的一次性 agent 执行 `stop`，输出中的 `agent_status_after` 为按键后的新状态。
+- R5：构造 running 记录且其 target 为 working，`hao clean --all` 不删除；target 不 working 时按原规则删除。
