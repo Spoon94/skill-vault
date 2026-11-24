@@ -290,3 +290,23 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 ### 实测记录（2026-11-25）
 - pi、Claude Code、qodercli：端到端通过。agy：本机未登录，无法测试。
 - 跨机器 `--machine`：本机无 SSH machine，端到端无法验证；调用点传递经静态审计完整，错误路径由 R10 覆盖。
+
+## 追加（R13–R14）：herdr 调用无超时导致 hao 无限挂起
+
+### R13 `hao ask` 在 herdr 客户端挂住时无限期挂起
+- 现象（实测）：对 qodercli 派活时，子进程 `herdr agent prompt` 一直没有返回，`hao ask … --wait --timeout 150` 因此挂了 **3 小时 50 分钟**，直到人工结束该 herdr 客户端才返回 rc=8。`--timeout` 只约束等待循环，派发动作本身没有任何上限。
+- 根因：`run_herdr` 用 `subprocess.run(cmd, capture_output=True, text=True)` 调用 herdr，没有 timeout。**所有** herdr 调用都受影响：任何一个 herdr 客户端挂住，对应的 hao 命令就永远不返回。
+- 修复：`run_herdr` 对每次调用设上限，超时即结束子进程并返回失败（rc 视为 herdr 错误，退出码 8，消息写明是哪条 herdr 命令、等了多久）：
+  | 调用 | 上限 |
+  |---|---|
+  | `agent prompt`（派发） | 30s |
+  | `pane wait-output --timeout N`（毫秒） | N/1000 + 5s |
+  | `agent wait --timeout N` | N/1000 + 5s |
+  | 其余（get / list / rename / send-keys / pane read / machine status 等） | 20s |
+- `ask` 在派发调用失败或超时时：记录取消（现有行为保留），错误文案明确写出「prompt 是否送达未知」，并提示用 `herdr pane read <pane>` 查看、必要时重新派发。
+- 测试：用 PATH 上会 `sleep 60` 的 herdr shim，逐个验证带每种调用的命令都能在上限内返回 rc=8、无异常、无残留（台账、进程）。
+
+### R14 herdr 不可达时 `status` 误报为「target not found」
+- 现象（实测，herdr 不可达）：`hao status w2:p9` → rc=3「target not found」。实际原因是 herdr 连不上。
+- 修复：`status` 区分「查询失败」与「确实不存在」，前者返回 8 并写明原因。
+- 测试：herdr shim 返回非 0 → `status` rc=8；正常返回但无匹配 → rc=3。
