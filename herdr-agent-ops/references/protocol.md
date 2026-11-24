@@ -21,6 +21,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 ## 等待协议
 
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。部分 agent（如 Claude Code）的工具 stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
+- **已验证哨兵**：快路径 `pane wait-output` 已验证到本任务哨兵行时保存该行；随后状态门槛返回 3/5/9 且屏幕重扫找不到哨兵（例如审批框盖住屏幕）时，使用已验证哨兵完成，`tail` 尽力提取、不可读则为 null + `tail_note`。herdr 故障（8）仍立即返回。三种等待模式中具备哨兵证据的路径同样处理。
 - **需要审批的 agent**：完成顺序固定为「最终答复正文 → 最后一行备份哨兵 → 仅当可直执行时再调 `hao done`」。审批由工具层在命令发出时拦截，模型事先无法可靠判断，因此默认模式对审批型 peer 的结果**不确定**；prompt 明确：需要审批或不确定时**不要请求审批，直接只打印备份信号**。默认模式结果在 `wait.tail`；需要确定性时用 `hao ask --text-only`，其 prompt 完全不出现 `hao done`，只要求答复+哨兵，结果只走文本通道。`tail` 从调用方 prompt 回显结束之后取（按归一化文本定位，容忍折行/TUI 装饰；回显滚出窗口时回退任务分隔符启发式），剥离 harness 状态行/分隔线，最多 40 行/2000 字符，`summary` 仅来自台账。可放行该命令或使用免审批模式启用台账通道；`--wake` 依赖 `hao done`，审批型 peer 上属于尽力而为。
 - **peer 完成上报（文本在前、台账可后）**：最终消息总是「完整答复正文 + 最后一行 `HAO_DONE <token>`」；哨兵打印完之后，仅在确认 `HAO_STATE_DIR="<调用方台账目录>" hao done --token <完整token> --summary "<关键结论/答复正文>"` 能直接执行（不触发审批）时才调用。台账 done 副作用可靠、不受渲染折行/TUI 改写/secret 掩码影响，`summary` 包含答复正文（≤600 字）；文本哨兵保证即使命令被审批框卡住也有完成信号。两段 token 直接拼接（无分隔符，实测出现过重复段/丢前缀/插分隔符三种拼错形态）。
 - **防回显**：token 拆分两段，prompt 不含完整 token；`[TASK <shortid>]` 用独立短 id。
@@ -49,7 +50,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 
 - `hao suggest --json`：`{"group": str, "reason": str, "candidates": [name, ...]}`
 - `hao ask`（异步）：`{"token": str, "shortid": str, "next": str, "result_path": str?（file 模式，台账写失败时仍在）, "target_cols": int?（布局可取时）}`
-- `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?, "tail": str?}`（`summary` 仅来自 peer 的 `hao done --summary`；经哨兵完成且台账无 done 记录时，`tail` 为 prompt 回显结束之后、哨兵之前的最终答复，剥离 TUI/协议回显/状态行，最多 40 行/2000 字符（回显不可见时回退任务分隔符启发式））。blocked 且未见哨兵时 exit5 的 stderr 会提示审批型对方可批准一次或用 `hao ask --text-only` 重新派发。
+- `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?, "tail": str|null, "tail_note": str?, "last_line": str|null}`（`summary` 仅来自 peer 的 `hao done --summary`；经哨兵完成且台账无 done 记录时，`tail` 为 prompt 回显结束之后、哨兵之前的文本，剥离 TUI/协议回显/状态行，最多 40 行/2000 字符；`tail` 可能包含 peer 界面显示的思考过程，`last_line` 是其中最后一条非空、非界面状态行。屏幕快照被审批框遮挡/哨兵不在快照时 `tail` 为 null 并给 `tail_note`，不回填协议回显）。blocked 且未见哨兵时 exit5 的 stderr 会提示审批型对方可批准一次或用 `hao ask --text-only` 重新派发。
 - `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
 - `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null（无 agent 时为 null，不是 unknown）, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
 - `hao stop`：`{"ok": true, "pane_id": str, "agent_status_before": str, "sent": [str, ...], "agent_status_after": str?, "dry_run"?: true}`；already idle 时 `sent: []`。

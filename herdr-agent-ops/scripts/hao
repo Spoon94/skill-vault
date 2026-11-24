@@ -1045,7 +1045,7 @@ def _tail_from_pane_text(text, token, sid, prompt=None):
                 start = i
                 break
     if start is None:
-        return ""
+        return None
     prompt_end = _prompt_end_line(lines, prompt)
     if prompt_end is not None and prompt_end < start:
         raw = lines[prompt_end + 1:start]
@@ -1078,13 +1078,17 @@ def _completion_tail(pane, token, sid, machine, prompt=None):
             ["pane", "read", pane, "--source", "recent-unwrapped",
              "--lines", "200"], machine)
         if rc != 0:
-            return None
+            return None, None, "peer screen not readable (dialog may cover it)"
         try:
             text = json.loads(out)["result"]["read"]["text"]
         except Exception:
             text = out
         _LAST_PANE_TEXT = text
-    return _tail_from_pane_text(text, token, sid, prompt=prompt)
+    tail = _tail_from_pane_text(text, token, sid, prompt=prompt)
+    if tail is None:
+        return None, None, "peer screen not readable (dialog may cover it)"
+    last_line = tail.splitlines()[-1] if tail.splitlines() else None
+    return tail, last_line, None
 
 
 def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
@@ -1133,7 +1137,13 @@ def _confirm_sentinel(pane, token, sid, machine, no_agent):
 FAST_PATH_SECONDS = 30
 
 
-def _finish_done(l, sid, ml, tail=None):
+def _finish_sentinel(l, sid, ml, pane, token, machine, prompt=None):
+    tail, last_line, note = _completion_tail(
+        pane, token, sid, machine, prompt=prompt)
+    return _finish_done(l, sid, ml, tail, note, last_line)
+
+
+def _finish_done(l, sid, ml, tail=None, tail_note=None, last_line=None):
     had_done = False
     try:
         rec = l.get(sid)
@@ -1145,8 +1155,11 @@ def _finish_done(l, sid, ml, tail=None):
     except Exception as e:
         _ledger_warn(e)  # r7#1: confirmed completion must still be returned
     out = {"status": "done", "matched_line": ml}
-    if tail is not None and not had_done:
+    if not had_done and (tail is not None or tail_note is not None):
         out["tail"] = tail
+        out["last_line"] = last_line
+    if tail_note is not None and not had_done:
+        out["tail_note"] = tail_note
     return out
 
 
@@ -1168,6 +1181,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     last_status = None
     seen_record = False
     sentinel_seen = False
+    validated_ml = None
     response_warned = False
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
@@ -1196,9 +1210,12 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             # Only status gates (3/5/9) get the pre-give-up rescan.
             last, _e = _sentinel_scan_tail(pane, token, sid, machine)
             if last:
-                return _finish_done(
-                    l, sid, last,
-                    _completion_tail(pane, token, sid, machine, prompt=prompt))
+                return _finish_sentinel(
+                    l, sid, last, pane, token, machine, prompt=prompt)
+            if validated_ml is not None:
+                return _finish_sentinel(
+                    l, sid, validated_ml, pane, token, machine,
+                    prompt=prompt)
             if gate == 5 and not sentinel_seen:
                 _set_blocked_hint(pane)
             return gate
@@ -1211,14 +1228,15 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                 return errc
             if ml:
                 sentinel_seen = True
+                validated_ml = ml
                 if _deadline_passed(deadline):
                     return _wait_timeout(observed_working, last_status,
                                          timeout, seen_record)
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
-                    return _finish_done(
-                        l, sid, conf,
-                        _completion_tail(pane, token, sid, machine, prompt=prompt))
+                    return _finish_sentinel(
+                        l, sid, conf, pane, token, machine,
+                        prompt=prompt)
             time.sleep(0.5)
         else:
             if _deadline_passed(deadline):
@@ -1239,14 +1257,15 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                 return errc
             if last:
                 sentinel_seen = True
+                validated_ml = last
                 if _deadline_passed(deadline):
                     return _wait_timeout(observed_working, last_status,
                                          timeout, seen_record)
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
-                    return _finish_done(
-                        l, sid, conf,
-                        _completion_tail(pane, token, sid, machine, prompt=prompt))
+                    return _finish_sentinel(
+                        l, sid, conf, pane, token, machine,
+                        prompt=prompt)
             else:
                 time.sleep(0.5)
         response_warned = _maybe_warn_unresponsive(
@@ -1290,6 +1309,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     last_status = None
     seen_record = bool(rec0)
     sentinel_seen = False
+    validated_ml = None
     response_warned = False
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
@@ -1314,6 +1334,10 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
                                      seen_record)
+            if validated_ml is not None:
+                return _finish_sentinel(
+                    l, sid, validated_ml, pane, token, machine,
+                    prompt=prompt)
             if gate == 5 and not sentinel_seen:
                 _set_blocked_hint(pane)
             return gate
@@ -1338,14 +1362,14 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             return errc
         if ml:
             sentinel_seen = True
+            validated_ml = ml
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
                                      seen_record)
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
-                return _finish_done(
-                    l, sid, conf,
-                    _completion_tail(pane, token, sid, machine, prompt=prompt))
+                return _finish_sentinel(
+                    l, sid, conf, pane, token, machine, prompt=prompt)
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
@@ -1354,14 +1378,14 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             return errc2
         if last:
             sentinel_seen = True
+            validated_ml = last
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
                                      seen_record)
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
-                return _finish_done(
-                    l, sid, conf,
-                    _completion_tail(pane, token, sid, machine, prompt=prompt))
+                return _finish_sentinel(
+                    l, sid, conf, pane, token, machine, prompt=prompt)
         response_warned = _maybe_warn_unresponsive(
             pane, time.time() - start, last_status, observed_working,
             sentinel_seen, response_warned)
