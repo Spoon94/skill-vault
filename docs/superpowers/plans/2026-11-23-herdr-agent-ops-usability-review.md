@@ -444,3 +444,28 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 - 真机（审批型 Claude Code，窄 pane，`--text-only`）连续 3 次：`tail` 恰为答复（如 `"42"`），不含任何协议说明文字。
 - 免审批对方经文本通道完成时 `tail` 同样干净。
 - 现有测试三方式全绿，集成冒烟通过。
+
+## 追加（R23）：已见过的哨兵不能丢；`tail` 可能含对方的思考过程
+
+### 现象一：对方先打印哨兵、再调用 `hao done` 并被审批框卡住时，等待方仍返回 rc=5
+- 真机（审批型 Claude Code，默认模式）：等待循环先经增量输出（`pane wait-output`）看到并验证了本任务的哨兵行，记为 `sentinel_seen`；随后稳定性确认因对方 blocked 不通过；门槛返回 5；「放弃前重扫」去读屏幕——**审批框盖住了屏幕，herdr 的屏幕快照三种来源都只剩约 30 行可见区域**，哨兵行已不在快照里——重扫失败；因为 `sentinel_seen` 为真，`--text-only` 提示也被抑制；最终返回笼统的 rc=5。
+- 也就是说：对方已经发出了完成信号，等待方手里有那一行，却把证据丢了并报告失败。
+
+### 修复一
+- 快路径（`pane wait-output`）验证到哨兵行时，把**那一行文本**保存下来（不只是置一个布尔标志）。
+- 门槛返回状态类结果（3 / 5 / 9）时：先照旧重扫；重扫找不到、但手里存有已验证的哨兵行 → 用它完成（经文本通道），不要返回门槛码。herdr 故障（8）仍立即返回。
+- 此时 `tail` 尽力从快照提取；哨兵行不在快照里（被对话框盖住）则 `tail` 为 null，并在返回体里加一句说明字段（如 `"tail_note": "peer screen not readable (dialog may cover it)"`），不要用协议回显充数。
+- 测试：stub 让 `pane wait-output` 返回本任务哨兵行、随后 `agent get` 返回 blocked、`pane read` 返回不含哨兵的短快照 → 断言 rc=0、`matched_line` 等于那一行、`tail` 为 null 且带说明。
+
+### 现象二：`tail` 可能包含对方界面显示的思考过程
+- 真机（pi，`--text-only`）：`tail` 是「The task: 9 + 6 = 15. Only answer the number. Then print sentinel last line: …」——pi 的界面会把推理内容显示出来，屏幕文本无法可靠区分推理与正文。
+
+### 修复二
+- 返回体增加 `last_line`：哨兵行之前最后一条非空、非界面状态行的文本（对「只回答数字」类任务即答复本身）。
+- 文档（protocol.md / README）写明：`tail` 是对方在哨兵之前显示的文本，可能含其界面显示的思考过程；`last_line` 是其中最后一行。
+- 测试：`last_line` 剥离状态行与装饰；无可用行时为 null。
+
+### 验收标准
+- 真机（审批型 Claude Code，默认模式）：若对方先打印哨兵再被审批框卡住 → `ask --wait` rc=0、`matched_line` 非空；若对方先被卡住没打印哨兵 → rc=5 且提示含 `--text-only`。
+- 真机（pi，`--text-only`）：`last_line` 为答复（如 `"15"`）。
+- 现有测试三方式全绿，集成冒烟通过。
