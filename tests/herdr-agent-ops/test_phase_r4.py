@@ -108,7 +108,7 @@ class TestR4SettledStatus(unittest.TestCase):
         self.assertEqual(data["agent_status_before"], "working")
         self.assertEqual(data["agent_status_after"], "idle")
         self.assertNotIn("did not change", err)
-        self.assertIsNone(Ledger().get(sid))
+        self.assertTrue(Ledger().get(sid)["interrupted"])
 
     def test_abort_interrupt_warns_when_status_unchanged(self):
         sid = "abcd12345678"

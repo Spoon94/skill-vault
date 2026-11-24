@@ -75,6 +75,15 @@ def resolve_target(target, machine=None):
         for p in json.loads(out)["result"]["panes"]:
             if p.get("label") == target or p.get("agent") == target:
                 return p["pane_id"]
+    # R8: pane label/agent-type matching missed; resolve a herdr agent name.
+    rc, out, _ = run_herdr(["agent", "list"], machine)
+    if rc == 0 and out:
+        try:
+            for a in json.loads(out)["result"]["agents"]:
+                if a.get("name") == target and a.get("pane_id"):
+                    return a["pane_id"]
+        except Exception:
+            pass
     return target
 
 
@@ -1015,6 +1024,12 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
                     l.consume(sid)
                 except Exception as e:
                     _ledger_warn(e)
+    elif result == 10:
+        try:
+            _led = _load_module("hao_ledger", "ledger.py")
+            _led.Ledger().consume(sid)
+        except Exception as e:
+            _ledger_warn(e)
     if result == 4 and timeout:
         _set_error(_WAIT_DIAG or f"timeout after {timeout}s")
     return result
@@ -1241,7 +1256,7 @@ def cmd_abort(shortid, interrupt):
     if not changed:
         _settle_warning("abort", target)
     try:
-        l.consume(sid)
+        l.mark_interrupted(sid)
     except Exception as e:
         _ledger_warn(e)
     if _JSON_OUTPUT:

@@ -147,14 +147,14 @@ class TestC2CancelledRetention(unittest.TestCase):
         os.environ.pop("HAO_STATE_DIR", None)
         self.tmp.cleanup()
 
-    def test_wait_does_not_consume_cancelled_tombstone(self):
+    def test_wait_consumes_cancelled_tombstone_after_observing_it(self):
         Ledger().write_running(self.sid, target="w2:p9")
         Ledger().cancel(self.sid)
         rc, _out, _err = run_cli(["wait", "w2:p9", self.sid], self.env)
         self.assertEqual(rc, 10)
-        self.assertEqual(Ledger().get(self.sid)["status"], "cancelled")
+        self.assertIsNone(Ledger().get(self.sid))
 
-    def test_abort_interrupt_consumes_tombstone(self):
+    def test_abort_interrupt_marks_and_wait_consumes_tombstone(self):
         Ledger().write_running(self.sid, target="w2:p9")
         Ledger().cancel(self.sid)
         with mock.patch.object(hao, "run_herdr",
@@ -163,8 +163,12 @@ class TestC2CancelledRetention(unittest.TestCase):
             rc, _out, err = run_cli(
                 ["abort", self.sid, "--interrupt", "--json"], self.env)
         self.assertEqual(rc, 0, err)
+        rec = Ledger().get(self.sid)
+        self.assertEqual(rec["status"], "cancelled")
+        self.assertTrue(rec["interrupted"])
+        rc, _out, _err = run_cli(["wait", "w2:p9", self.sid], self.env)
+        self.assertEqual(rc, 10)
         self.assertIsNone(Ledger().get(self.sid))
-        self.assertFalse(os.path.exists(self.state))
 
     def test_clean_removes_cancelled_when_target_not_working(self):
         Ledger().write_running(self.sid, target="w2:p9")

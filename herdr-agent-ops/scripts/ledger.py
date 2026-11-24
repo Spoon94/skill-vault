@@ -170,6 +170,14 @@ class Ledger:
             return 3
         return rc
 
+    def mark_interrupted(self, shortid):
+        """Mark a cancelled record as interrupted; waiters/tidy consume it."""
+        def go(rec):
+            rec["interrupted"] = True
+            rec["interrupted_at"] = time.time()
+            rec["updated"] = time.time()
+        return self._rw(shortid, go, create=False)
+
     def consume(self, shortid, keep_result=False):
         """Delete a consumed record and its per-record artifacts.
 
@@ -233,6 +241,16 @@ class Ledger:
             except Exception:
                 continue
             if rec.get("status") != "cancelled":
+                continue
+            if rec.get("interrupted"):
+                interrupted_at = rec.get("interrupted_at",
+                                         rec.get("updated", 0))
+                heartbeat_age = now - rec.get("updated", 0)
+                if not force and (now - interrupted_at <= 60
+                                  or heartbeat_age <= 60):
+                    continue
+                if self.consume(sid):
+                    removed += 1
                 continue
             cancelled_at = _cancelled_ts(rec)
             try:
@@ -330,8 +348,15 @@ class Ledger:
                 elif status in ("done", "cancelled"):
                     remove = all_ or aged
                     if status == "cancelled":
-                        cancelled_at = _cancelled_ts(rec)
-                        remove = remove or (now - cancelled_at > 3600)
+                        if rec.get("interrupted") and not all_:
+                            interrupted_at = rec.get("interrupted_at",
+                                                     rec.get("updated", 0))
+                            heartbeat_age = now - rec.get("updated", 0)
+                            remove = (now - interrupted_at > 60
+                                      and heartbeat_age > 60)
+                        else:
+                            cancelled_at = _cancelled_ts(rec)
+                            remove = remove or (now - cancelled_at > 3600)
                 else:
                     remove = aged
                 if remove:

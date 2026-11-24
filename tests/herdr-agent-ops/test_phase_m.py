@@ -86,7 +86,9 @@ class TestM1AbortJson(unittest.TestCase):
                                         "cancelled": True, "interrupted": True,
                                         "agent_status_before": "idle",
                                         "agent_status_after": "idle"})
-                self.assertIsNone(Ledger().get("abcd12345678"))
+                rec = Ledger().get("abcd12345678")
+                self.assertEqual(rec["status"], "cancelled")
+                self.assertTrue(rec["interrupted"])
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)
 
