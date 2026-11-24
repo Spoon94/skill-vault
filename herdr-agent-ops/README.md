@@ -37,7 +37,7 @@ herdr-agent-ops/
 | `hao restore [--workspace W\|--all] [--adopt\|--no-adopt] [--dry-run] [--pick PANE] [--machine M] [--json]` | 从 label 恢复名字并输出摘要 |
 | `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--wake` 异步唤醒；`--json` no-op |
 | `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
-| `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；summary 是结果载荷 |
+| `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；可读台账但无记录 → exit3 无哨兵；summary 是结果载荷 |
 | `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | 取消/中断（blocked 需用户授权） |
 | `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
 | `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
@@ -91,7 +91,7 @@ python3 <skill目录>/scripts/hao wait w2:p9 --token <shortid>
 
 ## 输出契约
 
-结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。所有命令支持 `--json`（`ask`/`wait` 恒 JSON，flag 为 no-op）。
+结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。所有命令支持 `--json`（`ask`/`wait` 的成功与失败都恒 JSON，flag 为 no-op；`done` 的 JSON 走 stderr）。
 
 ```text
 hao name: name 'forge' already taken by agent on w2:p9 (exit 6)

@@ -428,7 +428,7 @@ class TestWriteDegradation(unittest.TestCase):
                 raise TimeoutError("ledger lock timeout")
 
             def get(self, sid):
-                return None
+                return {"status": "running"}
 
         self.lm.Ledger = BoomLedger
         out, err = io.StringIO(), io.StringIO()

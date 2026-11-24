@@ -223,8 +223,14 @@ class TestPhaseBJson(unittest.TestCase):
 
     def test_done_json(self):
         with tempfile.TemporaryDirectory() as d:
-            rc, out, err = run_cli(["done", "hao-" + "abcd12345678" + "9900",
-                                    "--json"], {"XDG_STATE_HOME": d})
+            token = "hao-" + "abcd12345678" + "9900"
+            os.environ["XDG_STATE_HOME"] = d
+            try:
+                Ledger().write_running("abcd12345678", token=token)
+                rc, out, err = run_cli(["done", token, "--json"],
+                                       {"XDG_STATE_HOME": d})
+            finally:
+                os.environ.pop("XDG_STATE_HOME", None)
         self.assertEqual(rc, 0)
         self.assertIn("HAO_DONE", out)
         self.assertTrue(json.loads(err.splitlines()[-1])["ok"])

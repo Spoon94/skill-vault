@@ -933,8 +933,17 @@ def cmd_done(token, summary, final=False):
     except ValueError:
         _set_error("invalid token; expected 12-hex shortid or hao- token")
         return 2
-    l = _led.Ledger()
-    rec = _safe_get(l, sid)
+    try:
+        l = _led.Ledger()
+        rec = l.get(sid)
+        ledger_readable = True
+    except Exception as e:
+        l = None
+        rec = None
+        ledger_readable = False
+        _ledger_warn(e)
+    if rec is None and ledger_readable:
+        return fail(3, f"task {sid} not found")
     if rec and rec.get("status") == "cancelled":
         return fail(6, f"task {sid} was cancelled; refusing to mark done")
     if final and (not rec or rec.get("status") != "done"):
@@ -945,7 +954,8 @@ def cmd_done(token, summary, final=False):
             if st not in ("idle", "done"):
                 return fail(5, f"agent {target} is {st}; --final requires idle or done")
     try:
-        l.write_done(sid, summary=summary)
+        if l is not None:
+            l.write_done(sid, summary=summary)
     except Exception as e:
         # r8#3: the sentinel printed below is the fallback evidence —
         # a ledger failure must never swallow it
@@ -976,7 +986,7 @@ def cmd_done(token, summary, final=False):
     return wake_rc
 
 
-def cmd_cancel(shortid):
+def cmd_cancel(shortid, emit_json=True):
     _led = _load_module("hao_ledger", "ledger.py")
     try:
         sid = normalize_id(shortid)
@@ -988,7 +998,7 @@ def cmd_cancel(shortid):
         return fail(3, f"task {sid} not found")
     if rc == 6:
         return fail(6, f"task {sid} is already done")
-    if rc == 0 and _JSON_OUTPUT:
+    if rc == 0 and _JSON_OUTPUT and emit_json:
         _json_out({"ok": True, "shortid": sid})
     return rc
 
@@ -1043,13 +1053,14 @@ def cmd_abort(shortid, interrupt):
         if rc == 6:
             return fail(6, f"task {sid} is already done")
         if rc == 0 and _JSON_OUTPUT:
-            _json_out({"ok": True, "shortid": sid, "interrupted": False})
+            _json_out({"ok": True, "shortid": sid, "cancelled": True,
+                       "interrupted": False})
         return rc
     # aborting a blocked agent may discard its approval UI: needs user auth
     if target and current_state(target, rec.get("machine")) == "blocked" \
             and not _abort_approved(sid):
         return fail(5, f"task {sid} agent is blocked; interrupt requires TTY or 0600 approval")
-    rc = cmd_cancel(sid)
+    rc = cmd_cancel(sid, emit_json=False)
     if rc != 0:
         return rc
     if not target:
@@ -1062,7 +1073,8 @@ def cmd_abort(shortid, interrupt):
     if r2 != 0:
         return herdr_error_rc(e2, 8)
     if _JSON_OUTPUT:
-        _json_out({"ok": True, "shortid": sid, "interrupted": True})
+        _json_out({"ok": True, "shortid": sid, "cancelled": True,
+                   "interrupted": True})
     return 0
 
 
@@ -1664,7 +1676,17 @@ def main(argv=None):
         print()
         cmd_list()
         return 0
-    args = p.parse_args(argv)
+    try:
+        args = p.parse_args(argv)
+    except SystemExit as exc:
+        # argparse errors bypass main's normal error renderer; ask/wait keep
+        # their promise of JSON on every failure path.
+        if exc.code and argv:
+            cmd0 = _CMD_ALIASES.get(argv[0], argv[0])
+            if cmd0 in ("ask", "wait"):
+                print(json.dumps({"ok": False, "error": "usage error",
+                                  "exit": exc.code}, ensure_ascii=False))
+        raise
     cmd = _CMD_ALIASES.get(args.cmd, args.cmd)
     global _ERROR_DETAIL, _JSON_OUTPUT, _JSON_HANDLED
     _ERROR_DETAIL = None
@@ -1678,7 +1700,9 @@ def main(argv=None):
         return 0
     if isinstance(result, int) and result:
         reason = _error_reason(cmd, result)
-        if _JSON_OUTPUT and cmd in _JSON_COMMANDS and not _JSON_HANDLED:
+        always_json = cmd in ("ask", "wait")
+        if ((always_json or (_JSON_OUTPUT and cmd in _JSON_COMMANDS))
+                and not _JSON_HANDLED):
             dest = sys.stderr if cmd == "done" else sys.stdout
             print(json.dumps({"ok": False, "error": reason, "exit": result},
                              ensure_ascii=False), file=dest)
