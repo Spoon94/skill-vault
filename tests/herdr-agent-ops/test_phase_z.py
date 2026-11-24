@@ -172,8 +172,13 @@ class TestZ3Consume(unittest.TestCase):
             try:
                 led.Ledger().write_running("abcd12345678", target="w2:p9")
                 self.assertEqual(led.Ledger().cancel("abcd12345678"), 0)
+                def status_stub(args, machine=None):
+                    if args[:2] == ["agent", "get"]:
+                        return 0, json.dumps({"result": {"agent": {
+                            "agent_status": "idle"}}}), ""
+                    return 0, "{}", ""
                 with mock.patch.object(hao, "run_herdr",
-                                       return_value=(0, "{}", "")), \
+                                       side_effect=status_stub), \
                         mock.patch.object(hao.time, "sleep", return_value=None):
                     rc, _out, err = run_cli(
                         ["abort", "abcd12345678", "--interrupt", "--json"],

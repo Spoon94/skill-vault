@@ -46,11 +46,14 @@ def hao_command():
 HERDR_TIMEOUT_DEFAULT = 20
 HERDR_TIMEOUT_PROMPT = 30
 HERDR_TIMEOUT_WAIT_EXTRA = 5
+HERDR_TIMEOUT_HINT = 5
 
 
 def _herdr_timeout(args):
     if args[:2] == ["agent", "prompt"]:
         return HERDR_TIMEOUT_PROMPT
+    if args[:2] == ["pane", "layout"]:
+        return HERDR_TIMEOUT_HINT
     if args[:2] in (["pane", "wait-output"], ["agent", "wait"]):
         try:
             ms = int(args[args.index("--timeout") + 1])
@@ -167,31 +170,40 @@ def herdr_error_rc(stderr, fallback=8):
     return ERR.get(code, fallback) if code else fallback
 
 
-def resolve_target(target, machine=None):
-    """Normalize w:t:p -> w:p; resolve label / agent name -> pane id."""
+def _resolve_target_ex(target, machine=None):
+    """Returns (pane, error_rc); error_rc is set on a herdr/JSON failure."""
     m = re.match(r"^(w\w+):t\w+:(p\w+)$", target or "")
     if m:
-        return f"{m.group(1)}:{m.group(2)}"
+        return f"{m.group(1)}:{m.group(2)}", None
     if PANE_ID_RE.match(target or ""):
-        return target
-    rc, out, _ = run_herdr(["pane", "list"], machine)
-    if rc == 0 and out:
-        try:
-            for p in json.loads(out)["result"]["panes"]:
-                if p.get("label") == target or p.get("agent") == target:
-                    return p["pane_id"]
-        except Exception:
-            pass
+        return target, None
+    rc, out, err = run_herdr(["pane", "list"], machine)
+    if rc != 0:
+        return target, herdr_error_rc(err, 8)
+    try:
+        panes = json.loads(out)["result"]["panes"] if out else []
+    except Exception:
+        return target, fail(8, "herdr returned invalid JSON for pane list")
+    for p in panes:
+        if p.get("label") == target or p.get("agent") == target:
+            return p["pane_id"], None
     # R8: pane label/agent-type matching missed; resolve a herdr agent name.
-    rc, out, _ = run_herdr(["agent", "list"], machine)
-    if rc == 0 and out:
-        try:
-            for a in json.loads(out)["result"]["agents"]:
-                if a.get("name") == target and a.get("pane_id"):
-                    return a["pane_id"]
-        except Exception:
-            pass
-    return target
+    rc, out, err = run_herdr(["agent", "list"], machine)
+    if rc != 0:
+        return target, herdr_error_rc(err, 8)
+    try:
+        agents = json.loads(out)["result"]["agents"] if out else []
+    except Exception:
+        return target, fail(8, "herdr returned invalid JSON for agent list")
+    for a in agents:
+        if a.get("name") == target and a.get("pane_id"):
+            return a["pane_id"], None
+    return target, None
+
+
+def resolve_target(target, machine=None):
+    """Normalize w:t:p -> w:p; resolve label / agent name -> pane id."""
+    return _resolve_target_ex(target, machine)[0]
 
 
 def pane_width(pane, machine=None):
@@ -255,7 +267,9 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
     if scope and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,11}", scope):
         _set_error("invalid scope; expected [a-z0-9][a-z0-9-]{0,11}")
         return 2
-    pane = resolve_target(target, machine)
+    pane, resolve_rc = _resolve_target_ex(target, machine)
+    if resolve_rc:
+        return resolve_rc
     rc, out, err = run_herdr(["agent", "list"], machine)
     if rc != 0:
         return herdr_error_rc(err, 8)
@@ -310,12 +324,14 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
     rc1, _, err1 = run_herdr(["pane", "rename", pane, label], machine)
     if rc1 != 0:
         return herdr_error_rc(err1)
-    rc2, _, _ = run_herdr(["agent", "get", pane], machine)
+    rc2, _, err2 = run_herdr(["agent", "get", pane], machine)
     if rc2 != 0:
-        if _JSON_OUTPUT:
-            _json_out({"ok": True, "pane_id": pane, "name": name,
-                       "scope": scope, "label": label, "kept": kept})
-        return 0  # shell-only pane: label set, no agent to rename
+        if _herdr_err_code(err2) == "agent_not_found":
+            if _JSON_OUTPUT:
+                _json_out({"ok": True, "pane_id": pane, "name": name,
+                           "scope": scope, "label": label, "kept": kept})
+            return 0  # shell-only pane: label set, no agent to rename
+        return herdr_error_rc(err2, 8)
     rc3, _, err3 = run_herdr(["agent", "rename", pane, name], machine)
     if rc3 != 0:
         return herdr_error_rc(err3, 8)
@@ -326,7 +342,9 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
 
 
 def cmd_clear(target, force, dry_run=False, machine=None):
-    pane = resolve_target(target, machine)
+    pane, resolve_rc = _resolve_target_ex(target, machine)
+    if resolve_rc:
+        return resolve_rc
     rcg, outg, errg = run_herdr(["pane", "get", pane], machine)
     if rcg != 0:
         return herdr_error_rc(errg, 8)
@@ -347,11 +365,13 @@ def cmd_clear(target, force, dry_run=False, machine=None):
     rc1, _, err1 = run_herdr(["pane", "rename", pane, "--clear"], machine)
     if rc1 != 0:
         return herdr_error_rc(err1)
-    rca, _, _ = run_herdr(["agent", "get", pane], machine)
+    rca, _, erra = run_herdr(["agent", "get", pane], machine)
     if rca != 0:
-        if _JSON_OUTPUT:
-            _json_out({"ok": True, "pane_id": pane})
-        return 0  # no agent: label cleared is enough
+        if _herdr_err_code(erra) == "agent_not_found":
+            if _JSON_OUTPUT:
+                _json_out({"ok": True, "pane_id": pane})
+            return 0  # no agent: label cleared is enough
+        return herdr_error_rc(erra, 8)
     rc2, _, err2 = run_herdr(["agent", "rename", pane, "--clear"], machine)
     if rc2 != 0:
         return herdr_error_rc(err2)
@@ -625,15 +645,18 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
     hexpart = os.urandom(8).hex()          # exactly 16 hex
     token = "hao-" + hexpart
     shortid = hexpart[:12]
-    pane = resolve_target(target, machine)
+    pane, resolve_rc = _resolve_target_ex(target, machine)
+    if resolve_rc:
+        return resolve_rc
     target_cols = pane_width(pane, machine)
     warn_narrow_pane("ask", pane, target_cols)
+    submit_seq, st, snapshot_rc = _agent_snapshot(pane, machine)
+    if snapshot_rc:
+        return snapshot_rc
     if mode == "lifecycle" and not wait:
         return fail(2, "lifecycle mode requires --wait")
-    if mode == "lifecycle":
-        st = current_state(pane, machine)
-        if st in ("working", "blocked", "unknown"):
-            return fail(6, f"lifecycle mode needs an idle agent; {pane} is {st}")
+    if mode == "lifecycle" and st in ("working", "blocked", "unknown"):
+        return fail(6, f"lifecycle mode needs an idle agent; {pane} is {st}")
     result_path = None
     if mode == "file":
         result_path = os.path.join(_led.state_dir(), shortid, "result.md")
@@ -646,8 +669,7 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
         l.write_running(shortid, token=token, target=pane, machine=machine,
                         wake=wake, mode=mode, result_path=result_path,
                         caller=os.environ.get("HERDR_PANE_ID"),
-                        submit_seq=current_seq(pane, machine),
-                        submit_state=current_state(pane, machine))
+                        submit_seq=submit_seq, submit_state=st)
         wrote = True
     except Exception as e:
         if strict_ledger:
@@ -1239,7 +1261,9 @@ def _wait_file(pane, sid, token, timeout, machine):
 
 def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
              no_agent=False, accept_unknown=False):
-    pane = resolve_target(target, machine)
+    pane, resolve_rc = _resolve_target_ex(target, machine)
+    if resolve_rc:
+        return resolve_rc
     try:
         sid = normalize_id(token)
     except ValueError:
@@ -1345,9 +1369,29 @@ def _abort_command(sid):
     return f"{hao_command()} abort {sid} --interrupt"
 
 
-def _peer_is_working(rec):
+def _peer_status_ex(pane, machine=None):
+    """Return (agent_status, error_rc) from one agent get; 8 is fatal."""
+    rc, out, err = run_herdr(["agent", "get", pane], machine)
+    if rc != 0:
+        if _herdr_err_code(err) in ("agent_not_found", "pane_not_found"):
+            return "unknown", None
+        return None, herdr_error_rc(err, 8)
+    try:
+        return json.loads(out)["result"]["agent"].get("agent_status"), None
+    except Exception:
+        return None, fail(8, f"herdr returned invalid JSON for agent {pane}")
+
+
+def _peer_is_working_ex(rec):
     target = rec.get("target") if rec else None
-    return bool(target) and current_state(target, rec.get("machine")) == "working"
+    if not target:
+        return False, None
+    status, err = _peer_status_ex(target, rec.get("machine"))
+    return status == "working", err
+
+
+def _peer_is_working(rec):
+    return _peer_is_working_ex(rec)[0]
 
 
 def _record_peer_active(rec):
@@ -1405,7 +1449,11 @@ def cmd_cancel(shortid, emit_json=True, notify=True):
         return 2
     l = _led.Ledger()
     rec = _safe_get(l, sid)
-    peer_running = _peer_is_working(rec) if notify else False
+    peer_running = False
+    if notify:
+        peer_running, peer_err = _peer_is_working_ex(rec)
+        if peer_err:
+            return peer_err
     rc = l.cancel(sid)
     if rc == 3:
         return fail(3, f"task {sid} not found")
@@ -1466,7 +1514,9 @@ def cmd_abort(shortid, interrupt):
         return fail(3, f"task {sid} not found")
     target = rec.get("target")
     if not interrupt:
-        peer_running = _peer_is_working(rec)
+        peer_running, peer_err = _peer_is_working_ex(rec)
+        if peer_err:
+            return peer_err
         rc = l.cancel(sid)
         if rc == 3:
             return fail(3, f"task {sid} not found")
@@ -1481,17 +1531,21 @@ def cmd_abort(shortid, interrupt):
         if peer_running:
             _peer_running_hint("abort", sid)
         return rc
-    # aborting a blocked agent may discard its approval UI: needs user auth
-    if target and current_state(target, rec.get("machine")) == "blocked" \
-            and not _abort_approved(sid):
-        return fail(5, f"task {sid} agent is blocked; interrupt requires TTY or 0600 approval")
+    status_before = "unknown"
+    if target:
+        status_before, status_err = _peer_status_ex(
+            target, rec.get("machine"))
+        if status_err:
+            return status_err
+        # aborting a blocked agent may discard its approval UI: needs user auth
+        if status_before == "blocked" and not _abort_approved(sid):
+            return fail(5, f"task {sid} agent is blocked; interrupt requires TTY or 0600 approval")
     rc = cmd_cancel(sid, emit_json=False, notify=False)
     if rc != 0:
         return rc
     if not target:
         return fail(3, f"task {sid} has no target pane")
     mach = rec.get("machine")
-    status_before = current_state(target, mach)
     r1, _, e1 = run_herdr(["agent", "send-keys", target, "esc"], mach)
     if r1 != 0:
         return herdr_error_rc(e1, 8)
@@ -1537,7 +1591,9 @@ def _stop_approved(pane):
 
 
 def cmd_stop(target, dry_run=False, machine=None):
-    pane = resolve_target(target, machine)
+    pane, resolve_rc = _resolve_target_ex(target, machine)
+    if resolve_rc:
+        return resolve_rc
     allow = os.environ.get("HAO_ABORT_ALLOW")
     if allow not in (None, "", "1"):
         _set_error("invalid HAO_ABORT_ALLOW; expected 1 or unset")
@@ -1673,6 +1729,22 @@ def current_state(target, machine=None):
         return "unknown"
 
 
+def _agent_snapshot(pane, machine=None):
+    """One agent get for dispatch: returns (state_change_seq, status, error_rc)."""
+    rc, out, err = run_herdr(["agent", "get", pane], machine)
+    if rc != 0:
+        if _herdr_err_code(err) == "agent_not_found":
+            return 0, "unknown", None
+        code = herdr_error_rc(err, 8)
+        return 0, "unknown", code if code == 8 else None
+    try:
+        ag = json.loads(out)["result"]["agent"]
+        return (ag.get("state_change_seq") or 0,
+                ag.get("agent_status", "unknown"), None)
+    except Exception:
+        return 0, "unknown", fail(8, f"herdr returned invalid JSON for agent {pane}")
+
+
 SETTLE_INTERVAL = 0.3
 SETTLE_ATTEMPTS = 10
 
@@ -1735,7 +1807,12 @@ def _status_tasks(pane):
 
 
 def cmd_status(target, text_mode=False):
-    pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
+    if target:
+        pane, resolve_rc = _resolve_target_ex(target)
+        if resolve_rc:
+            return resolve_rc
+    else:
+        pane = os.environ.get("HERDR_PANE_ID")
     if not pane:
         _set_error("target required (or HERDR_PANE_ID)")
         return 3
@@ -1800,7 +1877,12 @@ def cmd_status(target, text_mode=False):
 
 
 def cmd_say(target, text, strict=False):
-    pane = resolve_target(target) if target else os.environ.get("HERDR_PANE_ID")
+    if target:
+        pane, resolve_rc = _resolve_target_ex(target)
+        if resolve_rc:
+            return resolve_rc
+    else:
+        pane = os.environ.get("HERDR_PANE_ID")
     if not pane:
         return fail(3, "target required (or HERDR_PANE_ID)")
     if strict and current_state(pane) == "working":

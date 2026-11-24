@@ -212,13 +212,96 @@ exit 0
         self.assertNotIn("X" * 20, err)
         self._assert_no_live_shim()
 
+    def test_ask_all_hang_returns_8_without_ledger(self):
+        rc, out, err = self._run(["ask", "w2:p9", "task", "--json"], "all")
+        self.assertEqual(rc, 8)
+        lines = [line for line in out.splitlines() if line.strip()]
+        self.assertEqual(len(lines), 1, out)
+        self.assertFalse(os.path.exists(self.state), err)
+
     def test_timeout_limits(self):
+        self.assertEqual(hao._herdr_timeout(["pane", "layout", "p"]), 5)
         self.assertEqual(hao._herdr_timeout(["agent", "prompt", "p"]), 30)
         self.assertEqual(hao._herdr_timeout(["pane", "wait-output", "p",
                                              "--timeout", "1000"]), 6)
         self.assertEqual(hao._herdr_timeout(["agent", "wait", "p",
                                              "--timeout", "8000"]), 13)
         self.assertEqual(hao._herdr_timeout(["agent", "get", "p"]), 20)
+
+
+class TestR17AskSingleGetAndFailFast(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = os.path.join(self.tmp.name, "hao", "tasks")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _ask_stub(self, gets):
+        def stub(args, machine=None):
+            if args[:2] == ["pane", "layout"]:
+                return 0, json.dumps({"result": {"layout": {"panes": []}}}), ""
+            if args[:2] == ["agent", "get"]:
+                gets.append(args)
+                return 0, json.dumps({"result": {"agent": {
+                    "agent_status": "idle", "state_change_seq": 3}}}), ""
+            if args[:2] == ["agent", "prompt"]:
+                return 0, "{}", ""
+            return 0, "{}", ""
+        return stub
+
+    def test_async_ask_gets_agent_once(self):
+        gets = []
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=self._ask_stub(gets)):
+            rc, _out, err = run_cli(
+                ["ask", "w2:p9", "task", "--json"],
+                {"HAO_STATE_DIR": self.state})
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(len(gets), 1, gets)
+
+    def test_lifecycle_precheck_reuses_same_get(self):
+        gets = []
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=self._ask_stub(gets)), \
+                mock.patch.object(hao, "cmd_wait",
+                                  return_value={"status": "done"}):
+            rc, _out, err = run_cli(
+                ["ask", "w2:p9", "task", "--mode", "lifecycle", "--wait",
+                 "--json"], {"HAO_STATE_DIR": self.state})
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(len(gets), 1, gets)
+
+    def test_first_herdr_failure_stops_resolve(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(hao, "run_herdr",
+                                  return_value=(8, "", "herdr unavailable")):
+            for cmd in (["name", "verse", "hawk"],
+                        ["clear", "verse"],
+                        ["stop", "verse"],
+                        ["ask", "verse", "task"],
+                        ["status", "verse"]):
+                with self.subTest(cmd=cmd):
+                    os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
+                    try:
+                        rc = hao.main(cmd)
+                    finally:
+                        os.environ.pop("HAO_STATE_DIR", None)
+                    self.assertEqual(rc, 8)
+                    self.assertFalse(os.path.exists(
+                        os.path.join(d, "hao", "tasks")))
+
+    def test_cancel_stops_before_ledger_write_on_herdr_failure(self):
+        os.environ["HAO_STATE_DIR"] = self.state
+        try:
+            Ledger().write_running("abcd12345678", target="w2:p9")
+            with mock.patch.object(hao, "run_herdr",
+                                   return_value=(8, "", "herdr unavailable")):
+                rc = hao.cmd_cancel("abcd12345678")
+            self.assertEqual(rc, 8)
+            self.assertEqual(Ledger().get("abcd12345678")["status"], "running")
+        finally:
+            os.environ.pop("HAO_STATE_DIR", None)
 
 
 class TestR15SingleAgentGet(unittest.TestCase):
