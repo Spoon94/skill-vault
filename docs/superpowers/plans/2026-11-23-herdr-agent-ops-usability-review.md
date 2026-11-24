@@ -167,3 +167,41 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 ## 验收（Claude）
 - 重跑系统性 stdout 扫描：16 条命令全部为「恰好一个 JSON」或（done）按文档例外。
 - `hao done <不存在的 12-hex>` → rc=3，台账文件数不变。
+
+---
+
+# 追加（R1–R3）：直接控制对方 agent + 窄 pane 警告
+
+## 背景
+
+用户看到 forge 持续刷屏，要求「控制它、把进程杀掉」。核查后并没有失控进程（forge 空闲、无子进程、屏幕 22 秒内无变化），但暴露两个缺口：
+
+1. **没有任务记录时，hao 无法让一个 agent 停下当前这一轮**。唯一的办法是 `abort <sid> --interrupt`，而它依赖任务记录；今天这种情形只能手写原生 `herdr agent send-keys`。
+2. **窄 pane 不提示**。本次 forge 的 pane 只有 25 列。窄 pane 既让任何输出看起来像疯狂滚动，也是此前哨兵连续失配（关键字被拆行、token 被折断，r7–r13）的根源，但派发时没有任何提醒。
+
+## R1 `hao stop <target>`：让 agent 停下当前这一轮
+
+- 语义：向目标 agent 发送 `esc` → `ctrl+c`，不依赖任务记录，不读写台账。
+- 守卫（安全优先，宁可不发也不误发）：
+  | 目标状态 | 行为 |
+  |---|---|
+  | working | 发送 `esc`、`ctrl+c`；回读状态写入输出 |
+  | idle / done / exited / closed | **不发按键**（对空闲的 TUI 发 `ctrl+c` 可能触发退出），exit 0，输出 `already idle` |
+  | blocked | 与 `abort --interrupt` 相同的用户级授权：TTY 确认，或 0600 的 `~/.config/hao/abort-approval` 文件内容含该 pane id；无授权 exit 5 |
+  | unknown | 不发按键，exit 9，提示 |
+  | pane 无 agent | exit 3，不发按键 |
+- flag：`--dry-run`、`--json`、`--machine`。JSON：`{"ok":true,"pane_id":"…","agent_status_before":"working","sent":["esc","ctrl+c"],"agent_status_after":…}`；already idle 时 `sent: []`。
+- 文档（README / SKILL.md / protocol.md / 顶层 help）写清与 abort 的区别：`abort <sid> --interrupt` = 作废任务并停对方；`stop` = 只停当前这一轮。
+
+## R2 窄 pane 警告
+
+- `ask`：解析目标 pane 后取 `herdr pane layout --pane <id>` 中该 pane 的宽度；小于 40 列 → stderr 输出一行警告（不阻塞、不改退出码）：对方 TUI 会折断每一行、文本哨兵可能无法识别、台账通道不受影响、建议加宽 pane。JSON 输出增加 `target_cols`。取不到布局时静默跳过。
+- `doctor`：`HERDR_PANE_ID` 可用时报告当前 pane 宽度（小于 40 列记为 warn），取不到则跳过；不创建任何文件。
+- 测试（stub 布局）：窄 → 有警告且有 `target_cols`；宽 → 无警告；布局获取失败 → 静默。
+
+## R3 验收（Claude）
+
+一次性实例放在**后台标签页**，不再挤用户当前标签页。
+
+- `hao stop`：working 的 agent → 停下；idle → 不发按键、rc=0；无 agent 的 pane → rc=3；blocked → 无授权 rc=5、有 0600 授权文件 rc=0（若能人为制造 blocked 状态）。
+- `ask` 对小于 40 列的 pane 给出警告，对宽 pane 不给。
