@@ -223,3 +223,25 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 ## 验收（Claude）
 - R4：对工作中的一次性 agent 执行 `stop`，输出中的 `agent_status_after` 为按键后的新状态。
 - R5：构造 running 记录且其 target 为 working，`hao clean --all` 不删除；target 不 working 时按原规则删除。
+
+## 追加（R7）：目标 pane 已不存在的过期记录永远删不掉
+
+### 现象（验收 R5 时实测）
+- 对一个已关闭的目标 pane，`current_state()` 返回 `'unknown'`。
+- R5 的 `_record_peer_active` 把 `unknown` 视为「对方可能仍在工作」而保留记录。
+- 结果：目标 pane 或 agent 已不存在的过期 running 记录，`hao clean --ttl 0`、`--all`、`doctor` 都删不掉，记录与锁文件永久残留。一次性 pane 关闭、agent 退出、herdr 重启后 pane 编号变化都会触发，违背零残留。
+
+### 修复
+- `_record_peer_active` 区分「对方不存在」与「状态读不到」：
+  - herdr 返回 `pane_not_found` / `agent_not_found`（或 pane 上已无 agent）→ 视为不活跃，过期后可删除；
+  - agent 存在且状态为 `working` / `blocked` → 保留；
+  - agent 存在且状态为 `unknown` → 保留（保守）；
+  - 其他错误（herdr 不可达等）→ 保留（保守）。
+- `hao stop` / `abort --interrupt` 的守卫不变（unknown 一律不发按键）。
+
+### 测试
+- 过期 running 记录 + 目标 pane 不存在 → `clean --ttl 0` 删除；
+- 过期 running 记录 + 目标 pane 存在但无 agent → 删除；
+- 过期 running 记录 + 目标 agent working → 保留；
+- 过期 running 记录 + agent 状态 unknown → 保留；
+- 过期 running 记录 + herdr 报其他错误 → 保留。
