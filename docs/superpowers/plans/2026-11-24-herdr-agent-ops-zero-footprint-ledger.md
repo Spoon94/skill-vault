@@ -52,3 +52,34 @@
 2. 真实任务 `ask --wait` 完成 → 记录与目录全部消失。
 3. 异步任务 + `wait` 取结果后同上；`cancel` 后由 `wait` 观察到 rc=10 → 消失。
 4. `~/.local/state/hao/` 不再被创建。
+
+---
+
+# 追加（C1–C2）：cancel 如实告知对方仍在运行
+
+## 现象
+
+`hao cancel` 只作废台账、不碰对方（设计如此），但输出不提示这一点。实测中调用方取消后以为对方已停，对方（forge）继续跑完了两个长任务。更糟的是 Z3 规定等待方一观察到 cancelled 就删除 tombstone，此时按提示去 `abort --interrupt` 会得到 rc=3，无法再停止对方。
+
+## 修复
+
+### C1 cancel / abort 的输出如实提示
+- `hao cancel <sid>` 与不带 `--interrupt` 的 `hao abort <sid>`：JSON 输出增加 `peer_running`（取消时目标 agent 是否处于 working）；为 true 时增加 `next`：`"<HAO_CMD> abort <sid> --interrupt"`（与 `ask` 的 `next` 字段同一约定），stderr 再输出一行同样内容的提示。文本模式输出同一提示。
+- 文档（README 命令面、protocol.md）明确：`cancel` 只是不再等结果，对方继续运行；要对方停下用 `abort --interrupt`。
+
+### C2 取消记录的保留规则
+- 取消的 tombstone **不再**在等待方观察到 cancelled 时立即删除。保留到下列任一情况：
+  (a) `abort --interrupt` 执行完毕 → 删除；
+  (b) 后续 tidy 发现目标 agent 已不处于 working → 删除；
+  (c) 取消后超过 1 小时 → 删除；
+  (d) `hao clean`。
+- tidy 只在会改变状态的命令以及 `doctor` / `clean` 中运行；只读命令不做删除。
+- done 记录「取走即删」的规则不变；无记录时目录照旧一并消失。
+
+## 测试
+- cancel：目标 working → `peer_running: true` 且 `next` 含 `abort … --interrupt`、stderr 有提示；目标 idle → `peer_running: false` 无 `next`；无 target → 无 `next`。
+- 保留规则：cancel → 等待方得到 rc=10 → tombstone 仍在 → `abort --interrupt` 成功 → tombstone 与目录消失；cancel 后目标已不 working → 下一次 tidy 删除；取消超过 1 小时 → `clean` 删除。
+
+## 流程约束（给实施方）
+- 测试中需要「工作中的 agent」一律用 stub，不得向任何真实 agent 派发长任务。
+- **禁止 `pkill -f`、`killall` 等按名称或模式结束进程**（2026-11-24 的 `pkill -f 'herdr-agent-ops/scripts/hao'` 误杀了其他会话的后台 `hao wait`）；只能按 PID 结束自己启动的进程。
