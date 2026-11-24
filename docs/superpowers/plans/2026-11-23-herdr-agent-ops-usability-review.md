@@ -328,3 +328,9 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 ### 验收标准
 - herdr 替身挂住时：`wait --timeout 20`（sentinel / lifecycle / file 三种模式）都在约一个调用上限内返回（不超过 25s），rc=8，stdout 恰好一个 JSON，无孤儿进程。
 - herdr 正常时：等待循环每轮恰好一次 `agent get`（stub 计数），已有行为（超时诊断、R11 警告、blocked / exited 门槛、取消）不变。
+
+## 追加（R16）：超时错误信息不得带出整条 prompt
+
+- 现象（实测）：`herdr agent prompt` 超时时，错误信息是「herdr command timed out after 30s: 」加上完整命令行（所有参数用空格拼接），于是整条 prompt（任务正文与协议说明，含换行）都被塞进了 stderr 和 `--json` 的 `error` 字段：stderr 被刷十几行，JSON 错误体长达上千字符。
+- 修复：超时信息里的命令摘要只保留子命令与目标（如 `herdr agent prompt w2:p4E`），其余参数省略；任何参数超过 60 字符一律截断。派发超时的错误文案保持「prompt 是否送达未知」的指引。
+- 测试：构造带超长参数的 herdr 调用超时，断言错误信息不超过 120 字符且不含 prompt 正文。
