@@ -334,3 +334,21 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 - 现象（实测）：`herdr agent prompt` 超时时，错误信息是「herdr command timed out after 30s: 」加上完整命令行（所有参数用空格拼接），于是整条 prompt（任务正文与协议说明，含换行）都被塞进了 stderr 和 `--json` 的 `error` 字段：stderr 被刷十几行，JSON 错误体长达上千字符。
 - 修复：超时信息里的命令摘要只保留子命令与目标（如 `herdr agent prompt w2:p4E`），其余参数省略；任何参数超过 60 字符一律截断。派发超时的错误文案保持「prompt 是否送达未知」的指引。
 - 测试：构造带超长参数的 herdr 调用超时，断言错误信息不超过 120 字符且不含 prompt 正文。
+
+## 追加（R17）：派发前重复请求，且 herdr 故障后仍继续调用
+
+### 现象（R16 验收时实测）
+- `hao ask` 在 herdr 完全挂住时用了 **90s** 才返回 rc=8（有界，但偏慢）：派发前依次执行 `pane layout`（窄 pane 警告用）、`agent get`（取 state_change_seq）、又一次 `agent get`（取 agent_status），各 20s 上限，再加 `agent prompt` 的 30s。
+- 即使 herdr 正常，每次派发也对同一个 `agent get` 请求发两次，外加一次仅为警告服务的布局查询——与 R15 修复的等待循环是同一类重复。
+- 第一次调用已经因 herdr 故障失败后，后续调用仍然照发。
+
+### 修复
+1. `cmd_ask` 只发一次 `agent get`，同时取 `state_change_seq` 与 `agent_status`。
+2. 仅为提示服务的调用（`pane layout` 取宽度）使用较短的上限（5s），超时按「取不到」处理、不阻塞派发。
+3. 派发前任一步骤因 herdr 故障（超时、不可达，即 8）失败时立即返回 8，不再继续后续调用（不写台账、不派发）。
+4. 其他命令里同类「一次失败后继续调用」的路径照此检查。
+
+### 验收标准
+- herdr 替身挂住时：`hao ask` 在 30s 内返回 rc=8，不写台账记录。
+- herdr 正常时：每次 `hao ask` 恰好一次 `agent get`（计数断言）；lifecycle 模式的预检复用同一次结果。
+- 现有测试与集成冒烟全绿。
