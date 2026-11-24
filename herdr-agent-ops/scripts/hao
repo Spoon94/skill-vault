@@ -628,11 +628,11 @@ def build_prompt(task, token, result_path=None):
         "",
         "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
         f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
-        f"首选完成上报：输出完最终答复的全部正文后，执行：{hao_command()} done --token <完整令牌> "
+        "完成顺序：先输出最终答复的全部正文；随后在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
+        f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token <完整令牌> "
         '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
-        "；若无法执行该命令（如跨机器），或执行它需要向用户申请审批，不要请求审批，直接只打印备份信号。"
+        "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。",
         "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
-        "同时在最终消息最后一行打印作为备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
     ]
     if result_path:
         lines.append(f"请先把最终结果完整写入文件 {result_path}，写完后再做完成上报。")
@@ -936,8 +936,76 @@ def _join_wrapped_sentinels(lines):
     return [(l, j) for l, j in out]
 
 
+_LAST_PANE_TEXT = None
+_TUI_BORDERS = set("│┃┆┇┊┄┈─━└┘|╎╏")
+_TUI_MARKERS = set("●⏺✻▸▶")
+
+
+_TAIL_ANSI_RE = re.compile(
+    r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)")
+
+
+def _strip_tui_line(line):
+    line = _TAIL_ANSI_RE.sub("", line)
+    line = "".join(ch for ch in line if ch >= " " and ch != "\x7f").strip()
+    while line and line[0] in _TUI_BORDERS:
+        line = line[1:].lstrip()
+    while line and line[-1] in _TUI_BORDERS:
+        line = line[:-1].rstrip()
+    if line[:1] in _TUI_MARKERS:
+        line = line[1:].lstrip()
+    return line
+
+
+def _tail_from_pane_text(text, token, sid):
+    """Text before the last matching sentinel, stripped and capped."""
+    lines = text.splitlines()
+    start = None
+    for k in range(1, min(len(lines), 8) + 1):
+        for line, joined in _join_wrapped_sentinels(lines[-k:]):
+            m = SENTINEL_RE.match(line)
+            if m and _token_matches(m.group(1), token, sid, joined=joined):
+                start = len(lines) - k
+                break
+        if start is not None:
+            break
+    if start is None:
+        for i in range(len(lines) - 1, -1, -1):
+            m = SENTINEL_RE.match(lines[i])
+            if m and _token_matches(m.group(1), token, sid):
+                start = i
+                break
+    if start is None:
+        return ""
+    cleaned = [_strip_tui_line(line) for line in lines[:start]]
+    while cleaned and not cleaned[0]:
+        cleaned.pop(0)
+    while cleaned and not cleaned[-1]:
+        cleaned.pop()
+    tail = "\n".join(cleaned[-40:])
+    return tail[-2000:] if len(tail) > 2000 else tail
+
+
+def _completion_tail(pane, token, sid, machine):
+    global _LAST_PANE_TEXT
+    text = _LAST_PANE_TEXT
+    if text is None:
+        rc, out, err = run_herdr(
+            ["pane", "read", pane, "--source", "recent-unwrapped",
+             "--lines", "200"], machine)
+        if rc != 0:
+            return None
+        try:
+            text = json.loads(out)["result"]["read"]["text"]
+        except Exception:
+            text = out
+        _LAST_PANE_TEXT = text
+    return _tail_from_pane_text(text, token, sid)
+
+
 def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
     """Big-window rescan: return the LAST matching sentinel line for this task."""
+    global _LAST_PANE_TEXT
     rc, out, err = run_herdr(
         ["pane", "read", pane, "--source", "recent-unwrapped", "--lines", str(lines)], machine)
     if rc != 0:
@@ -946,6 +1014,7 @@ def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
         txt = json.loads(out)["result"]["read"]["text"]
     except Exception:
         txt = out
+    _LAST_PANE_TEXT = txt
     last = None
     for line, joined in _join_wrapped_sentinels(txt.splitlines()):
         m = SENTINEL_RE.match(line)
@@ -980,12 +1049,21 @@ def _confirm_sentinel(pane, token, sid, machine, no_agent):
 FAST_PATH_SECONDS = 30
 
 
-def _finish_done(l, sid, ml):
+def _finish_done(l, sid, ml, tail=None):
+    had_done = False
+    try:
+        rec = l.get(sid)
+        had_done = bool(rec and rec.get("status") == "done")
+    except Exception:
+        pass
     try:
         l.write_done(sid, matched_line=ml, wait_consumed=True, create=False)
     except Exception as e:
         _ledger_warn(e)  # r7#1: confirmed completion must still be returned
-    return {"status": "done", "matched_line": ml}
+    out = {"status": "done", "matched_line": ml}
+    if tail is not None and not had_done:
+        out["tail"] = tail
+    return out
 
 
 def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown):
@@ -996,6 +1074,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     1s wait-output snapshot is still found after the agent settles.
     """
     _led = _load_module("hao_ledger", "ledger.py")
+    global _LAST_PANE_TEXT
+    _LAST_PANE_TEXT = None
     l = _led.Ledger()
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
@@ -1030,7 +1110,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             # Only status gates (3/5/9) get the pre-give-up rescan.
             last, _e = _sentinel_scan_tail(pane, token, sid, machine)
             if last:
-                return _finish_done(l, sid, last)
+                return _finish_done(
+                    l, sid, last,
+                    _completion_tail(pane, token, sid, machine))
             return gate
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
@@ -1046,7 +1128,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                                          timeout, seen_record)
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
-                    return _finish_done(l, sid, conf)
+                    return _finish_done(
+                        l, sid, conf,
+                        _completion_tail(pane, token, sid, machine))
             time.sleep(0.5)
         else:
             if _deadline_passed(deadline):
@@ -1072,7 +1156,9 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                                          timeout, seen_record)
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
-                    return _finish_done(l, sid, conf)
+                    return _finish_done(
+                        l, sid, conf,
+                        _completion_tail(pane, token, sid, machine))
             else:
                 time.sleep(0.5)
         response_warned = _maybe_warn_unresponsive(
@@ -1103,6 +1189,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     """agent-wait backstop loop with submit_seq activity gate.
     Completion still requires sentinel/ledger done (task-level evidence)."""
     _led = _load_module("hao_ledger", "ledger.py")
+    global _LAST_PANE_TEXT
+    _LAST_PANE_TEXT = None
     l = _led.Ledger()
     rec0 = _safe_get(l, sid) or {}
     submit_seq = rec0.get("submit_seq") or 0
@@ -1163,7 +1251,9 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
                                      seen_record)
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
-                return _finish_done(l, sid, conf)
+                return _finish_done(
+                    l, sid, conf,
+                    _completion_tail(pane, token, sid, machine))
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
@@ -1177,7 +1267,9 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
                                      seen_record)
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
-                return _finish_done(l, sid, conf)
+                return _finish_done(
+                    l, sid, conf,
+                    _completion_tail(pane, token, sid, machine))
         response_warned = _maybe_warn_unresponsive(
             pane, time.time() - start, last_status, observed_working,
             sentinel_seen, response_warned)
