@@ -45,7 +45,10 @@ def hao_command():
 def run_herdr(args, machine=None):
     """Run a herdr command, return (rc, stdout, stderr)."""
     cmd = ["herdr"] + (["--machine", machine] if machine else []) + args
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        return 8, "", f"herdr unavailable: {e}"
     return p.returncode, p.stdout, p.stderr
 
 
@@ -53,14 +56,14 @@ def _herdr_err_code(stderr):
     try:
         return json.loads(stderr).get("error", {}).get("code")
     except Exception:
+        if "unknown machine" in (stderr or "").lower():
+            return "unknown_machine"
         return None
 
 
 def herdr_error_rc(stderr, fallback=8):
-    try:
-        return map_herdr_error(json.loads(stderr))
-    except Exception:
-        return fallback
+    code = _herdr_err_code(stderr)
+    return ERR.get(code, fallback) if code else fallback
 
 
 def resolve_target(target, machine=None):
@@ -72,9 +75,12 @@ def resolve_target(target, machine=None):
         return target
     rc, out, _ = run_herdr(["pane", "list"], machine)
     if rc == 0 and out:
-        for p in json.loads(out)["result"]["panes"]:
-            if p.get("label") == target or p.get("agent") == target:
-                return p["pane_id"]
+        try:
+            for p in json.loads(out)["result"]["panes"]:
+                if p.get("label") == target or p.get("agent") == target:
+                    return p["pane_id"]
+        except Exception:
+            pass
     # R8: pane label/agent-type matching missed; resolve a herdr agent name.
     rc, out, _ = run_herdr(["agent", "list"], machine)
     if rc == 0 and out:
@@ -149,24 +155,40 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
         _set_error("invalid scope; expected [a-z0-9][a-z0-9-]{0,11}")
         return 2
     pane = resolve_target(target, machine)
-    rc, out, _ = run_herdr(["agent", "list"], machine)
-    agents = json.loads(out)["result"]["agents"] if out else []
+    rc, out, err = run_herdr(["agent", "list"], machine)
+    if rc != 0:
+        return herdr_error_rc(err, 8)
+    try:
+        agents = json.loads(out)["result"]["agents"] if out else []
+    except Exception:
+        return fail(8, "herdr returned invalid JSON for agent list")
     for a in agents:
         if a.get("name") == name and a.get("pane_id") != pane:
             return fail(6, f"name {name!r} already taken by agent on {a.get('pane_id')}")
     # zero-registry: a hao-<name> label on any other pane reserves the name
-    rcp, outp, _ = run_herdr(["pane", "list"], machine)
+    rcp, outp, errp = run_herdr(["pane", "list"], machine)
+    if rcp != 0:
+        return herdr_error_rc(errp, 8)
+    try:
+        pane_rows = json.loads(outp)["result"]["panes"] if outp else []
+    except Exception:
+        return fail(8, "herdr returned invalid JSON for pane list")
     if rcp == 0 and outp:
-        for pp in json.loads(outp)["result"]["panes"]:
+        for pp in pane_rows:
             if pp.get("pane_id") == pane:
                 continue
             m = HAO_LABEL_RE.match(pp.get("label") or "")
             if m and m.group(1) == name:
                 return fail(6, f"name {name!r} already reserved by label {m.group(0)} on {pp.get('pane_id')}")
-    rcg, outg, _ = run_herdr(["pane", "get", pane], machine)
+    rcg, outg, errg = run_herdr(["pane", "get", pane], machine)
+    if rcg != 0:
+        return herdr_error_rc(errg, 8)
     cur = ""
-    if rcg == 0 and outg:
-        cur = json.loads(outg)["result"]["pane"].get("label") or ""
+    if outg:
+        try:
+            cur = json.loads(outg)["result"]["pane"].get("label") or ""
+        except Exception:
+            return fail(8, "herdr returned invalid JSON for pane get")
     kept = False
     if scope is None:
         existing = label_scope(cur)
@@ -204,10 +226,15 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
 
 def cmd_clear(target, force, dry_run=False, machine=None):
     pane = resolve_target(target, machine)
-    rcg, outg, _ = run_herdr(["pane", "get", pane], machine)
+    rcg, outg, errg = run_herdr(["pane", "get", pane], machine)
+    if rcg != 0:
+        return herdr_error_rc(errg, 8)
     cur = ""
-    if rcg == 0 and outg:
-        cur = json.loads(outg)["result"]["pane"].get("label") or ""
+    if outg:
+        try:
+            cur = json.loads(outg)["result"]["pane"].get("label") or ""
+        except Exception:
+            return fail(8, "herdr returned invalid JSON for pane get")
     if cur and not HAO_LABEL_RE.match(cur) and not force:
         return fail(6, f"pane {pane} has non-hao label {cur!r}; use --force")
     if dry_run:
@@ -263,12 +290,18 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
     rc, out, err = run_herdr(["agent", "list"], machine)
     if rc != 0:
         return herdr_error_rc(err, 8)
-    agents = json.loads(out)["result"]["agents"]
+    try:
+        agents = json.loads(out)["result"]["agents"]
+    except Exception:
+        return fail(8, "herdr returned invalid JSON for agent list")
     # names are per-machine unique: conflict/ambiguity check scans ALL workspaces
     rca, outa, erra = run_herdr(["pane", "list"], machine)
     if rca != 0:
         return herdr_error_rc(erra, 8)
-    all_panes = json.loads(outa)["result"]["panes"]
+    try:
+        all_panes = json.loads(outa)["result"]["panes"]
+    except Exception:
+        return fail(8, "herdr returned invalid JSON for pane list")
     full = preflight(all_panes, agents, ws)
     if full["conflicts"]:
         if not _JSON_OUTPUT:
@@ -290,7 +323,10 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
             else:
                 return herdr_error_rc(err2, 8)
         else:
-            panes = json.loads(out2)["result"]["panes"]
+            try:
+                panes = json.loads(out2)["result"]["panes"]
+            except Exception:
+                return fail(8, "herdr returned invalid JSON for pane list")
     plan = preflight(panes, agents, ws)
     if plan["ambiguous"] and not pick:
         if not _JSON_OUTPUT:
@@ -407,11 +443,21 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
         print(f"custom: {custom}")
         return 0
     if live_names is None:
-        rc, out, _ = run_herdr(["agent", "list"], machine)
-        live_names = [a.get("name") for a in json.loads(out)["result"]["agents"]] if out else []
+        rc, out, err = run_herdr(["agent", "list"], machine)
+        if rc != 0:
+            return fail(8, f"herdr agent list failed: {err.strip() or rc}")
+        try:
+            live_names = [a.get("name") for a in json.loads(out)["result"]["agents"]] if out else []
+        except Exception:
+            return fail(8, "herdr returned invalid JSON for agent list")
     if label_roles is None:
-        rc, out, _ = run_herdr(["pane", "list"], machine)
-        label_roles = [p.get("label") for p in json.loads(out)["result"]["panes"] if p.get("label")]
+        rc, out, err = run_herdr(["pane", "list"], machine)
+        if rc != 0:
+            return fail(8, f"herdr pane list failed: {err.strip() or rc}")
+        try:
+            label_roles = [p.get("label") for p in json.loads(out)["result"]["panes"] if p.get("label")]
+        except Exception:
+            return fail(8, "herdr returned invalid JSON for pane list")
     def _role(lbl):
         m2 = HAO_LABEL_RE.match(lbl or "")
         return m2.group(1) if m2 else lbl
@@ -463,7 +509,7 @@ def build_prompt(task, token, result_path=None):
         f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
         f"首选完成上报：输出完最终答复的全部正文后，执行：{hao_command()} done --token <完整令牌> "
         '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
-        "；若无法执行该命令（如跨机器），仅打印备份信号。"
+        "；若无法执行该命令（如跨机器），或执行它需要向用户申请审批，不要请求审批，直接只打印备份信号。"
         "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
         "同时在最终消息最后一行打印作为备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
     ]
@@ -615,7 +661,10 @@ def _agent_gate(pane, machine, no_agent, accept_unknown):
             _set_error(f"agent {pane} not found; for a shell pane use --no-agent (or --mode file)")
             return 3
         return herdr_error_rc(err, 8)
-    st = json.loads(out)["result"]["agent"].get("agent_status")
+    try:
+        st = json.loads(out)["result"]["agent"].get("agent_status")
+    except Exception:
+        return fail(8, f"herdr returned invalid JSON for agent {pane}")
     if st == "blocked":
         return 5
     if st in ("exited", "closed"):
@@ -802,6 +851,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     observed_working = False
     last_status = None
     seen_record = False
+    sentinel_seen = False
+    response_warned = False
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
         if rec:
@@ -829,6 +880,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             if errc is not None:
                 return errc
             if ml:
+                sentinel_seen = True
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
                     return _finish_done(l, sid, conf)
@@ -843,11 +895,15 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             if errc is not None:
                 return errc
             if last:
+                sentinel_seen = True
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
                     return _finish_done(l, sid, conf)
             else:
                 time.sleep(0.5)
+        response_warned = _maybe_warn_unresponsive(
+            pane, time.time() - start, last_status, observed_working,
+            sentinel_seen, response_warned)
     # r8#2 last chance: a wrapped sentinel is invisible to the single-line
     # fast path — one joined tail rescan before declaring timeout
     last, errc = _sentinel_scan_tail(pane, token, sid, machine)
@@ -863,6 +919,23 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     return 4
 
 
+RESPONSE_WARN_S = 15
+
+
+def _maybe_warn_unresponsive(pane, elapsed, status, observed_working,
+                             sentinel_seen, warned):
+    if (warned or sentinel_seen or observed_working
+            or elapsed < RESPONSE_WARN_S):
+        return warned
+    if status in ("idle", "done"):
+        print(f"hao wait: warning: peer on {pane} has not left idle/done "
+              f"after 15s and no ledger/sentinel evidence arrived; it may "
+              f"not have received the prompt (e.g. still starting); inspect "
+              f"with: herdr pane read {pane}", file=sys.stderr)
+        return True
+    return warned
+
+
 def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown):
     """agent-wait backstop loop with submit_seq activity gate.
     Completion still requires sentinel/ledger done (task-level evidence)."""
@@ -876,6 +949,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     observed_working = False
     last_status = None
     seen_record = bool(rec0)
+    sentinel_seen = False
+    response_warned = False
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
         if rec:
@@ -891,7 +966,10 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
         rc, out, err = run_herdr(["agent", "get", pane], machine)
         if rc != 0:
             return herdr_error_rc(err, 8)
-        ag = json.loads(out)["result"]["agent"]
+        try:
+            ag = json.loads(out)["result"]["agent"]
+        except Exception:
+            return fail(8, f"herdr returned invalid JSON for agent {pane}")
         st = ag.get("agent_status")
         last_status = st
         if st == "working":
@@ -911,6 +989,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
         if errc is not None:
             return errc
         if ml:
+            sentinel_seen = True
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
                 return _finish_done(l, sid, conf)
@@ -918,9 +997,13 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
         if errc2 is not None:
             return errc2
         if last:
+            sentinel_seen = True
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
                 return _finish_done(l, sid, conf)
+        response_warned = _maybe_warn_unresponsive(
+            pane, time.time() - start, last_status, observed_working,
+            sentinel_seen, response_warned)
         if not saw_activity and time.time() - start > 5:
             return 9  # no activity observed for this task
         run_herdr(["agent", "wait", pane,
@@ -1300,7 +1383,7 @@ def cmd_stop(target, dry_run=False, machine=None):
     if rc != 0:
         if _herdr_err_code(err) == "agent_not_found":
             return fail(3, f"pane {pane} has no agent")
-        return herdr_error_rc(err, 3)
+        return herdr_error_rc(err, 8)
     try:
         agent = json.loads(out)["result"]["agent"]
     except Exception:
@@ -1617,7 +1700,11 @@ def cmd_list(workspace=None, machine=None, json_out=False):
         _set_error(f"cannot list panes in workspace {ws}")
         return herdr_error_rc(err, 8)
     rows = []
-    for p in json.loads(out)["result"]["panes"]:
+    try:
+        pane_rows = json.loads(out)["result"]["panes"]
+    except Exception:
+        return fail(8, "herdr returned invalid JSON for pane list")
+    for p in pane_rows:
         m = HAO_LABEL_RE.match(p.get("label") or "")
         if m:
             rows.append({"pane_id": p["pane_id"], "label": p.get("label"),
@@ -1992,6 +2079,24 @@ _STATE_CHANGE_COMMANDS = {"name", "clear", "restore", "ask", "done",
                           "result", "say"}
 
 
+def _machine_preflight(machine):
+    """Return an error code or None before a --machine command touches state."""
+    try:
+        rc, out, err = run_herdr(["machine", "status", machine])
+    except Exception as e:
+        return fail(8, f"herdr unavailable while checking machine {machine}: {e}")
+    if rc == 0:
+        return None
+    code = _herdr_err_code(err)
+    detail = ((err or out or "").strip().splitlines()[-1]
+              if (err or out or "").strip() else "machine status failed")
+    if code == "unknown_machine":
+        return fail(7, f"machine {machine} unavailable: {detail}")
+    if code is None:
+        return fail(8, f"herdr unavailable while checking machine {machine}: {detail}")
+    return fail(7, f"machine {machine} unavailable: {detail}")
+
+
 def _post_state_change(cmd, args):
     if cmd in _STATE_CHANGE_COMMANDS and not getattr(args, "dry_run", False):
         _tidy_cancelled()
@@ -2021,7 +2126,11 @@ def main(argv=None):
     _ERROR_DETAIL = None
     _JSON_OUTPUT = bool(getattr(args, "json", False))
     _JSON_HANDLED = False
-    result = args.func(args)
+    result = None
+    if cmd != "doctor" and getattr(args, "machine", None):
+        result = _machine_preflight(args.machine)
+    if result is None:
+        result = args.func(args)
     if isinstance(result, dict):
         _post_state_change(cmd, args)
         print(json.dumps(result, ensure_ascii=False))

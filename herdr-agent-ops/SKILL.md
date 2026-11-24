@@ -76,4 +76,4 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 - 任何命令可加 `--json` 取结构化输出（ask/wait 的成功与失败都恒 JSON，flag 为 no-op；done 的 JSON 走 stderr）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
 - prompt/wake 内嵌的 hao 调用带 `HAO_STATE_DIR="<调用方台账目录>"`，对端环境不同也写到同一台账。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
-- 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器先校验 `herdr machine` profile。
+- 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器命令会先校验 machine profile（未知 machine exit7）。wait 在 15s 无响应时只警告一次。

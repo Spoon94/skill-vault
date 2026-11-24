@@ -15,12 +15,13 @@
 | 9 | 协议错误（baseline 旧 token、lifecycle 未观察 working 转变、stop 遇 unknown agent） |
 | 10 | cancelled |
 
-herdr 的 JSON `error.code` / stderr 必须解析，**不透传 herdr 退出码**。映射见 `ERR`（scripts/hao）。
+herdr 的 JSON `error.code` / stderr 必须解析，**不透传 herdr 退出码**。映射见 `ERR`（scripts/hao）。纯文本 `unknown machine` 也映射 exit7；`--machine` 命令会先做 `herdr machine status <m>` 前置校验，未知 machine 不执行后续动作；herdr 不可达或返回非 JSON 时 exit8，不抛 Traceback（doctor 保持自己的报告形式）。
 mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不代表 mutation 未执行）。
 
 ## 等待协议
 
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。部分 agent（如 Claude Code）的工具 stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
+- **需要审批的 agent**：prompt 明确要求：若执行 `hao done` 需要向用户申请审批，**不要请求审批，直接只打印备份信号**。此类 peer 默认走文本哨兵通道（拿不到 summary）；用户可为该命令放行或使用免审批模式以启用台账通道。
 - **peer 完成上报（主/备双通道）**：**首选带 `HAO_STATE_DIR="<调用方台账目录>"` 的 `hao done --token <完整token> --summary "<关键结论/答复正文>"`**（prompt/wake 已内嵌该前缀；对端环境不同也写同一台账）（同机可用时）——台账副作用可靠，不受渲染折行、TUI 改写、peer 侧 secret 掩码影响（实测：peer harness 把正文里的完整 token 渲染成掩码占位符，文本哨兵永久丢失）；必须在最终答复正文**全部输出之后**调用——台账 done 会立即释放等待方，早调用会让等待方读不到结论。`summary` 是给等待方的结果载荷，必须包含任务要求的答复本身（≤600 字）；`wait` 返回体原样携带。文本哨兵 `HAO_DONE <token>` 为**备份信号**，两段 token 直接拼接（无分隔符，实测出现过重复段/丢前缀/插分隔符三种拼错形态）。
 - **防回显**：token 拆分两段，prompt 不含完整 token；`[TASK <shortid>]` 用独立短 id。
 - **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。token 形态容错（均实测出现过）：`hao-` 前缀可缺失；peer 拼段出错（重复段 20-hex）——位数容忍 12–32 hex。**身份校验分级**：恰 16-hex 要求完整 token 精确相等；13–15-hex（截断渲染）要求是完整 token 的前缀；恰 12-hex 的裸 shortid 哨兵可凭 shortid 相等确认（唯一例外）；超长（>16-hex）必须同时匹配完整 token 的**首 8 与尾 8 段**（覆盖段重复损坏）。完整 token 不可得（台账降级的 bare-shortid 等待）时，13-hex 以上一律不匹配——宁漏判不误判（正常路径 wait 每轮从台账升级为完整 token）。折行合并只认**独立成行**的哨兵前缀（与 SENTINEL_RE 相同的行首锚定与装饰容忍，提示词回显里"…打印：HAO_DONE"之类行中关键字永不参与合并），处理两种实测断裂形态：token 中间断开（不完整尾部 <12-hex 吸收纯 hex 续行，合并总长 ≤32-hex，可跨多行链式）、`HAO_DONE` 关键字与 token 分行（只吸收 **≥16-hex 的完整 token** 行，`hao-` 前缀可有可无；≤15-hex 续行只能靠 shortid 锚定、不足以确认，不合并）；片段行 token 之后与关键字行/HAO_DONE 之后的装饰（。│/** 等）均不阻碍合并（装饰剥除或保留在插入点之后）；**完整哨兵永不续接**（其后紧跟的 hex 输出行不会破坏匹配）。**重组行强校验**：折行合并显式返回 (line, joined) 标记（不以字符串同一性推断来源），joined 行只认完整 token 精确相等或超长首8尾8——shortid 锚定对重组行无效，完整 token 不可得时重组行一律不确认（宁漏判不误判）；大窗口重扫先合并再匹配；fast path 放弃前（`--timeout`<30s 场景）补做一次合并尾扫。 装饰符前缀/尾部集合现为单一共享常量（`_PREFIX_CHARS`/`_TAIL_CHARS`），三处正则统一引用；适配新 agent TUI 时用 `herdr pane read <pane> --source recent-unwrapped` 采样真实边框/状态字形后只改常量。
@@ -28,6 +29,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - **完成确认**：必须有任务级证据（哨兵 `HAO_DONE <token>` 或台账 `status=done`），可降级（台账不可读/不可写时哨兵仍可确认）。但 `hao done` 的哨兵只在记录存在或台账不可读时打印；台账可读而记录缺失是 exit3（无哨兵），cancelled 记录是 exit6（无哨兵）。`state_change_seq` 仅活动门槛，不作完成信号。台账锁等待有界（5s 超时即抛，flock 随进程死亡自动释放）；heartbeat/write_done 失败一律降级为凭 pane 证据返回成功 + 一次性 stderr warning，已确认的完成不因台账丢失。
 - **命中确认**：哨兵命中后 agent 仍 working 不确认；2s 稳定窗口内无更晚匹配、且该行仍是本任务最后一条 `HAO_DONE` 才写 done（防提前引用/流式残片）。gate 报错（exited 等）前也先大窗口重扫——哨兵可能刚好在退出前到达。
 - **活动门槛**：相对 submit_state 的 working/blocked transition，或 submit_seq + 短窗口 final idle/done（fast coverage）。
+- **未响应提示**：派发后约 15s 仍停留 idle/done 且没有任何台账/哨兵完成证据时，wait 输出一次 stderr 警告（提示 prompt 可能未被接收，可用 `herdr pane read <pane>` 查看）；unknown 不发，只警告不改变退出码。
 - **两阶段等待（sentinel 模式）**：前 ~30s fast path（`pane wait-output --regex` 短轮询 + 台账/心跳）；之后切**长等待兜底**——server 侧 `herdr agent wait --until idle --until done --until blocked --timeout 8000` 短循环（每轮查台账顾及 cancel），settle 后 `pane read --lines 200` 大窗口重扫哨兵，防止哨兵滚出 1s 快照丢失。`--timeout 0` 翻译为省略 `--timeout`。
 - **模式差异**：`lifecycle` 以 submit_seq 为活动门槛（5s 内无活动 → exit9），agent unknown → exit6，完成仍需哨兵/台账证据；`file` 每轮重读台账（result_path 可后到；台账丢失时回退约定路径 `state_dir/<shortid>/result.md`），结果文件非空且大小连续两轮稳定才算完成，blocked → exit5、exited → exit3（pane 无 agent 但 pane 存在时跳过门槛；pane 不存在 → exit3）。
 - **终态模型**：任何 wait 成功即写 `status=done`（含 matched_line 或 result_path）。sentinel/lifecycle 模式在返回前删除该任务的记录与锁；file 模式保留记录与结果文件，`hao result` 读取后删除记录、锁、结果目录。取消 tombstone 由观察到 rc=10 的等待方删除；`abort --interrupt` 只标记 `interrupted`，不立即删除。interrupted 记录由 tidy 在**无新鲜心跳**（`updated` 超过 60s）且标记超过 60s 时回收；普通取消仍保留到目标不 working、超过 1 小时或 `hao clean`。删除后 tidy 回收孤儿锁/结果目录，无记录时连同 `tasks/` 与空的 `hao*` 父目录一起删除。TTL 按 updated 清理无人认领的终态记录与 orphan running（默认 24h）；**过期的 running 记录在 clean/doctor 删除前检查 target**：target pane/agent 已不存在（`pane_not_found`/`agent_not_found`/无 agent）时删除；agent 存在且 working/blocked/unknown 时保留；其它读取错误保留（保守）。系统临时目录清理是最后兜底。两个等待方同时等同一任务时，先取走者删除记录，后一方若观察到记录消失即 exit3「task record already consumed」。
