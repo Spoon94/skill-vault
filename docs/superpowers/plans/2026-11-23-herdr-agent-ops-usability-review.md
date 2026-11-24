@@ -352,3 +352,23 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 - herdr 替身挂住时：`hao ask` 在 30s 内返回 rc=8，不写台账记录。
 - herdr 正常时：每次 `hao ask` 恰好一次 `agent get`（计数断言）；lifecycle 模式的预检复用同一次结果。
 - 现有测试与集成冒烟全绿。
+
+## 追加（R18）：单元测试不得依赖真实的 herdr
+
+### 现象（实测）
+- 全量回归约 23 次里出现 1 次间歇性失败（整套用时不变，说明不是慢测试超时）。
+- 让 herdr 不可达（PATH 上放一个直接 `exit 1` 的替身）后跑单元测试：**311 个里 10 个失败**——
+  `test_restore_dry_run_env_workspace`、`test_wait_file_missing_pane_exit3`、`test_status_nonexistent`、
+  `test_clear_dry_run`、`test_name_dry_run`、`test_ask_mode_error`、`test_abort_json`、
+  `test_ask_lifecycle_requires_wait`、`test_ask_error_without_json_flag`、`test_cancel_tombstone_remains_until_wait`。
+- 原因：这些测试直接调用真实 herdr（例如用真实的 `agent get` 查一个不存在的 pane 来验证退出码 3），herdr 任何一次瞬时故障都会让它们失败；没有 herdr 的环境里整套单元测试跑不过。
+
+### 修复
+1. 上述 10 个测试（以及任何会触达真实 herdr 的单元测试）改为 stub `run_herdr`：它们验证的是 hao 对特定 herdr 返回的处理，用 stub 给出确定的返回（如 `pane_not_found`、`agent_not_found`、超时、非 JSON）即可，语义不变。
+2. 加一道离线守卫：测试加载 hao 后，默认把 `run_herdr` 替换为一个「记录调用并返回失败」的桩；需要特定 herdr 行为的测试必须显式安装自己的 stub。于是任何新的单元测试若隐式依赖真实 herdr，会确定性地失败，而不是偶发。
+3. 真实 herdr 的覆盖保留在集成冒烟（`integration/test_integration.py`，需 `HERDR_ENV=1`）。
+
+### 验收标准
+- herdr 不可达（替身 `exit 1`）时：单元测试 0 失败。
+- herdr 正常时：全部通过；连续运行 10 次无失败。
+- 集成冒烟照常通过。
