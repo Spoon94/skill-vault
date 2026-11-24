@@ -83,8 +83,7 @@ class TestM1AbortJson(unittest.TestCase):
                 data = one_json_line(self, out)
                 self.assertEqual(data, {"ok": True, "shortid": "abcd12345678",
                                         "cancelled": True, "interrupted": True})
-                self.assertEqual(Ledger().get("abcd12345678")["status"],
-                                 "cancelled")
+                self.assertIsNone(Ledger().get("abcd12345678"))
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)
 
@@ -94,12 +93,15 @@ class TestM1AbortJson(unittest.TestCase):
             try:
                 Ledger().write_running("abcd12345678", target="w2:p9",
                                        token="hao-" + "abcd12345678" + "9900")
-                rc, out, err = run_cli(["abort", "abcd12345678", "--json"],
-                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
+                with mock.patch.object(hao, "run_herdr", side_effect=ok_stub):
+                    rc, out, err = run_cli(
+                        ["abort", "abcd12345678", "--json"],
+                        {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 0, err)
                 data = one_json_line(self, out)
                 self.assertEqual(data, {"ok": True, "shortid": "abcd12345678",
-                                        "cancelled": True, "interrupted": False})
+                                        "cancelled": True, "interrupted": False,
+                                        "peer_running": False})
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)
 

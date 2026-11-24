@@ -38,7 +38,7 @@ herdr-agent-ops/
 | `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--wake` 异步唤醒；`--json` no-op |
 | `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
 | `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；可读台账但无记录 → exit3 无哨兵；summary 是结果载荷 |
-| `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | 取消/中断（blocked 需用户授权） |
+| `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | cancel 只取消等待、**不停止对方**；working 时提示 `abort --interrupt`（blocked 需授权） |
 | `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
 | `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
 | `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
@@ -101,6 +101,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 - agent name `^[a-z]{4,6}$`，per-machine 唯一；label 前缀 `hao-`
 - **零注册表**：名字持久化只用 pane label（herdr session.json 会保存）；任务协调用**零残留临时台账**——仅在任务存在时建于系统临时目录（Linux 有 `XDG_RUNTIME_DIR` 则用之，否则 `tempfile.gettempdir()/hao-<uid>/tasks`），`wait`/`result` 取走即删，目录随之消失；`HAO_STATE_DIR` 可覆盖；不使用用户主目录或 XDG 状态目录
+- **cancel 不停止对方**：`cancel`/`abort`（不带 `--interrupt`）只作废等待；目标仍 working 时命令输出 `peer_running:true`、`next` 和 stderr 提示，要停对方执行 `abort <sid> --interrupt`。取消 tombstone 保留到 abort 完成、tidy 发现目标不 working、取消超过 1 小时或 `clean`；`wait` 看到 rc10 不删除。
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）

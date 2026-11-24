@@ -165,19 +165,25 @@ class TestZ3Consume(unittest.TestCase):
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)
 
-    def test_cancelled_tombstone_disappears_after_wait_observes_it(self):
+    def test_cancelled_tombstone_survives_wait_until_abort(self):
         with tempfile.TemporaryDirectory() as d:
             state = self._state(d)
             os.environ["HAO_STATE_DIR"] = state
             try:
                 led.Ledger().write_running("abcd12345678", target="w2:p9")
                 self.assertEqual(led.Ledger().cancel("abcd12345678"), 0)
-                self.assertEqual(led.Ledger().get("abcd12345678")["status"],
-                                 "cancelled")
                 rc, _out, _err = run_cli(
                     ["wait", "w2:p9", "abcd12345678"],
                     {"HAO_STATE_DIR": state})
                 self.assertEqual(rc, 10)
+                self.assertEqual(led.Ledger().get("abcd12345678")["status"],
+                                 "cancelled")
+                with mock.patch.object(hao, "run_herdr",
+                                       return_value=(0, "{}", "")):
+                    rc, _out, err = run_cli(
+                        ["abort", "abcd12345678", "--interrupt", "--json"],
+                        {"HAO_STATE_DIR": state, "HAO_ABORT_ALLOW": "1"})
+                self.assertEqual(rc, 0, err)
                 self.assertFalse(os.path.exists(state))
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)

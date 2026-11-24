@@ -30,7 +30,8 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - **活动门槛**：相对 submit_state 的 working/blocked transition，或 submit_seq + 短窗口 final idle/done（fast coverage）。
 - **两阶段等待（sentinel 模式）**：前 ~30s fast path（`pane wait-output --regex` 短轮询 + 台账/心跳）；之后切**长等待兜底**——server 侧 `herdr agent wait --until idle --until done --until blocked --timeout 8000` 短循环（每轮查台账顾及 cancel），settle 后 `pane read --lines 200` 大窗口重扫哨兵，防止哨兵滚出 1s 快照丢失。`--timeout 0` 翻译为省略 `--timeout`。
 - **模式差异**：`lifecycle` 以 submit_seq 为活动门槛（5s 内无活动 → exit9），agent unknown → exit6，完成仍需哨兵/台账证据；`file` 每轮重读台账（result_path 可后到；台账丢失时回退约定路径 `state_dir/<shortid>/result.md`），结果文件非空且大小连续两轮稳定才算完成，blocked → exit5、exited → exit3（pane 无 agent 但 pane 存在时跳过门槛；pane 不存在 → exit3）。
-- **终态模型**：任何 wait 成功即写 `status=done`（含 matched_line 或 result_path）。sentinel/lifecycle 模式在返回前删除该任务的记录与锁；`cancelled` tombstone 被 wait 观察到（rc=10）后删除；file 模式保留记录与结果文件，`hao result` 读取后删除记录、锁、结果目录。删除后 tidy 回收孤儿锁/结果目录，无记录时连同 `tasks/` 与空的 `hao*` 父目录一起删除。TTL 按 updated 清理无人认领的终态记录与 orphan running（默认 24h）；系统临时目录清理是最后兜底。两个等待方同时等同一任务时，先取走者删除记录，后一方若观察到记录消失即 exit3「task record already consumed」。
+- **终态模型**：任何 wait 成功即写 `status=done`（含 matched_line 或 result_path）。sentinel/lifecycle 模式在返回前删除该任务的记录与锁；file 模式保留记录与结果文件，`hao result` 读取后删除记录、锁、结果目录。取消 tombstone **不因 wait 观察到 rc=10 而删除**：保留到 `abort --interrupt` 成功、后续 tidy 发现目标已不 working、取消超过 1 小时或 `hao clean`。删除后 tidy 回收孤儿锁/结果目录，无记录时连同 `tasks/` 与空的 `hao*` 父目录一起删除。TTL 按 updated 清理无人认领的终态记录与 orphan running（默认 24h）；系统临时目录清理是最后兜底。两个等待方同时等同一任务时，先取走者删除记录，后一方若观察到记录消失即 exit3「task record already consumed」。
+- **cancel 语义**：`cancel` 与不带 `--interrupt` 的 `abort` 只作废台账/等待，**不停止对方**。取消时目标 working → JSON 增加 `peer_running:true` 与 `next`（完整 `abort <sid> --interrupt`），stderr 同步提示；文本模式打印同一提示。`abort --interrupt` 成功后才停止对方并删除 tombstone。tidy 仅在改状态命令与 doctor/clean 中运行，只读命令不删。
 ## wake
 
 - `hao done` 在任务完成时向调用方 pane 发送固定模板：`[HAO_WAKE] <shortid> done — run: HAO_STATE_DIR="<调用方台账目录>" <python> "<skill>/scripts/hao" wait <target> --token <shortid>`；不注入 peer 的 summary 或任何 peer 文本（防注入）。`target`/`shortid` 取自 caller 写入的台账记录。
@@ -46,8 +47,8 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?}`（`summary` 来自 peer 的 `hao done --summary` 结果载荷）
 - `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
 - `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null（无 agent 时为 null，不是 unknown）, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
-- `hao cancel`：`{"ok": true, "shortid": str}`
-- `hao abort`：`{"ok": true, "shortid": str, "cancelled": true, "interrupted": bool}`；`--interrupt` 成功也只输出这一行。
+- `hao cancel`：`{"ok": true, "shortid": str, "peer_running": bool, "next": str?}`（`next` 仅在目标 working 时出现，值为完整 `abort <sid> --interrupt` 命令）
+- `hao abort`：`{"ok": true, "shortid": str, "cancelled": true, "interrupted": bool, "peer_running": bool, "next": str?}`；不带 `--interrupt` 时 `peer_running`/`next` 同上；`--interrupt` 成功也只输出原有字段并删除 tombstone。
 - **`hao done` 例外**：哨兵走 **stdout 最后一行**（`HAO_DONE <token>`），JSON 结果走 **stderr**（避免污染哨兵行）；`--summary` 是给等待方的结果载荷，会写入台账并由 `wait` 返回。台账可读但没有该任务时 exit3 且**不打印哨兵**（防止伪造完成）；记录已 cancelled 时 exit6，同样不打印。只有台账不可读时才降级：stderr 一次性 warning，哨兵仍打印。
 
 ## 输出模式矩阵
@@ -56,7 +57,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 |---|---|---|
 | name / clear | 文本/静默成功；错误 stderr | stdout `{"ok":true,...}`；错误 stdout `{"ok":false,...}` + stderr 原因 |
 | restore | 摘要文本 | stdout 结构化摘要 |
-| cancel / abort | 静默成功 | stdout 单行 JSON |
+| cancel / abort | 成功静默；working 时 stderr 提示 abort | stdout 单行 JSON；working 时 stderr 提示 |
 | status | 紧凑 JSON | stdout JSON 追加 `"ok":true` |
 | result | 结果正文 | stdout `{"ok":true,"shortid","content"}` |
 | suggest / list | 单行人读/列表 | 仅 JSON |

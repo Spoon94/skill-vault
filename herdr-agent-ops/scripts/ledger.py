@@ -59,6 +59,11 @@ def _remove(path):
         return False
 
 
+def _cancelled_ts(rec):
+    vals = [v for v in (rec.get("cancelled_at"), rec.get("updated")) if v]
+    return min(vals) if vals else 0
+
+
 def _remove_tree(path):
     try:
         if os.path.isdir(path) and not os.path.islink(path):
@@ -158,6 +163,7 @@ class Ledger:
                 rc = 6  # done > cancelled, no-op
             else:
                 rec["status"] = "cancelled"
+                rec["cancelled_at"] = time.time()
                 rec["updated"] = time.time()
                 rc = 0
         if self._rw(shortid, go, create=False) is None:
@@ -203,6 +209,40 @@ class Ledger:
 
     def tidy(self):
         self._tidy()
+
+    def tidy_cancelled(self, is_running, max_age=3600, force=False):
+        """Remove cancelled tombstones whose target is no longer running
+        or whose cancellation is older than max_age. Callers must invoke
+        this only from state-changing commands, doctor, or clean."""
+        removed = 0
+        base = state_dir()
+        if not os.path.isdir(base):
+            return removed
+        try:
+            names = os.listdir(base)
+        except OSError:
+            return removed
+        now = time.time()
+        for fn in names:
+            if not fn.endswith(".json"):
+                continue
+            sid = fn[:-5]
+            try:
+                with open(os.path.join(base, fn)) as f:
+                    rec = json.load(f)
+            except Exception:
+                continue
+            if rec.get("status") != "cancelled":
+                continue
+            cancelled_at = _cancelled_ts(rec)
+            try:
+                running = bool(is_running(rec))
+            except Exception:
+                running = True  # unreadable peer state: retain for a retry
+            if force or now - cancelled_at > max_age or not running:
+                if self.consume(sid):
+                    removed += 1
+        return removed
 
     def _tidy(self):
         """Collect orphan locks/results and remove the empty state tree."""
@@ -277,6 +317,9 @@ class Ledger:
                         stats["kept_running"] += 1
                 elif status in ("done", "cancelled"):
                     remove = all_ or aged
+                    if status == "cancelled":
+                        cancelled_at = _cancelled_ts(rec)
+                        remove = remove or (now - cancelled_at > 3600)
                 else:
                     remove = aged
                 if remove:

@@ -985,12 +985,6 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
                     l.consume(sid)
                 except Exception as e:
                     _ledger_warn(e)
-    elif result == 10:
-        try:
-            _led = _load_module("hao_ledger", "ledger.py")
-            _led.Ledger().consume(sid)
-        except Exception as e:
-            _ledger_warn(e)
     if result == 4 and timeout:
         _set_error(_WAIT_DIAG or f"timeout after {timeout}s")
     return result
@@ -1056,20 +1050,53 @@ def cmd_done(token, summary, final=False):
     return wake_rc
 
 
-def cmd_cancel(shortid, emit_json=True):
+def _abort_command(sid):
+    return f"{hao_command()} abort {sid} --interrupt"
+
+
+def _peer_is_working(rec):
+    target = rec.get("target") if rec else None
+    return bool(target) and current_state(target, rec.get("machine")) == "working"
+
+
+def _peer_running_hint(label, sid):
+    print(f"hao {label}: peer is still running; to stop it run: "
+          f"{_abort_command(sid)}", file=sys.stderr)
+
+
+def _tidy_cancelled(force=False):
+    """Tidy cancelled tombstones from a state-changing command context."""
+    try:
+        _led = _load_module("hao_ledger", "ledger.py")
+        return _led.Ledger().tidy_cancelled(_peer_is_working, force=force)
+    except Exception as e:
+        _ledger_warn(e)
+        return 0
+
+
+def cmd_cancel(shortid, emit_json=True, notify=True):
     _led = _load_module("hao_ledger", "ledger.py")
     try:
         sid = normalize_id(shortid)
     except ValueError:
         _set_error("invalid id; expected 12-hex shortid")
         return 2
-    rc = _led.Ledger().cancel(sid)
+    l = _led.Ledger()
+    rec = _safe_get(l, sid)
+    peer_running = _peer_is_working(rec) if notify else False
+    rc = l.cancel(sid)
     if rc == 3:
         return fail(3, f"task {sid} not found")
     if rc == 6:
         return fail(6, f"task {sid} is already done")
     if rc == 0 and _JSON_OUTPUT and emit_json:
-        _json_out({"ok": True, "shortid": sid})
+        payload = {"ok": True, "shortid": sid,
+                   "peer_running": peer_running}
+        if peer_running:
+            payload["next"] = _abort_command(sid)
+        _json_out(payload)
+    if notify and peer_running:
+        _peer_running_hint("cancel", sid)
     return rc
 
 
@@ -1117,20 +1144,26 @@ def cmd_abort(shortid, interrupt):
         return fail(3, f"task {sid} not found")
     target = rec.get("target")
     if not interrupt:
-        rc = _led.Ledger().cancel(sid)
+        peer_running = _peer_is_working(rec)
+        rc = l.cancel(sid)
         if rc == 3:
             return fail(3, f"task {sid} not found")
         if rc == 6:
             return fail(6, f"task {sid} is already done")
         if rc == 0 and _JSON_OUTPUT:
-            _json_out({"ok": True, "shortid": sid, "cancelled": True,
-                       "interrupted": False})
+            payload = {"ok": True, "shortid": sid, "cancelled": True,
+                       "interrupted": False, "peer_running": peer_running}
+            if peer_running:
+                payload["next"] = _abort_command(sid)
+            _json_out(payload)
+        if peer_running:
+            _peer_running_hint("abort", sid)
         return rc
     # aborting a blocked agent may discard its approval UI: needs user auth
     if target and current_state(target, rec.get("machine")) == "blocked" \
             and not _abort_approved(sid):
         return fail(5, f"task {sid} agent is blocked; interrupt requires TTY or 0600 approval")
-    rc = cmd_cancel(sid, emit_json=False)
+    rc = cmd_cancel(sid, emit_json=False, notify=False)
     if rc != 0:
         return rc
     if not target:
@@ -1142,6 +1175,10 @@ def cmd_abort(shortid, interrupt):
     r2, _, e2 = run_herdr(["agent", "send-keys", target, "ctrl+c"], mach)
     if r2 != 0:
         return herdr_error_rc(e2, 8)
+    try:
+        l.consume(sid)
+    except Exception as e:
+        _ledger_warn(e)
     if _JSON_OUTPUT:
         _json_out({"ok": True, "shortid": sid, "cancelled": True,
                    "interrupted": True})
@@ -1473,6 +1510,8 @@ def cmd_clean(ttl=86400, all_=False, dry_run=False):
     _led = _load_module("hao_ledger", "ledger.py")
     stats = _led.Ledger().cleanup(ttl_s=0 if all_ else ttl,
                                   dry_run=dry_run, all_=all_)
+    if not dry_run:
+        stats["removed"] += _tidy_cancelled(force=True)
     if _JSON_OUTPUT:
         _json_out({"ok": True, **stats})
     else:
@@ -1494,6 +1533,7 @@ def cmd_doctor(machine=None):
         state_check["ok"] = (not os.path.exists(state)
                              or (os.path.isdir(state) and os.access(state, os.W_OK)))
         ledger_stats = led.Ledger().cleanup()
+        ledger_stats["removed"] += _tidy_cancelled()
     except Exception:
         ledger_ok = False
     ledger_check = {"name": "ledger", "ok": ledger_ok,
@@ -1738,6 +1778,15 @@ def build_parser():
     return p
 
 
+_STATE_CHANGE_COMMANDS = {"name", "clear", "restore", "ask", "done",
+                          "result", "say"}
+
+
+def _post_state_change(cmd, args):
+    if cmd in _STATE_CHANGE_COMMANDS and not getattr(args, "dry_run", False):
+        _tidy_cancelled()
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     p = build_parser()
@@ -1764,6 +1813,7 @@ def main(argv=None):
     _JSON_HANDLED = False
     result = args.func(args)
     if isinstance(result, dict):
+        _post_state_change(cmd, args)
         print(json.dumps(result, ensure_ascii=False))
         _JSON_OUTPUT = False
         _JSON_HANDLED = False
@@ -1780,6 +1830,7 @@ def main(argv=None):
         _JSON_OUTPUT = False
         _JSON_HANDLED = False
         return result
+    _post_state_change(cmd, args)
     _JSON_OUTPUT = False
     _JSON_HANDLED = False
     return 0
