@@ -42,7 +42,7 @@ python3 scripts/hao restore --dry-run
 
 1. **命名**：`python3 scripts/hao name <target> <name> [--scope S]`，或 `python3 scripts/hao suggest "<task>" [--scope S] [--custom NAME]`。
 2. **持久化/恢复**：`python3 scripts/hao restore [--workspace W|--all]`（默认当前 workspace）。
-3. **派活与等待**：`python3 scripts/hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`python3 scripts/hao wait <target> --token <t>`；`python3 scripts/hao done --token <t> --summary "<结果载荷>"`；`python3 scripts/hao cancel <t>` / `python3 scripts/hao abort <t> [--interrupt]`。**cancel 只取消等待，不停止对方**；目标 working 时会提示 `abort --interrupt`。
+3. **派活与等待**：`python3 scripts/hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`python3 scripts/hao wait <target> --token <t>`；`python3 scripts/hao done --token <t> --summary "<结果载荷>"`；`python3 scripts/hao cancel <t>` / `python3 scripts/hao abort <t> [--interrupt]` / `python3 scripts/hao stop <target> [--dry-run]`。**cancel 只取消等待，不停止对方**；`stop` 只停当前这一轮且不读写台账；目标 working 时 cancel 会提示 `abort --interrupt`。
 4. **其它**：`python3 scripts/hao list` / `status [target]` / `say` / `result` / `doctor` / `clean [--all] [--ttl S] [--dry-run]`。
 
 ## 长任务：异步 + 唤醒
@@ -70,6 +70,7 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 - 零注册表：名字持久化只用 `hao-` label；任务协调用零残留临时台账（仅任务存在时建于系统临时目录，`wait`/`result` 取走即删；`HAO_STATE_DIR` 可覆盖，不使用用户主目录或 XDG 状态目录）。
 - 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
 - cancel 的 tombstone 保留到 abort --interrupt 完成、tidy 发现目标不 working、取消超过 1 小时或 clean；wait 观察到 rc10 不删除。
+- `stop`（只停当前一轮，不依赖任务记录）与 `abort --interrupt`（作废任务并停对方）不同；blocked 都需授权。窄 pane（<40 列）会收到警告。
 - 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
 - 任何命令可加 `--json` 取结构化输出（ask/wait 的成功与失败都恒 JSON，flag 为 no-op；done 的 JSON 走 stderr）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
 - prompt/wake 内嵌的 hao 调用带 `HAO_STATE_DIR="<调用方台账目录>"`，对端环境不同也写到同一台账。

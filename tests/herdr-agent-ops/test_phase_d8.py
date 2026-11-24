@@ -51,7 +51,8 @@ class TestD8UniversalJson(unittest.TestCase):
             "name": ["w2:p9", "hawk"], "clear": ["w2:p9"], "restore": [],
             "ask": ["w2:p9", "task"], "wait": ["w2:p9", "deadbeef0000"],
             "done": ["deadbeef0000"], "cancel": ["deadbeef0000"],
-            "abort": ["deadbeef0000"], "suggest": ["task"], "list": [],
+            "abort": ["deadbeef0000"], "stop": ["w2:p9"],
+            "suggest": ["task"], "list": [],
             "status": [], "say": ["hi"], "result": ["deadbeef0000"],
             "doctor": [], "clean": [],
         }

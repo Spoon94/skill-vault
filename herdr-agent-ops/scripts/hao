@@ -78,6 +78,28 @@ def resolve_target(target, machine=None):
     return target
 
 
+def pane_width(pane, machine=None):
+    """Return a pane's column width from `pane layout`, or None if unknown."""
+    rc, out, _ = run_herdr(["pane", "layout", "--pane", pane], machine)
+    if rc != 0 or not out:
+        return None
+    try:
+        for p in json.loads(out)["result"]["layout"]["panes"]:
+            if p.get("pane_id") == pane:
+                return int(p["rect"]["width"])
+    except Exception:
+        return None
+    return None
+
+
+def warn_narrow_pane(cmd, pane, cols):
+    if cols is not None and cols < 40:
+        print(f"hao {cmd}: warning: target pane {pane} is {cols} columns "
+              f"(<40); narrow panes wrap every line, the text sentinel may "
+              f"be unrecognized, and the ledger channel is unaffected; "
+              f"consider widening the pane", file=sys.stderr)
+
+
 def default_workspace():
     return os.environ.get("HERDR_WORKSPACE_ID") or "w1"
 
@@ -448,6 +470,8 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
     token = "hao-" + hexpart
     shortid = hexpart[:12]
     pane = resolve_target(target, machine)
+    target_cols = pane_width(pane, machine)
+    warn_narrow_pane("ask", pane, target_cols)
     if mode == "lifecycle" and not wait:
         return fail(2, "lifecycle mode requires --wait")
     if mode == "lifecycle":
@@ -484,11 +508,17 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
                 _ledger_warn(ce)
         return herdr_error_rc(err)
     if wait:
-        return cmd_wait(pane, token, timeout, mode, machine)
+        result = cmd_wait(pane, token, timeout, mode, machine)
+        if isinstance(result, dict) and target_cols is not None:
+            result = dict(result)
+            result["target_cols"] = target_cols
+        return result
     out = {"token": token, "shortid": shortid,
            "next": f"hao wait {pane} --token {token}"}
     if result_path:
         out["result_path"] = result_path  # r9#2: survives a lost ledger write
+    if target_cols is not None:
+        out["target_cols"] = target_cols
     return out
 
 
@@ -1185,6 +1215,94 @@ def cmd_abort(shortid, interrupt):
     return 0
 
 
+def _stop_approved(pane):
+    if os.environ.get("HAO_ABORT_ALLOW") == "1":
+        return True
+    cfg_dir = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+    cfg = os.path.join(cfg_dir, "hao", "abort-approval")
+    try:
+        st = os.stat(cfg)
+        if st.st_mode & 0o777 == 0o600:
+            with open(cfg) as f:
+                if pane in f.read():
+                    return True
+    except OSError:
+        pass
+    try:
+        if sys.stdin.isatty():
+            ans = input(f"hao: pane {pane} is blocked on an approval prompt; "
+                        f"stopping it may discard that prompt. Continue? [y/N] ")
+            return ans.strip().lower() in ("y", "yes")
+    except EOFError:
+        pass
+    return False
+
+
+def cmd_stop(target, dry_run=False, machine=None):
+    pane = resolve_target(target, machine)
+    allow = os.environ.get("HAO_ABORT_ALLOW")
+    if allow not in (None, "", "1"):
+        _set_error("invalid HAO_ABORT_ALLOW; expected 1 or unset")
+        return 2
+    rc, out, err = run_herdr(["agent", "get", pane], machine)
+    if rc != 0:
+        if _herdr_err_code(err) == "agent_not_found":
+            return fail(3, f"pane {pane} has no agent")
+        return herdr_error_rc(err, 3)
+    try:
+        agent = json.loads(out)["result"]["agent"]
+    except Exception:
+        return fail(3, f"pane {pane} has no agent")
+    if not isinstance(agent, dict):
+        return fail(3, f"pane {pane} has no agent")
+    status = agent.get("agent_status", "unknown")
+    if status == "unknown":
+        return fail(9, f"pane {pane} agent status unknown; refusing to send keys")
+    if status not in ("working", "blocked", "idle", "done", "exited", "closed"):
+        return fail(9, f"pane {pane} has unsupported agent status {status!r}; refusing to send keys")
+    blocked = status == "blocked"
+    if blocked and not _stop_approved(pane):
+        return fail(5, f"pane {pane} agent is blocked; stop requires TTY or 0600 approval")
+
+    if status in ("idle", "done", "exited", "closed"):
+        payload = {"ok": True, "pane_id": pane,
+                   "agent_status_before": status, "sent": [],
+                   "agent_status_after": status}
+        if _JSON_OUTPUT:
+            _json_out(payload)
+        else:
+            print(f"{pane}: already idle ({status})")
+        return 0
+    if dry_run:
+        payload = {"ok": True, "pane_id": pane,
+                   "agent_status_before": status, "sent": [],
+                   "agent_status_after": status, "dry_run": True}
+        if _JSON_OUTPUT:
+            _json_out(payload)
+        else:
+            print(f"{pane}: would send esc, ctrl+c ({status})")
+        return 0
+
+    sent = []
+    r1, _, e1 = run_herdr(["agent", "send-keys", pane, "esc"], machine)
+    if r1 != 0:
+        return herdr_error_rc(e1, 8)
+    sent.append("esc")
+    r2, _, e2 = run_herdr(["agent", "send-keys", pane, "ctrl+c"], machine)
+    if r2 != 0:
+        return herdr_error_rc(e2, 8)
+    sent.append("ctrl+c")
+    after = current_state(pane, machine)
+    payload = {"ok": True, "pane_id": pane,
+               "agent_status_before": status, "sent": sent,
+               "agent_status_after": after}
+    if _JSON_OUTPUT:
+        _json_out(payload)
+    else:
+        print(f"{pane}: sent {', '.join(sent)} ({status} -> {after})")
+    return 0
+
+
 # ---------------------------------------------------------------- modes helpers
 
 def lifecycle_gate(submit_seq, current_seq, final):
@@ -1475,7 +1593,7 @@ _EXIT_REASON = {
 _ERROR_DETAIL = None
 _JSON_OUTPUT = False
 _JSON_HANDLED = False
-_JSON_COMMANDS = {"name", "clear", "restore", "cancel", "abort",
+_JSON_COMMANDS = {"name", "clear", "restore", "cancel", "abort", "stop",
                   "status", "result", "done", "suggest", "list", "say", "doctor", "clean"}
 
 
@@ -1568,6 +1686,13 @@ def cmd_doctor(machine=None):
         state_check,
         ledger_check,
     ]
+    pane_id = os.environ.get("HERDR_PANE_ID")
+    if pane_id:
+        cols = pane_width(pane_id)
+        if cols is not None:
+            checks.append({"name": "pane width", "ok": True,
+                           "pane_id": pane_id, "cols": cols, "width": cols,
+                           "warn": cols < 40})
     ok = all(c["ok"] for c in checks)
     if _JSON_OUTPUT:
         _json_out({"ok": ok, "checks": checks})
@@ -1577,6 +1702,9 @@ def cmd_doctor(machine=None):
             print(c["name"], "ok" if c["ok"] else "MISSING")
             if c["name"] == "ledger" and c["ok"]:
                 print(f"  removed={c['removed']} kept_running={c['kept']}")
+            if c["name"] == "pane width":
+                print(f"  cols={c['cols']}" + (" warn: <40 columns"
+                                                if c["warn"] else ""))
 
     if not ok:
         return fail(8, "one or more doctor checks failed")
@@ -1591,8 +1719,8 @@ def build_parser():
         prog="hao",
         description="herdr-agent-ops: names, labels, task wait and status.",
         epilog=("Examples: hao suggest \"review PR\"; hao name w2:p9 hawk --scope api; "
-                "hao ask w2:p9 \"review\" --wait; hao status w2:p9 --json. "
-                "Exit codes: references/protocol.md"),
+                "hao ask w2:p9 \"review\" --wait; hao stop w2:p9; "
+                "hao status w2:p9 --json. Exit codes: references/protocol.md"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = p.add_subparsers(title="commands", dest="cmd")
@@ -1710,6 +1838,13 @@ def build_parser():
     sp.add_argument("shortid", help="task token or 12-hex shortid")
     sp.add_argument("--interrupt", action="store_true",
                     help="send esc/ctrl+c after cancel (blocked agents need approval)")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
+
+    sp = add("stop", lambda a: cmd_stop(a.target, a.dry_run, a.machine), [],
+             "Stop the target agent's current turn (esc, ctrl+c); no task record needed.")
+    sp.add_argument("target", help="pane id, label, or agent name")
+    sp.add_argument("--dry-run", action="store_true", help="show what would be sent without sending")
+    sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
     sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
     sp = add("suggest", lambda a: cmd_suggest(a.task, a.scope, a.json,

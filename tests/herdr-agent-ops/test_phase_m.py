@@ -282,6 +282,7 @@ class TestEveryCommandJsonContract(unittest.TestCase):
             ("wait", ["wait", "w2:p9", "abcd12345678", "--json"], True),
             ("cancel", ["cancel", "abcd12345678", "--json"]),
             ("abort", ["abort", "abcd12345678", "--json"]),
+            ("stop", ["stop", "w2:p9", "--json"]),
             ("suggest", ["suggest", "review API", "--json"]),
             ("list", ["list", "--json"]),
             ("status", ["status", "w2:p9", "--json"]),
