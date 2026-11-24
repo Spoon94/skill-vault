@@ -258,3 +258,35 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 - 现象：等待超过 30s 进入兜底阶段后，每轮在 server 侧 `agent wait` 里阻塞最长 8s 才查一次台账；`abort --interrupt` 写入取消记录、发按键，约 3s 后把记录删除。等待方很可能错过取消记录存在的窗口，再查时记录已消失，得到 rc=3「task record already consumed」，而不是 rc=10 cancelled。（实测：快速轮询阶段的等待方得到正确的 rc=10。）
 - 修复：`abort --interrupt` 不再立即删除取消记录，改为标记已中断；记录由观察到 cancelled 的等待方删除；tidy 仅在该记录**没有新鲜心跳**（没有活跃等待方）且标记超过 60s 时回收。C2 的规则相应改为「取消的记录保留到被等待方观察到，或对方已不 working，或取消超过 1 小时，或 `clean`；`abort --interrupt` 只标记不删除」。
 - 测试：等待方处于兜底阶段（用 stub 让首轮即进入兜底，或把 8s 阻塞做成可注入）时执行 `abort --interrupt` → 等待方 rc=10；没有活跃等待方时 60s 后由 tidy 回收。
+
+## 追加（R10–R12）：跨机器错误路径与第三种 agent 的实测
+
+### R10 `--machine` 指向不可用的 machine 时行为不一致
+实测对 `--machine no-such-profile-xyz`（herdr 的报错是纯文本 `error: unknown machine '…'`，不是 JSON）：
+
+| 命令 | 现状 | 应为 |
+|---|---|---|
+| `name … --dry-run` | rc=0，报告成功 | rc=7 |
+| `clear … --dry-run` | rc=0，报告成功 | rc=7 |
+| `suggest` | **rc=1，Traceback 崩溃** | rc=7 |
+| `list` / `restore` / `ask` / `wait` | rc=8 | rc=7 |
+| `stop` | rc=3「target not found」 | rc=7 |
+| `doctor` | rc=7 | 不变 |
+
+- 修复：`main()` 在解析参数后，对除 `doctor` 外所有带 `--machine` 的命令做一次前置校验（`herdr machine status <m>`）；不可用则统一返回 7 并给出 machine 名与原因，不执行任何后续动作。`herdr_error_rc` 同时识别纯文本的 `unknown machine`。`doctor` 保持自己的报告形式。
+- 健壮性：任何 `json.loads(out)` 之前必须检查 `run_herdr` 的返回码；herdr 不可达或返回非 JSON 时返回 8 并给出原因，不得抛出 Traceback（`suggest` 的崩溃即由此而来）。
+- 测试：stub `run_herdr` 模拟「未知 machine」与「herdr 不可达」两种失败，遍历所有带 `--machine` 的命令与 `suggest` / `list` / `restore` / `name`，断言退出码正确、无异常、stdout 恰好一个 JSON、且没有派发或写台账。
+
+### R11 对方从未响应时尽早提醒
+- 现象：刚启动的 agent 尚未初始化完时，`herdr agent prompt` 返回成功但 TUI 丢弃了输入（qodercli 实测）。`wait` 要等满整个超时才报告「never observed working」。
+- 修复：等待循环在派发后约 15s 内，若对方状态始终未离开 idle/done，且没有任何台账或哨兵证据，输出一次 stderr 警告：「对方在派发 15s 后仍无反应，可能没有收到 prompt（例如它还在启动中）；可用 herdr pane read <pane> 查看」。**只警告，不失败**（对方状态不可检测的 agent 仍可能在工作）。状态为 unknown 时不发此警告。
+- 测试：stub 状态恒为 idle → 15s 左右出现一次警告且等待继续；状态变为 working → 无警告。
+
+### R12 需要人工审批才能执行命令的 agent 会被 `hao done` 卡住
+- 现象：qodercli 默认权限模式下，peer 执行 prompt 里给出的 `hao done …` 命令时会弹出「Allow this command to run?」，于是 blocked，台账主通道用不了（实测）。
+- 修复：build_prompt 的首选上报一句改为明确包含这种情况：「若无法执行该命令，或执行它需要向用户申请审批，**不要请求审批**，直接只打印备份信号。」对方因此走文本哨兵通道完成。
+- protocol.md 记录：需要审批的 agent 默认走备份通道（拿不到 summary）；用户可为其放行该命令或使用免审批模式以启用台账通道（实测 qodercli 以 `--permission-mode bypass_permissions` 启动并等其初始化完成后，13s 经台账完成）。
+
+### 实测记录（2026-11-25）
+- pi、Claude Code、qodercli：端到端通过。agy：本机未登录，无法测试。
+- 跨机器 `--machine`：本机无 SSH machine，端到端无法验证；调用点传递经静态审计完整，错误路径由 R10 覆盖。
