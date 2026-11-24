@@ -60,6 +60,33 @@ def _herdr_timeout(args):
     return HERDR_TIMEOUT_DEFAULT
 
 
+def _herdr_summary(args):
+    """Short command summary: subcommand + target only, capped per arg."""
+    parts = ["herdr"]
+    if args:
+        parts.append(args[0])
+    if len(args) > 1:
+        parts.append(args[1])
+    target = None
+    if len(args) > 2:
+        if not args[2].startswith("-"):
+            target = args[2]
+        else:
+            for opt in ("--pane", "--workspace", "--machine"):
+                if opt in args:
+                    pos = args.index(opt)
+                    if pos + 1 < len(args):
+                        target = args[pos + 1]
+                    break
+    if target:
+        parts.append(target)
+    clean = []
+    for part in parts:
+        part = re.sub(r"\s+", " ", part or "")
+        clean.append(part[:60])
+    return " ".join(clean)
+
+
 def _kill_herdr_group(p):
     if p is None:
         return
@@ -104,8 +131,11 @@ def run_herdr(args, machine=None):
                 out, err = p.communicate(timeout=1)
             except Exception:
                 out, err = "", ""
-            return 8, "", (f"herdr command timed out after {limit}s: "
-                           f"{' '.join(cmd)}")
+            msg = (f"herdr command timed out after {limit}s: "
+                   f"{_herdr_summary(args)}")
+            if len(msg) > 120:
+                msg = msg[:117] + "..."
+            return 8, "", msg
         return p.returncode, out, err
     finally:
         if p is not None and p.poll() is None:
@@ -632,8 +662,12 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
                 l.cancel(shortid)
             except Exception as ce:
                 _ledger_warn(ce)
+        if "timed out" in err.lower():
+            return fail(8, f"herdr agent prompt timed out; prompt delivery "
+                           f"unknown; inspect: herdr pane read {pane}; "
+                           f"re-dispatch if needed")
         why = err.strip() or f"herdr exit {rc}"
-        return fail(8 if "timed out" in err.lower() else herdr_error_rc(err),
+        return fail(herdr_error_rc(err),
                     f"herdr agent prompt failed ({why}); prompt delivery "
                     f"unknown; inspect with: herdr pane read {pane}; "
                     f"re-dispatch if needed")

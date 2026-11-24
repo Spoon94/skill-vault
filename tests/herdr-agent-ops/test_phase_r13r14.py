@@ -195,6 +195,23 @@ exit 0
                     self.assertEqual(len(f.read().split()), 1)
                 self.assertFalse(os.path.exists(self.state))
 
+    def test_timeout_error_is_short_and_omits_prompt(self):
+        if os.path.exists(self.pidlog):
+            os.remove(self.pidlog)
+        prompt = "task line one\ntask line two\n" + ("X" * 200)
+        env = {k: v for k, v in self.env.items() if v is not None}
+        env["SHIM_SLEEP"] = "prompt"
+        with mock.patch.dict(os.environ, env), \
+                mock.patch.object(hao, "_herdr_timeout", return_value=0.5):
+            rc, _out, err = hao.run_herdr(
+                ["agent", "prompt", "w2:p4E", prompt])
+        self.assertEqual(rc, 8)
+        self.assertLessEqual(len(err), 120, err)
+        self.assertIn("herdr agent prompt w2:p4E", err)
+        self.assertNotIn("task line", err)
+        self.assertNotIn("X" * 20, err)
+        self._assert_no_live_shim()
+
     def test_timeout_limits(self):
         self.assertEqual(hao._herdr_timeout(["agent", "prompt", "p"]), 30)
         self.assertEqual(hao._herdr_timeout(["pane", "wait-output", "p",
