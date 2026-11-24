@@ -245,3 +245,16 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 - 过期 running 记录 + 目标 agent working → 保留；
 - 过期 running 记录 + agent 状态 unknown → 保留；
 - 过期 running 记录 + herdr 报其他错误 → 保留。
+
+## 追加（R8–R9）：真实使用中暴露的两处
+
+### R8 用 agent 名字作 target 时没有被解析成 pane id
+- 现象：`hao ask verse …` 可以送达（herdr 自己认得 agent 名字），但 `resolve_target("verse")` 原样返回名字，于是所有依赖 pane id 的功能对名字目标静默失效：窄 pane 警告不触发、输出里 `target_cols` 为 null、台账记录的 `target` 存的是名字而不是 pane id（`status` 按 pane 列任务时对不上）。help 里明确写着 target 可以是 agent name。
+- 原因：`resolve_target` 只按 pane label 和 agent 类型（claude/pi）匹配，不按 herdr 的 agent 名字匹配。
+- 修复：`resolve_target` 在常规匹配落空后，用 `herdr agent list`（或 `agent get`）按 `name == target` 解析出 pane id；解析不到才原样返回。解析成功后上述功能全部对名字目标生效。
+- 测试：名字 → pane id；label / pane id / `w:t:p` 行为不变；不存在的名字原样返回。
+
+### R9 长等待中执行 `abort --interrupt`，等待方可能得到错误的退出码
+- 现象：等待超过 30s 进入兜底阶段后，每轮在 server 侧 `agent wait` 里阻塞最长 8s 才查一次台账；`abort --interrupt` 写入取消记录、发按键，约 3s 后把记录删除。等待方很可能错过取消记录存在的窗口，再查时记录已消失，得到 rc=3「task record already consumed」，而不是 rc=10 cancelled。（实测：快速轮询阶段的等待方得到正确的 rc=10。）
+- 修复：`abort --interrupt` 不再立即删除取消记录，改为标记已中断；记录由观察到 cancelled 的等待方删除；tidy 仅在该记录**没有新鲜心跳**（没有活跃等待方）且标记超过 60s 时回收。C2 的规则相应改为「取消的记录保留到被等待方观察到，或对方已不 working，或取消超过 1 小时，或 `clean`；`abort --interrupt` 只标记不删除」。
+- 测试：等待方处于兜底阶段（用 stub 让首轮即进入兜底，或把 8s 阻塞做成可注入）时执行 `abort --interrupt` → 等待方 rc=10；没有活跃等待方时 60s 后由 tidy 回收。
