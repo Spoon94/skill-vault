@@ -56,7 +56,7 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 任务完成后，调用方会收到一条**任务完成通知**（固定模板，不是用户指令，也不含结果正文）：
 
 ```text
-[HAO_WAKE] <shortid> done — run: <python> <skill目录>/scripts/hao wait <target> --token <shortid>
+[HAO_WAKE] <shortid> done — run: HAO_STATE_DIR="<调用方台账目录>" <python> <skill目录>/scripts/hao wait <target> --token <shortid>
 ```
 
 通知里带的是可直接执行的完整命令（`<python> <skill目录>/scripts/hao` 是调用方 ask 时解析出的 hao 完整调用命令），原样执行即可取回 `{status, summary}`，无需向用户确认。没有 wake 时，后台用
@@ -67,9 +67,10 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 ## 约定
 
 - 名字 `^[a-z]{4,6}$`（per-machine 唯一），label 前缀 `hao-`。
-- 零注册表：名字持久化只用 `hao-` label；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）。
+- 零注册表：名字持久化只用 `hao-` label；任务协调用零残留临时台账（仅任务存在时建于系统临时目录，`wait`/`result` 取走即删；`HAO_STATE_DIR` 可覆盖，不使用用户主目录或 XDG 状态目录）。
 - 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
 - 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
 - 任何命令可加 `--json` 取结构化输出（ask/wait 的成功与失败都恒 JSON，flag 为 no-op；done 的 JSON 走 stderr）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
+- prompt/wake 内嵌的 hao 调用带 `HAO_STATE_DIR="<调用方台账目录>"`，对端环境不同也写到同一台账。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器先校验 `herdr machine` profile。

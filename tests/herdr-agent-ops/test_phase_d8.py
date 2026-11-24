@@ -20,7 +20,7 @@ _loader.exec_module(hao)
 
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
-    saved = {k: os.environ.get(k) for k in ("XDG_STATE_HOME", "HERDR_PANE_ID")}
+    saved = {k: os.environ.get(k) for k in ("HAO_STATE_DIR", "HERDR_PANE_ID")}
     if env:
         for key, value in env.items():
             if value is None:
@@ -98,13 +98,13 @@ class TestD8UniversalJson(unittest.TestCase):
             run = SimpleNamespace(returncode=0, stdout="ok", stderr="")
             with mock.patch.object(hao.subprocess, "run", return_value=run):
                 rc, out, _ = run_cli(["doctor", "--json"],
-                                     {"XDG_STATE_HOME": d, "HERDR_ENV": "1"})
+                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"), "HERDR_ENV": "1"})
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertTrue(data["ok"])
         self.assertTrue(all(c["ok"] for c in data["checks"]))
         self.assertEqual([c["name"] for c in data["checks"]],
-                         ["python3", "herdr", "HERDR_ENV", "XDG default", "ledger"])
+                         ["python3", "herdr", "HERDR_ENV", "state dir", "ledger"])
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ from ledger import Ledger  # noqa: E402
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
     saved = {k: os.environ.get(k) for k in
-             ("XDG_STATE_HOME", "HAO_ABORT_ALLOW", "HERDR_PANE_ID")}
+             ("HAO_STATE_DIR", "HAO_ABORT_ALLOW", "HERDR_PANE_ID")}
     if env:
         for key, value in env.items():
             if value is None:
@@ -70,7 +70,7 @@ def one_json_line(test, text):
 class TestM1AbortJson(unittest.TestCase):
     def test_interrupt_emits_one_json(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", target="w2:p9",
@@ -78,7 +78,7 @@ class TestM1AbortJson(unittest.TestCase):
                 with mock.patch.object(hao, "run_herdr", side_effect=ok_stub):
                     rc, out, err = run_cli(
                         ["abort", "abcd12345678", "--interrupt", "--json"],
-                        {"XDG_STATE_HOME": d, "HAO_ABORT_ALLOW": "1"})
+                        {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"), "HAO_ABORT_ALLOW": "1"})
                 self.assertEqual(rc, 0, err)
                 data = one_json_line(self, out)
                 self.assertEqual(data, {"ok": True, "shortid": "abcd12345678",
@@ -86,28 +86,28 @@ class TestM1AbortJson(unittest.TestCase):
                 self.assertEqual(Ledger().get("abcd12345678")["status"],
                                  "cancelled")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_non_interrupt_json_has_cancelled(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 Ledger().write_running("abcd12345678", target="w2:p9",
                                        token="hao-" + "abcd12345678" + "9900")
                 rc, out, err = run_cli(["abort", "abcd12345678", "--json"],
-                                       {"XDG_STATE_HOME": d})
+                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 0, err)
                 data = one_json_line(self, out)
                 self.assertEqual(data, {"ok": True, "shortid": "abcd12345678",
                                         "cancelled": True, "interrupted": False})
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
 
 class TestM2AlwaysJson(unittest.TestCase):
     def test_ask_error_without_json_flag(self):
         rc, out, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle"],
-                               {"XDG_STATE_HOME": tempfile.mkdtemp()})
+                               {"HAO_STATE_DIR": tempfile.mkdtemp()})
         self.assertEqual(rc, 2)
         data = one_json_line(self, out)
         self.assertFalse(data["ok"])
@@ -116,7 +116,7 @@ class TestM2AlwaysJson(unittest.TestCase):
 
     def test_wait_error_without_json_flag(self):
         rc, out, err = run_cli(["wait", "w2:p9", "nothex"],
-                               {"XDG_STATE_HOME": tempfile.mkdtemp()})
+                               {"HAO_STATE_DIR": tempfile.mkdtemp()})
         self.assertEqual(rc, 2)
         data = one_json_line(self, out)
         self.assertFalse(data["ok"])
@@ -136,7 +136,7 @@ class TestM2AlwaysJson(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, out, err = run_cli(
                 ["done", "hao-" + "aabbccddeeff" + "0011", "--json"],
-                {"XDG_STATE_HOME": d})
+                {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 3)
         self.assertEqual(out, "")
         payloads = [json.loads(line) for line in err.splitlines()
@@ -151,7 +151,7 @@ class TestM3DoneLedgerContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, out, err = run_cli(
                 ["done", "hao-" + "aabbccddeeff" + "0011", "--json"],
-                {"XDG_STATE_HOME": d})
+                {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
             self.assertEqual(rc, 3)
             self.assertNotIn("HAO_DONE", out)
             self.assertIn("not found", err)
@@ -192,47 +192,47 @@ class TestM3DoneLedgerContract(unittest.TestCase):
 
     def test_existing_running_record_is_marked_done(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", token=token)
                 rc, out, err = run_cli(["done", token],
-                                       {"XDG_STATE_HOME": d})
+                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 0, err)
                 self.assertIn("HAO_DONE " + token, out)
                 self.assertEqual(Ledger().get("abcd12345678")["status"],
                                  "done")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_existing_done_record_is_idempotent(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", token=token)
                 Ledger().write_done("abcd12345678")
                 rc, out, err = run_cli(["done", token],
-                                       {"XDG_STATE_HOME": d})
+                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 0, err)
                 self.assertIn("HAO_DONE " + token, out)
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_cancelled_task_still_refused(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", token=token)
                 Ledger().cancel("abcd12345678")
                 rc, out, err = run_cli(["done", token],
-                                       {"XDG_STATE_HOME": d})
+                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 6)
                 self.assertNotIn("HAO_DONE", out)
                 self.assertIn("was cancelled", err)
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
 
 class TestEveryCommandJsonContract(unittest.TestCase):
@@ -240,7 +240,7 @@ class TestEveryCommandJsonContract(unittest.TestCase):
     on stdout is deliberate; its JSON is on stderr)."""
 
     def _run_success(self, argv, setup=None, patch_wait=False, env=None):
-        edits = {"XDG_STATE_HOME": self.d, "HERDR_PANE_ID": None,
+        edits = {"HAO_STATE_DIR": os.path.join(self.d, "hao", "tasks"), "HERDR_PANE_ID": None,
                  "HAO_ABORT_ALLOW": "1"}
         if env:
             edits.update(env)
@@ -262,12 +262,12 @@ class TestEveryCommandJsonContract(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.d = self.tmp.name
-        os.environ["XDG_STATE_HOME"] = self.d
+        os.environ["HAO_STATE_DIR"] = os.path.join(self.d, "hao", "tasks")
         Ledger().write_running("abcd12345678", target="w2:p9",
                                token="hao-" + "abcd12345678" + "9900")
 
     def tearDown(self):
-        os.environ.pop("XDG_STATE_HOME", None)
+        os.environ.pop("HAO_STATE_DIR", None)
         self.tmp.cleanup()
 
     def test_success_shapes(self):
@@ -344,7 +344,7 @@ class TestEveryCommandJsonContract(unittest.TestCase):
         ]
         for name, argv, stub in cases:
             with self.subTest(name=name):
-                env = {"XDG_STATE_HOME": self.d, "HERDR_PANE_ID": None}
+                env = {"HAO_STATE_DIR": os.path.join(self.d, "hao", "tasks"), "HERDR_PANE_ID": None}
                 with mock.patch.object(hao, "run_herdr", side_effect=stub):
                     rc, out, err = run_cli(argv, env)
                 self.assertNotEqual(rc, 0)
@@ -355,7 +355,7 @@ class TestEveryCommandJsonContract(unittest.TestCase):
         with mock.patch.object(hao, "run_herdr", side_effect=ok_stub):
             rc, out, err = run_cli(
                 ["done", "hao-" + "deadbeef0000" + "0011", "--json"],
-                {"XDG_STATE_HOME": self.d})
+                {"HAO_STATE_DIR": os.path.join(self.d, "hao", "tasks")})
         self.assertEqual(rc, 3)
         self.assertEqual(out, "")
         self.assertEqual(len([line for line in err.splitlines()

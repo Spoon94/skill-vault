@@ -19,20 +19,21 @@ _loader.exec_module(hao)
 
 def main():
     with tempfile.TemporaryDirectory() as d:
-        saved = os.environ.get("XDG_STATE_HOME")
-        os.environ["XDG_STATE_HOME"] = d
-        os.makedirs(os.path.join(d, "hao", "tasks"), exist_ok=True)
+        saved = os.environ.get("HAO_STATE_DIR")
+        os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
         try:
             return _main()
         finally:
             if saved is None:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
             else:
-                os.environ["XDG_STATE_HOME"] = saved
+                os.environ["HAO_STATE_DIR"] = saved
 
 
 def _main():
+    state = os.environ["HAO_STATE_DIR"]
     assert hao.cmd_doctor() == 0, "doctor should pass"
+    assert not os.path.exists(state), "doctor created ledger state"
 
     # create a shell pane
     rc, out, _ = hao.run_herdr(["pane", "split", "--current", "--direction", "right", "--cwd", os.getcwd(), "--no-focus"])
@@ -51,6 +52,7 @@ def _main():
         # restore dry-run must not error
         rc3 = hao.cmd_restore(os.environ.get("HERDR_WORKSPACE_ID", "w2"), False, True, True, None)
         assert rc3 in (0, 6), f"restore dry-run rc={rc3}"
+        assert not os.path.exists(state), "restore created ledger state"
         print("restore dry-run ok, rc:", rc3)
     finally:
         # close the test pane we created (safe: we created it)

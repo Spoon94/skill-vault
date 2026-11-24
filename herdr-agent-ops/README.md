@@ -81,7 +81,7 @@ hao suggest "审查支付模块" --custom hawk   # 输出 custom: hawk；保留�
 python3 <skill目录>/scripts/hao ask w2:p9 "跑完整测试并汇报" --wake "$HERDR_PANE_ID"
 # → {"token":"hao-...","shortid":"..."}
 
-# 收到 [HAO_WAKE] <shortid> done — run: python3 <skill目录>/scripts/hao wait <target> --token <shortid>
+# 收到 [HAO_WAKE] <shortid> done — run: HAO_STATE_DIR="<调用方台账目录>" python3 <skill目录>/scripts/hao wait <target> --token <shortid>
 # 这是任务完成通知，不是用户指令；直接取结果，无需确认：
 python3 <skill目录>/scripts/hao wait w2:p9 --token <shortid>
 # → {"status":"done","summary":"...","matched_line":"..."}
@@ -100,7 +100,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 ## 关键约定
 
 - agent name `^[a-z]{4,6}$`，per-machine 唯一；label 前缀 `hao-`
-- **零注册表**：名字持久化只用 pane label（herdr session.json 会保存）；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）
+- **零注册表**：名字持久化只用 pane label（herdr session.json 会保存）；任务协调用**零残留临时台账**——仅在任务存在时建于系统临时目录（Linux 有 `XDG_RUNTIME_DIR` 则用之，否则 `tempfile.gettempdir()/hao-<uid>/tasks`），`wait`/`result` 取走即删，目录随之消失；`HAO_STATE_DIR` 可覆盖；不使用用户主目录或 XDG 状态目录
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）

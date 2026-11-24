@@ -78,7 +78,7 @@ class TestIds(unittest.TestCase):
 class TestLedgerFlow(unittest.TestCase):
     def test_done_cancel_by_shortid(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -94,7 +94,7 @@ class TestLedgerFlow(unittest.TestCase):
 
     def test_cancel_unknown(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 self.assertEqual(cmd_cancel("deadbeef0000"), 3)
@@ -105,7 +105,7 @@ class TestLedgerFlow(unittest.TestCase):
 class TestFileWait(unittest.TestCase):
     def test_wait_file(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -145,7 +145,7 @@ class TestFileWait(unittest.TestCase):
     def test_wait_file_missing_pane_exit3(self):
         # r6#2 + error-map fix: nonexistent pane must stop the wait with 3
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -379,7 +379,7 @@ class TestFileConventionPath(unittest.TestCase):
     def test_wait_file_falls_back_to_convention_path(self):
         # r9#2: ledger lost result_path; state_dir/<sid>/result.md still completes
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -419,7 +419,7 @@ class TestWriteDegradation(unittest.TestCase):
         self.lm.Ledger = self.orig_ledger
         hao.run_herdr = self.orig_run
         hao._LEDGER_WARNED = False
-        os.environ.pop("XDG_STATE_HOME", None)
+        os.environ.pop("HAO_STATE_DIR", None)
 
     def test_done_prints_sentinel_when_ledger_write_fails(self):
         # r8#3 (P1): ledger failure must never swallow the sentinel
@@ -448,7 +448,7 @@ class TestWriteDegradation(unittest.TestCase):
 
         hao.run_herdr = stub
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             r = hao.cmd_ask("w2:pX", "task", False, "file", None, 60)
         self.assertIn("result_path", r)
         self.assertTrue(r["result_path"].endswith("result.md"))
@@ -469,7 +469,7 @@ class TestWriteDegradation(unittest.TestCase):
         self.lm.Ledger = BoomLedger
         hao.run_herdr = stub
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
                 r = hao.cmd_ask("w2:pX", "task text", False, "sentinel", None, 60)

@@ -3,6 +3,9 @@
 Best-effort coordination cache. Names are zero-registry (pane labels);
 this ledger only tracks in-flight task state for wait/cancel/wake/result.
 All writes are fresh read-modify-write field merges under a per-shortid lock.
+
+The ledger is runtime-only: it lives in a system temporary directory, only
+exists while tasks do, and is removed as soon as a waiter/result consumes it.
 The state directory is resolved per call (env changes take effect immediately).
 """
 import fcntl
@@ -10,14 +13,21 @@ import json
 import os
 import re
 import shutil
+import sys
+import tempfile
 import time
 
 SHORTID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 
 
 def state_dir():
-    base = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
-    return os.path.join(base, "hao", "tasks")
+    override = os.environ.get("HAO_STATE_DIR")
+    if override:
+        return os.path.abspath(os.path.expanduser(override))
+    if sys.platform.startswith("linux") and os.environ.get("XDG_RUNTIME_DIR"):
+        return os.path.join(os.environ["XDG_RUNTIME_DIR"], "hao", "tasks")
+    uid = getattr(os, "getuid", lambda: "user")()
+    return os.path.join(tempfile.gettempdir(), f"hao-{uid}", "tasks")
 
 
 def _path(shortid):
@@ -26,17 +36,59 @@ def _path(shortid):
     return os.path.join(state_dir(), shortid + ".json")
 
 
+def _ensure_dir():
+    base = state_dir()
+    parent = os.path.dirname(base)
+    parent_existed = os.path.isdir(parent)
+    os.makedirs(base, mode=0o700, exist_ok=True)
+    parents = [parent] if (not parent_existed
+                           or os.path.basename(parent).startswith("hao")) else []
+    for path in [base] + parents:
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            pass
+    return base
+
+
+def _remove(path):
+    try:
+        os.remove(path)
+        return True
+    except OSError:
+        return False
+
+
+def _remove_tree(path):
+    try:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path)
+            return True
+    except OSError:
+        pass
+    return False
+
+
 class Ledger:
     def __init__(self):
-        # lazy on purpose: constructing a Ledger must not fail on a
-        # read-only/missing state dir — waits degrade gracefully and
-        # _rw creates the directory on demand
+        # Lazy on purpose: constructing a Ledger must not create anything.
         pass
 
     def _rw(self, shortid, fn, lock_timeout=5.0, create=True):
         p = _path(shortid)
-        os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
-        with open(p + ".lock", "w") as lf:
+        if not create and not os.path.exists(p):
+            return None
+        if create:
+            base = _ensure_dir()
+        else:
+            base = os.path.dirname(p)
+            if not os.path.isdir(base):
+                return None
+        with open(p + ".lock", "a+") as lf:
+            try:
+                os.chmod(lf.name, 0o600)
+            except OSError:
+                pass
             deadline = time.time() + lock_timeout
             while True:
                 try:
@@ -48,12 +100,12 @@ class Ledger:
                     time.sleep(0.05)
             rec = {}
             exists = os.path.exists(p)
-            if exists:
-                with open(p) as f:
-                    rec = json.load(f)
             if not exists and not create:
                 fcntl.flock(lf, fcntl.LOCK_UN)
                 return None
+            if exists:
+                with open(p) as f:
+                    rec = json.load(f)
             fn(rec)
             tmp = p + ".tmp"
             with open(tmp, "w") as f:
@@ -71,14 +123,14 @@ class Ledger:
             rec["status"] = "running"
             rec.setdefault("created", time.time())
             rec["updated"] = time.time()
-        self._rw(shortid, go)
+        return self._rw(shortid, go)
 
-    def write_done(self, shortid, **fields):
+    def write_done(self, shortid, create=True, **fields):
         def go(rec):
             rec.update(fields)
             rec["status"] = "done"
             rec["updated"] = time.time()
-        self._rw(shortid, go)
+        return self._rw(shortid, go, create=create)
 
     def heartbeat(self, shortid):
         # field-level merge of updated only; never creates a stub record.
@@ -108,8 +160,88 @@ class Ledger:
                 rec["status"] = "cancelled"
                 rec["updated"] = time.time()
                 rc = 0
-        self._rw(shortid, go)
+        if self._rw(shortid, go, create=False) is None:
+            return 3
         return rc
+
+    def consume(self, shortid, keep_result=False):
+        """Delete a consumed record and its per-record artifacts.
+
+        Call after wait observes done/cancelled, or after result reads a file.
+        keep_result=True leaves a file-mode record/result for `hao result`.
+        """
+        if keep_result:
+            return False
+        p = _path(shortid)
+        base = os.path.dirname(p)
+        lock_path = p + ".lock"
+        removed = False
+        if os.path.exists(lock_path) and os.path.exists(p):
+            try:
+                with open(lock_path, "a+") as lf:
+                    deadline = time.time() + 5.0
+                    while True:
+                        try:
+                            fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            break
+                        except OSError:
+                            if time.time() >= deadline:
+                                break  # best-effort: never wedge a wait return
+                            time.sleep(0.05)
+                    removed = _remove(p)
+                    _remove(lock_path)
+                    fcntl.flock(lf, fcntl.LOCK_UN)
+            except OSError:
+                removed = _remove(p)
+                _remove(lock_path)
+        elif os.path.exists(p):
+            removed = _remove(p)
+            _remove(lock_path)
+        _remove_tree(os.path.join(base, shortid))
+        self._tidy()
+        return removed
+
+    def tidy(self):
+        self._tidy()
+
+    def _tidy(self):
+        """Collect orphan locks/results and remove the empty state tree."""
+        base = state_dir()
+        if not os.path.isdir(base):
+            return
+        try:
+            names = os.listdir(base)
+        except OSError:
+            return
+        for fn in names:
+            path = os.path.join(base, fn)
+            if fn.endswith(".json.lock"):
+                sid = fn[:-len(".json.lock")]
+                if not os.path.exists(os.path.join(base, sid + ".json")):
+                    _remove(path)
+            elif (os.path.isdir(path) and not os.path.islink(path)
+                  and not fn.startswith(".")):
+                if not os.path.exists(os.path.join(base, fn + ".json")):
+                    _remove_tree(path)
+        # legacy cleanup lock no longer used
+        try:
+            names = os.listdir(base)
+        except OSError:
+            return
+        if any(fn.endswith(".json") for fn in names):
+            return
+        _remove(os.path.join(base, ".cleanup.lock"))
+        try:
+            os.rmdir(base)
+        except OSError:
+            return
+        parent = os.path.dirname(base)
+        while os.path.basename(parent).startswith("hao"):
+            try:
+                os.rmdir(parent)
+            except OSError:
+                break
+            parent = os.path.dirname(parent)
 
     def cleanup(self, ttl_s=86400, dry_run=False, all_=False):
         stats = {"removed": 0, "locks_removed": 0,
@@ -119,10 +251,13 @@ class Ledger:
         base = state_dir()
         if not os.path.isdir(base):
             return stats
-        lock_path = os.path.join(base, ".cleanup.lock")
-        with open(lock_path, "w") as lf:
+        try:
+            dfd = os.open(base, os.O_RDONLY)
+        except OSError:
+            return stats
+        try:
             try:
-                fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(dfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
                 return stats  # another cleanup holds the lock: conservatively skip
             for fn in os.listdir(base):
@@ -164,19 +299,17 @@ class Ledger:
                     if (sid in removed_ids
                             or not os.path.exists(os.path.join(base, sid + ".json"))):
                         stats["locks_removed"] += 1
-                        if not dry_run:
-                            try:
-                                os.remove(path)
-                            except OSError:
-                                stats["locks_removed"] -= 1
+                        if not dry_run and not _remove(path):
+                            stats["locks_removed"] -= 1
                 elif os.path.isdir(path) and not os.path.islink(path) and not fn.startswith("."):
                     if (fn in removed_ids
                             or not os.path.exists(os.path.join(base, fn + ".json"))):
                         stats["dirs_removed"] += 1
-                        if not dry_run:
-                            try:
-                                shutil.rmtree(path)
-                            except OSError:
-                                stats["dirs_removed"] -= 1
-            fcntl.flock(lf, fcntl.LOCK_UN)
+                        if not dry_run and not _remove_tree(path):
+                            stats["dirs_removed"] -= 1
+            fcntl.flock(dfd, fcntl.LOCK_UN)
+        finally:
+            os.close(dfd)
+        if not dry_run:
+            self._tidy()
         return stats

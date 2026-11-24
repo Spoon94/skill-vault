@@ -23,9 +23,23 @@ def _hao_script():
 
 
 def hao_command():
-    """Always invoke the skill-local script through the interpreter."""
+    """Always invoke the skill-local script through the interpreter, pinned
+    to this caller's ledger directory so a peer with a different environment
+    writes to the same ledger."""
+    led = _load_module("hao_ledger", "ledger.py")
+    try:
+        state = led.state_dir()
+    except Exception:
+        # a test/fake ledger module may not expose the resolver
+        state = os.environ.get("HAO_STATE_DIR")
+        if not state:
+            import tempfile
+            uid = getattr(os, "getuid", lambda: "user")()
+            state = os.path.join(tempfile.gettempdir(), f"hao-{uid}", "tasks")
+    state = state.replace("\\", "\\\\").replace('"', '\\"')
+    state = state.replace("$", "\\$").replace("`", "\\`")
     py = sys.executable or "python3"
-    return f'{py} "{_hao_script()}"'
+    return f'HAO_STATE_DIR="{state}" {py} "{_hao_script()}"'
 
 
 def run_herdr(args, machine=None):
@@ -522,6 +536,21 @@ def _wait_round_rec(l, sid):
         return rec if rec is not None else {}
 
 
+def _wait_record_gone(l, sid):
+    """True only when the ledger is readable and the record is now absent."""
+    try:
+        return l.get(sid) is None
+    except Exception:
+        return False
+
+
+def _wait_consumed(l, sid, seen):
+    if seen and _wait_record_gone(l, sid):
+        _set_error("task record already consumed")
+        return True
+    return False
+
+
 def _wait_common_check(rec):
     """Returns (kind, payload): 'done'/'cancelled'/None. rec = fresh heartbeat read."""
     if rec and rec.get("status") == "done":
@@ -709,7 +738,7 @@ FAST_PATH_SECONDS = 30
 
 def _finish_done(l, sid, ml):
     try:
-        l.write_done(sid, matched_line=ml, wait_consumed=True)
+        l.write_done(sid, matched_line=ml, wait_consumed=True, create=False)
     except Exception as e:
         _ledger_warn(e)  # r7#1: confirmed completion must still be returned
     return {"status": "done", "matched_line": ml}
@@ -728,8 +757,13 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     deadline = None if timeout == 0 else start + (timeout or 1800)
     observed_working = False
     last_status = None
+    seen_record = False
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
+        if rec:
+            seen_record = True
+        elif _wait_consumed(l, sid, seen_record):
+            return 3
         token = rec.get("token") or token  # ledger holds the full token
         kind, payload = _wait_common_check(rec)
         if kind == "done":
@@ -796,8 +830,13 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     saw_activity = False
     observed_working = False
     last_status = None
+    seen_record = bool(rec0)
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
+        if rec:
+            seen_record = True
+        elif _wait_consumed(l, sid, seen_record):
+            return 3
         token = rec.get("token") or token  # ledger holds the full token
         kind, payload = _wait_common_check(rec)
         if kind == "done":
@@ -855,8 +894,14 @@ def _wait_file(pane, sid, token, timeout, machine):
     l = _led.Ledger()
     deadline = None if timeout == 0 else time.time() + (timeout or 1800)
     last_size = None
+    seen_record = False
     while deadline is None or time.time() < deadline:
-        kind, payload = _wait_common_check(_wait_round_rec(l, sid))
+        rec = _wait_round_rec(l, sid)
+        if rec:
+            seen_record = True
+        elif _wait_consumed(l, sid, seen_record):
+            return 3
+        kind, payload = _wait_common_check(rec)
         if kind == "done":
             return payload
         if kind == "cancelled":
@@ -890,7 +935,8 @@ def _wait_file(pane, sid, token, timeout, machine):
             sz = os.path.getsize(rp)
             if sz > 0 and sz == last_size:
                 try:
-                    l.write_done(sid, result_path=rp, wait_consumed=True)
+                    l.write_done(sid, result_path=rp, wait_consumed=True,
+                                 create=False)
                 except Exception as e:
                     _ledger_warn(e)  # r7#1: stable file is the evidence
                 return {"status": "done", "result_path": rp}
@@ -918,9 +964,26 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
     if isinstance(result, dict) and result.get("status") == "done":
         try:
             _led = _load_module("hao_ledger", "ledger.py")
-            _led.Ledger().write_done(sid, wait_consumed=True)
-        except Exception:
-            pass
+            l = _led.Ledger()
+        except Exception as e:
+            l = None
+            _ledger_warn(e)
+        if l is not None:
+            try:
+                l.write_done(sid, wait_consumed=True, create=False)
+            except Exception as e:
+                _ledger_warn(e)
+            if not result.get("result_path"):
+                try:
+                    l.consume(sid)
+                except Exception as e:
+                    _ledger_warn(e)
+    elif result == 10:
+        try:
+            _led = _load_module("hao_ledger", "ledger.py")
+            _led.Ledger().consume(sid)
+        except Exception as e:
+            _ledger_warn(e)
     if result == 4 and timeout:
         _set_error(_WAIT_DIAG or f"timeout after {timeout}s")
     return result
@@ -955,7 +1018,7 @@ def cmd_done(token, summary, final=False):
                 return fail(5, f"agent {target} is {st}; --final requires idle or done")
     try:
         if l is not None:
-            l.write_done(sid, summary=summary)
+            l.write_done(sid, summary=summary, create=False)
     except Exception as e:
         # r8#3: the sentinel printed below is the fallback evidence —
         # a ledger failure must never swallow it
@@ -1258,9 +1321,7 @@ def cmd_say(target, text, strict=False):
 
 def _mark_result_consumed(led, sid):
     try:
-        l = led.Ledger()
-        if l.get(sid):
-            l.write_done(sid, result_consumed=True)
+        led.Ledger().consume(sid)
     except Exception as e:
         _ledger_warn(e)
 
@@ -1419,8 +1480,12 @@ def cmd_doctor(machine=None):
     global _JSON_HANDLED
     ledger_stats = {"removed": 0, "kept_running": 0}
     ledger_ok = True
+    state_check = {"name": "state dir", "ok": True}
     try:
         led = _load_module("hao_ledger", "ledger.py")
+        state = led.state_dir()
+        state_check["ok"] = (not os.path.exists(state)
+                             or (os.path.isdir(state) and os.access(state, os.W_OK)))
         ledger_stats = led.Ledger().cleanup()
     except Exception:
         ledger_ok = False
@@ -1442,8 +1507,6 @@ def cmd_doctor(machine=None):
         if not _JSON_OUTPUT:
             print(out)
         return 0
-    xdg = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
-
     def ver(cmd):
         try:
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -1455,7 +1518,7 @@ def cmd_doctor(machine=None):
         {"name": "python3", "ok": ver(["python3", "--version"])},
         {"name": "herdr", "ok": ver(["herdr", "--version"])},
         {"name": "HERDR_ENV", "ok": os.environ.get("HERDR_ENV") == "1"},
-        {"name": "XDG default", "ok": os.path.isdir(os.path.join(xdg, "hao", "tasks"))},
+        state_check,
         ledger_check,
     ]
     ok = all(c["ok"] for c in checks)

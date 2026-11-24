@@ -21,7 +21,7 @@ from ledger import Ledger  # noqa: E402
 class TestD7Wake(unittest.TestCase):
     def test_wake_template_is_self_describing_without_summary(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 sid = "abcd12345678"
                 token = "hao-" + sid + "9900"
@@ -46,7 +46,7 @@ class TestD7Wake(unittest.TestCase):
                 self.assertEqual(prompt, expected)
                 self.assertNotIn("private answer", prompt)
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
 
 if __name__ == "__main__":

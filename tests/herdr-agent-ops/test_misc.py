@@ -104,8 +104,8 @@ class TestWaitRoundRec(unittest.TestCase):
             ro = os.path.join(d, "ro")
             os.makedirs(ro)
             os.chmod(ro, 0o500)
-            saved = os.environ.get("XDG_STATE_HOME")
-            os.environ["XDG_STATE_HOME"] = ro
+            saved = os.environ.get("HAO_STATE_DIR")
+            os.environ["HAO_STATE_DIR"] = ro
             try:
                 import ledger as led
                 buf = __import__("io").StringIO()
@@ -115,9 +115,9 @@ class TestWaitRoundRec(unittest.TestCase):
             finally:
                 os.chmod(ro, 0o700)
                 if saved is None:
-                    os.environ.pop("XDG_STATE_HOME", None)
+                    os.environ.pop("HAO_STATE_DIR", None)
                 else:
-                    os.environ["XDG_STATE_HOME"] = saved
+                    os.environ["HAO_STATE_DIR"] = saved
                 hao._LEDGER_WARNED = False
 
 
