@@ -310,3 +310,21 @@ PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫
 - 现象（实测，herdr 不可达）：`hao status w2:p9` → rc=3「target not found」。实际原因是 herdr 连不上。
 - 修复：`status` 区分「查询失败」与「确实不存在」，前者返回 8 并写明原因。
 - 测试：herdr shim 返回非 0 → `status` rc=8；正常返回但无匹配 → rc=3。
+
+## 追加（R15）：herdr 挂住时 `wait` 不遵守 `--timeout`，且每轮重复请求
+
+### 现象（R13 验收时实测，herdr 替身每次调用都挂住）
+- `hao wait … --timeout 20` 用了 **60s** 才返回 rc=8。已有上限、不再无限挂起，但没有遵守调用方给的超时。
+- 一轮等待里连续三次各 20s 上限的 herdr 调用：①R11 的响应检查 `current_state` → `agent get`；②状态门槛 `_agent_gate` → 又一次 `agent get`；③门槛失败后「放弃前重扫」`pane read`。
+- 另：即使 herdr 正常，①和②也是**每轮对同一个 `agent get` 请求发两次**（R11 引入的额外开销，快路径约每 1.5s 多起一个 herdr 进程）。
+- 另：hao 进程被外部终止时，正在进行的 herdr 子进程（独立会话）会成为孤儿残留。
+
+### 修复
+1. **每轮只发一次 `agent get`**：状态门槛函数同时返回状态，供响应检查复用。lifecycle / file 模式同理。
+2. **herdr 自身故障不重扫**：门槛因 herdr 失败（超时、不可达、非 JSON，即 8）而失败时立即返回 8；「放弃前重扫」只用于 agent 状态类门槛（3 / 5 / 9）。
+3. **步骤之间检查截止时间**：任何一步之后若已超过 deadline，不再发起新的 herdr 调用，直接返回（因 herdr 失败而停 → 8，否则 → 4）。
+4. **子进程必收**：`run_herdr` 用 try/finally 保证任何退出路径（含 hao 被 SIGTERM 终止）都会结束它启动的 herdr 进程组，不留孤儿。
+
+### 验收标准
+- herdr 替身挂住时：`wait --timeout 20`（sentinel / lifecycle / file 三种模式）都在约一个调用上限内返回（不超过 25s），rc=8，stdout 恰好一个 JSON，无孤儿进程。
+- herdr 正常时：等待循环每轮恰好一次 `agent get`（stub 计数），已有行为（超时诊断、R11 警告、blocked / exited 门槛、取消）不变。
