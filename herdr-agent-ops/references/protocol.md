@@ -61,6 +61,7 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 | ask / wait | 恒 JSON | 恒 JSON；`--json` 为 no-op |
 | done | 哨兵为 stdout 最后一行 | 哨兵仍最后；JSON 走 stderr |
 | say | 静默成功 | stdout `{"ok":true,"pane_id"}` |
-| doctor | 检查行文本 | stdout `{"ok":bool,"checks":[...]}` |
+| doctor | 检查行文本（含 TTL 清理） | stdout `{"ok":bool,"checks":[...]}` |
+| clean | 清理摘要 | stdout `{"ok":true,"removed","locks_removed","dirs_removed","kept_running"}` |
 
 所有命令均接受 `--json`；`ask`/`wait` 恒 JSON，该 flag 为 no-op。所有错误路径保留 A1 的 stderr 原因行；`--json` 不改变退出码。

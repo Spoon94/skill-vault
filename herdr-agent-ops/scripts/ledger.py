@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 import re
+import shutil
 import time
 
 SHORTID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
@@ -110,26 +111,72 @@ class Ledger:
         self._rw(shortid, go)
         return rc
 
-    def cleanup(self, ttl_s=86400):
+    def cleanup(self, ttl_s=86400, dry_run=False, all_=False):
+        stats = {"removed": 0, "locks_removed": 0,
+                 "dirs_removed": 0, "kept_running": 0}
+        removed_ids = set()
         now = time.time()
         base = state_dir()
         if not os.path.isdir(base):
-            return  # nothing to clean
+            return stats
         lock_path = os.path.join(base, ".cleanup.lock")
         with open(lock_path, "w") as lf:
             try:
                 fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
-                return  # another cleanup holds the lock: conservatively skip
+                return stats  # another cleanup holds the lock: conservatively skip
             for fn in os.listdir(base):
                 if not fn.endswith(".json"):
                     continue
+                path = os.path.join(base, fn)
                 try:
-                    with open(os.path.join(base, fn)) as f:
+                    with open(path) as f:
                         rec = json.load(f)
                 except Exception:
                     continue  # skip bad JSON
-                # clean terminal/stale and orphan running (no fresh heartbeat)
-                if now - rec.get("updated", 0) > ttl_s:
-                    os.remove(os.path.join(base, fn))
+                status = rec.get("status")
+                aged = now - rec.get("updated", 0) > ttl_s
+                if status == "running":
+                    remove = aged and not all_
+                    if not remove:
+                        stats["kept_running"] += 1
+                elif status in ("done", "cancelled"):
+                    remove = all_ or aged
+                else:
+                    remove = aged
+                if remove:
+                    sid = fn[:-5]
+                    if dry_run:
+                        stats["removed"] += 1
+                        removed_ids.add(sid)
+                    else:
+                        try:
+                            os.remove(path)
+                            stats["removed"] += 1
+                            removed_ids.add(sid)
+                        except OSError:
+                            pass
+            # orphan locks and result directories
+            for fn in os.listdir(base):
+                path = os.path.join(base, fn)
+                if fn.endswith(".json.lock"):
+                    sid = fn[:-len(".json.lock")]
+                    if (sid in removed_ids
+                            or not os.path.exists(os.path.join(base, sid + ".json"))):
+                        stats["locks_removed"] += 1
+                        if not dry_run:
+                            try:
+                                os.remove(path)
+                            except OSError:
+                                stats["locks_removed"] -= 1
+                elif os.path.isdir(path) and not os.path.islink(path) and not fn.startswith("."):
+                    if (fn in removed_ids
+                            or not os.path.exists(os.path.join(base, fn + ".json"))):
+                        stats["dirs_removed"] += 1
+                        if not dry_run:
+                            try:
+                                shutil.rmtree(path)
+                            except OSError:
+                                stats["dirs_removed"] -= 1
             fcntl.flock(lf, fcntl.LOCK_UN)
+        return stats

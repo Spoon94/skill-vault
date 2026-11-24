@@ -43,7 +43,8 @@ herdr-agent-ops/
 | `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
 | `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
 | `hao result <t> [--target PANE] [--file PATH] [--allow-any-path] [--json]` | 读取结果；`--allow-any-path` 需显式担责 |
-| `hao doctor [--machine M] [--json]` | 环境/机器自检 |
+| `hao doctor [--machine M] [--json]` | 环境/机器自检（含默认 TTL 清理） |
+| `hao clean [--all] [--ttl S] [--dry-run] [--json]` | 清理终态/孤儿台账、无主锁与结果目录 |
 
 所有命令均接受 `--json`（`ask`/`wait` 恒 JSON，该 flag 为 no-op）与 `--help`；完整参数见 `hao <cmd> --help`，协议见 `references/protocol.md`。脚本路径相对本 README/SKILL.md 所在目录；各平台 skill 目录见仓库 `INSTALL.md`。
 
@@ -125,7 +126,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 ```bash
 cd tests/herdr-agent-ops
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（192 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（200 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

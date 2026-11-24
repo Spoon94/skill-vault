@@ -43,7 +43,7 @@ python3 scripts/hao restore --dry-run
 1. **命名**：`python3 scripts/hao name <target> <name> [--scope S]`，或 `python3 scripts/hao suggest "<task>" [--scope S] [--custom NAME]`。
 2. **持久化/恢复**：`python3 scripts/hao restore [--workspace W|--all]`（默认当前 workspace）。
 3. **派活与等待**：`python3 scripts/hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`python3 scripts/hao wait <target> --token <t>`；`python3 scripts/hao done --token <t> --summary "<结果载荷>"`；`python3 scripts/hao cancel <t>` / `python3 scripts/hao abort <t> [--interrupt]`。
-4. **其它**：`python3 scripts/hao list` / `status [target]` / `say` / `result` / `doctor`。
+4. **其它**：`python3 scripts/hao list` / `status [target]` / `say` / `result` / `doctor` / `clean [--all] [--ttl S] [--dry-run]`。
 
 ## 长任务：异步 + 唤醒
 

@@ -1359,7 +1359,7 @@ _ERROR_DETAIL = None
 _JSON_OUTPUT = False
 _JSON_HANDLED = False
 _JSON_COMMANDS = {"name", "clear", "restore", "cancel", "abort",
-                  "status", "result", "done", "suggest", "list", "say", "doctor"}
+                  "status", "result", "done", "suggest", "list", "say", "doctor", "clean"}
 
 
 def _json_out(obj):
@@ -1389,16 +1389,44 @@ def _emit_error(cmd, rc):
           file=sys.stderr)
 
 
+def cmd_clean(ttl=86400, all_=False, dry_run=False):
+    _led = _load_module("hao_ledger", "ledger.py")
+    stats = _led.Ledger().cleanup(ttl_s=0 if all_ else ttl,
+                                  dry_run=dry_run, all_=all_)
+    if _JSON_OUTPUT:
+        _json_out({"ok": True, **stats})
+    else:
+        verb = "would remove" if dry_run else "removed"
+        print(f"{verb} {stats['removed']}, locks_removed "
+              f"{stats['locks_removed']}, dirs_removed {stats['dirs_removed']}, "
+              f"kept_running {stats['kept_running']}")
+    return 0
+
+
 def cmd_doctor(machine=None):
     global _JSON_HANDLED
+    ledger_stats = {"removed": 0, "kept_running": 0}
+    ledger_ok = True
+    try:
+        led = _load_module("hao_ledger", "ledger.py")
+        ledger_stats = led.Ledger().cleanup()
+    except Exception:
+        ledger_ok = False
+    ledger_check = {"name": "ledger", "ok": ledger_ok,
+                    "removed": ledger_stats.get("removed", 0),
+                    "kept": ledger_stats.get("kept_running", 0)}
     if machine:
         rc, out, _ = run_herdr(["machine", "status", machine, "--json"])
         ok = rc == 0
+        checks = [{"name": "machine", "ok": ok}, ledger_check]
+        all_ok = ok and ledger_ok
         if _JSON_OUTPUT:
-            _json_out({"ok": ok, "checks": [{"name": "machine", "ok": ok}]})
+            _json_out({"ok": all_ok, "checks": checks})
             _JSON_HANDLED = True
         if not ok:
             return fail(7, f"machine {machine} unavailable")
+        if not ledger_ok:
+            return fail(8, "ledger cleanup failed")
         if not _JSON_OUTPUT:
             print(out)
         return 0
@@ -1412,19 +1440,21 @@ def cmd_doctor(machine=None):
             return False
 
     checks = [
-        ("python3", ver(["python3", "--version"])),
-        ("herdr", ver(["herdr", "--version"])),
-        ("HERDR_ENV", os.environ.get("HERDR_ENV") == "1"),
-        ("XDG default", os.path.isdir(os.path.join(xdg, "hao", "tasks"))),
+        {"name": "python3", "ok": ver(["python3", "--version"])},
+        {"name": "herdr", "ok": ver(["herdr", "--version"])},
+        {"name": "HERDR_ENV", "ok": os.environ.get("HERDR_ENV") == "1"},
+        {"name": "XDG default", "ok": os.path.isdir(os.path.join(xdg, "hao", "tasks"))},
+        ledger_check,
     ]
-    ok = all(v for _, v in checks)
+    ok = all(c["ok"] for c in checks)
     if _JSON_OUTPUT:
-        _json_out({"ok": ok,
-                   "checks": [{"name": k, "ok": v} for k, v in checks]})
+        _json_out({"ok": ok, "checks": checks})
         _JSON_HANDLED = True
     else:
-        for k, v in checks:
-            print(k, "ok" if v else "MISSING")
+        for c in checks:
+            print(c["name"], "ok" if c["ok"] else "MISSING")
+            if c["name"] == "ledger" and c["ok"]:
+                print(f"  removed={c['removed']} kept_running={c['kept']}")
 
     if not ok:
         return fail(8, "one or more doctor checks failed")
@@ -1608,6 +1638,14 @@ def build_parser():
     sp.add_argument("--file", metavar="PATH", help="result file path under the task root")
     sp.add_argument("--allow-any-path", dest="allow_any_path", action="store_true",
                     help="allow --file outside the task result root (user responsibility)")
+    sp.add_argument("--json", action="store_true", help="emit one JSON result line")
+
+    sp = add("clean", lambda a: cmd_clean(a.ttl, a.all, a.dry_run), [],
+             "Clean expired ledger records, orphan locks, and result directories.")
+    sp.add_argument("--all", action="store_true", help="remove all terminal records")
+    sp.add_argument("--ttl", type=int, default=86400, metavar="SECONDS",
+                    help="terminal/orphan TTL in seconds (default 86400)")
+    sp.add_argument("--dry-run", action="store_true", help="show what would be removed")
     sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
     sp = add("doctor", lambda a: cmd_doctor(a.machine), [],

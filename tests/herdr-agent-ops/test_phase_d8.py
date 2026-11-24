@@ -53,7 +53,7 @@ class TestD8UniversalJson(unittest.TestCase):
             "done": ["deadbeef0000"], "cancel": ["deadbeef0000"],
             "abort": ["deadbeef0000"], "suggest": ["task"], "list": [],
             "status": [], "say": ["hi"], "result": ["deadbeef0000"],
-            "doctor": [],
+            "doctor": [], "clean": [],
         }
         parser = hao.build_parser()
         for name, args in samples.items():
@@ -104,7 +104,7 @@ class TestD8UniversalJson(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertTrue(all(c["ok"] for c in data["checks"]))
         self.assertEqual([c["name"] for c in data["checks"]],
-                         ["python3", "herdr", "HERDR_ENV", "XDG default"])
+                         ["python3", "herdr", "HERDR_ENV", "XDG default", "ledger"])
 
 
 if __name__ == "__main__":
