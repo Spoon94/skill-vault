@@ -39,7 +39,7 @@ herdr-agent-ops/
 | `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
 | `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；可读台账但无记录 → exit3 无哨兵；summary 是结果载荷 |
 | `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | cancel 只取消等待、**不停止对方**；working 时提示 `abort --interrupt`（blocked 需授权） |
-| `hao stop <target> [--dry-run] [--machine M] [--json]` | 只停当前这一轮（working 发 esc/ctrl+c；blocked 需授权；不依赖任务记录） |
+| `hao stop <target> [--dry-run] [--machine M] [--json]` | 只停当前这一轮（working 发 esc/ctrl+c；发送后最多 3s 读 settled status；blocked 需授权；不依赖任务记录） |
 | `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
 | `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
 | `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
@@ -52,6 +52,10 @@ herdr-agent-ops/
 短别名：`n` name · `r` restore · `a` ask · `w` wait · `d` done · `l` list · `s` suggest · `c` clear · `st` status · `sy` say · `rs` result
 
 等待模式：`sentinel`（默认，文本哨兵；~30s 后自动切 herdr agent wait 兜底 + 大窗口重扫）· `lifecycle`（agent wait 短循环 + 活动门槛）· `file`（结果文件稳定即完成）
+
+## 从旧版本升级
+
+旧版本（PR #9 之前）的台账在 `~/.local/state/hao/tasks/`，新版本默认使用系统临时目录。升级时若有旧版本派出、尚未取走的任务，用 `HAO_STATE_DIR=~/.local/state/hao/tasks python3 <skill目录>/scripts/hao wait <target> --token <token>` 读取；这只读旧目录，不迁移、不覆盖新台账。
 
 ## 30 秒上手
 
@@ -105,6 +109,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 - **cancel 不停止对方**：`cancel`/`abort`（不带 `--interrupt`）只作废等待；目标仍 working 时命令输出 `peer_running:true`、`next` 和 stderr 提示，要停对方执行 `abort <sid> --interrupt`。取消 tombstone 保留到 abort 完成、tidy 发现目标不 working、取消超过 1 小时或 `clean`；`wait` 看到 rc10 不删除。
 - **stop vs abort**：`stop <target>` 只停当前这一轮，不依赖/不读写任务记录；`abort <sid> --interrupt` 先作废任务再停对方。两者对 blocked 都要求 TTY/0600 授权。
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
+- running 记录过 TTL 后，`clean` / `doctor` 会先看 target 的 agent 状态；对方仍 working/blocked（或状态读不到）时保留，不删除。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）
 

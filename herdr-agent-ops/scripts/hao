@@ -1089,6 +1089,19 @@ def _peer_is_working(rec):
     return bool(target) and current_state(target, rec.get("machine")) == "working"
 
 
+def _record_peer_active(rec):
+    """True when a running record's peer is still working/blocked, or its
+    live state cannot be read (conservative: keep the record)."""
+    target = rec.get("target") if rec else None
+    if not target:
+        return False
+    try:
+        state = current_state(target, rec.get("machine"))
+    except Exception:
+        return True
+    return state in ("working", "blocked", "unknown")
+
+
 def _peer_running_hint(label, sid):
     print(f"hao {label}: peer is still running; to stop it run: "
           f"{_abort_command(sid)}", file=sys.stderr)
@@ -1199,19 +1212,25 @@ def cmd_abort(shortid, interrupt):
     if not target:
         return fail(3, f"task {sid} has no target pane")
     mach = rec.get("machine")
+    status_before = current_state(target, mach)
     r1, _, e1 = run_herdr(["agent", "send-keys", target, "esc"], mach)
     if r1 != 0:
         return herdr_error_rc(e1, 8)
     r2, _, e2 = run_herdr(["agent", "send-keys", target, "ctrl+c"], mach)
     if r2 != 0:
         return herdr_error_rc(e2, 8)
+    status_after, changed = _settled_status(target, status_before, mach)
+    if not changed:
+        _settle_warning("abort", target)
     try:
         l.consume(sid)
     except Exception as e:
         _ledger_warn(e)
     if _JSON_OUTPUT:
         _json_out({"ok": True, "shortid": sid, "cancelled": True,
-                   "interrupted": True})
+                   "interrupted": True,
+                   "agent_status_before": status_before,
+                   "agent_status_after": status_after})
     return 0
 
 
@@ -1292,7 +1311,9 @@ def cmd_stop(target, dry_run=False, machine=None):
     if r2 != 0:
         return herdr_error_rc(e2, 8)
     sent.append("ctrl+c")
-    after = current_state(pane, machine)
+    after, changed = _settled_status(pane, status, machine)
+    if not changed:
+        _settle_warning("stop", pane)
     payload = {"ok": True, "pane_id": pane,
                "agent_status_before": status, "sent": sent,
                "agent_status_after": after}
@@ -1371,6 +1392,26 @@ def current_state(target, machine=None):
         return json.loads(out)["result"]["agent"].get("agent_status", "unknown")
     except Exception:
         return "unknown"
+
+
+SETTLE_INTERVAL = 0.3
+SETTLE_ATTEMPTS = 10
+
+
+def _settled_status(pane, before, machine=None):
+    """Poll for up to 3s until the agent status differs from before."""
+    last = before
+    for _ in range(SETTLE_ATTEMPTS):
+        time.sleep(SETTLE_INTERVAL)
+        last = current_state(pane, machine)
+        if last != before:
+            return last, True
+    return last, False
+
+
+def _settle_warning(label, pane):
+    print(f"hao {label}: warning: agent status for {pane} did not change "
+          f"within 3s; the peer may not have responded", file=sys.stderr)
 
 
 def lifecycle_wait(target, token, machine=None):
@@ -1627,7 +1668,8 @@ def _emit_error(cmd, rc):
 def cmd_clean(ttl=86400, all_=False, dry_run=False):
     _led = _load_module("hao_ledger", "ledger.py")
     stats = _led.Ledger().cleanup(ttl_s=0 if all_ else ttl,
-                                  dry_run=dry_run, all_=all_)
+                                  dry_run=dry_run, all_=all_,
+                                  is_running=_record_peer_active)
     if not dry_run:
         stats["removed"] += _tidy_cancelled(force=True)
     if _JSON_OUTPUT:
@@ -1650,7 +1692,7 @@ def cmd_doctor(machine=None):
         state = led.state_dir()
         state_check["ok"] = (not os.path.exists(state)
                              or (os.path.isdir(state) and os.access(state, os.W_OK)))
-        ledger_stats = led.Ledger().cleanup()
+        ledger_stats = led.Ledger().cleanup(is_running=_record_peer_active)
         ledger_stats["removed"] += _tidy_cancelled()
     except Exception:
         ledger_ok = False

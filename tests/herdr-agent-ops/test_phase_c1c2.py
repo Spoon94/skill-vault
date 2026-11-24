@@ -158,7 +158,8 @@ class TestC2CancelledRetention(unittest.TestCase):
         Ledger().write_running(self.sid, target="w2:p9")
         Ledger().cancel(self.sid)
         with mock.patch.object(hao, "run_herdr",
-                               side_effect=state_stub("working")):
+                               side_effect=state_stub("working")), \
+                mock.patch.object(hao.time, "sleep", return_value=None):
             rc, _out, err = run_cli(
                 ["abort", self.sid, "--interrupt", "--json"], self.env)
         self.assertEqual(rc, 0, err)

@@ -75,14 +75,17 @@ class TestM1AbortJson(unittest.TestCase):
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", target="w2:p9",
                                        token=token)
-                with mock.patch.object(hao, "run_herdr", side_effect=ok_stub):
+                with mock.patch.object(hao, "run_herdr", side_effect=ok_stub), \
+                        mock.patch.object(hao.time, "sleep", return_value=None):
                     rc, out, err = run_cli(
                         ["abort", "abcd12345678", "--interrupt", "--json"],
                         {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"), "HAO_ABORT_ALLOW": "1"})
                 self.assertEqual(rc, 0, err)
                 data = one_json_line(self, out)
                 self.assertEqual(data, {"ok": True, "shortid": "abcd12345678",
-                                        "cancelled": True, "interrupted": True})
+                                        "cancelled": True, "interrupted": True,
+                                        "agent_status_before": "idle",
+                                        "agent_status_after": "idle"})
                 self.assertIsNone(Ledger().get("abcd12345678"))
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)

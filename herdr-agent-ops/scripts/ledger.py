@@ -283,7 +283,7 @@ class Ledger:
                 break
             parent = os.path.dirname(parent)
 
-    def cleanup(self, ttl_s=86400, dry_run=False, all_=False):
+    def cleanup(self, ttl_s=86400, dry_run=False, all_=False, is_running=None):
         stats = {"removed": 0, "locks_removed": 0,
                  "dirs_removed": 0, "kept_running": 0}
         removed_ids = set()
@@ -312,7 +312,13 @@ class Ledger:
                 status = rec.get("status")
                 aged = now - rec.get("updated", 0) > ttl_s
                 if status == "running":
-                    remove = aged and not all_
+                    keep = False
+                    if aged and not all_ and is_running is not None:
+                        try:
+                            keep = bool(is_running(rec))
+                        except Exception:
+                            keep = True  # unreadable peer state: conservative
+                    remove = aged and not all_ and not keep
                     if not remove:
                         stats["kept_running"] += 1
                 elif status in ("done", "cancelled"):

@@ -70,7 +70,8 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 - 零注册表：名字持久化只用 `hao-` label；任务协调用零残留临时台账（仅任务存在时建于系统临时目录，`wait`/`result` 取走即删；`HAO_STATE_DIR` 可覆盖，不使用用户主目录或 XDG 状态目录）。
 - 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
 - cancel 的 tombstone 保留到 abort --interrupt 完成、tidy 发现目标不 working、取消超过 1 小时或 clean；wait 观察到 rc10 不删除。
-- `stop`（只停当前一轮，不依赖任务记录）与 `abort --interrupt`（作废任务并停对方）不同；blocked 都需授权。窄 pane（<40 列）会收到警告。
+- `stop`（只停当前一轮，不依赖任务记录）与 `abort --interrupt`（作废任务并停对方）不同；发送后最多 3s 取 settled status，blocked 都需授权。窄 pane（<40 列）会收到警告。
+- running 记录过 TTL 时，clean/doctor 先查 target agent；仍 working/blocked 或状态不可读则保留。
 - 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
 - 任何命令可加 `--json` 取结构化输出（ask/wait 的成功与失败都恒 JSON，flag 为 no-op；done 的 JSON 走 stderr）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
 - prompt/wake 内嵌的 hao 调用带 `HAO_STATE_DIR="<调用方台账目录>"`，对端环境不同也写到同一台账。

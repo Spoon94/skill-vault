@@ -179,7 +179,8 @@ class TestZ3Consume(unittest.TestCase):
                 self.assertEqual(led.Ledger().get("abcd12345678")["status"],
                                  "cancelled")
                 with mock.patch.object(hao, "run_herdr",
-                                       return_value=(0, "{}", "")):
+                                       return_value=(0, "{}", "")), \
+                        mock.patch.object(hao.time, "sleep", return_value=None):
                     rc, _out, err = run_cli(
                         ["abort", "abcd12345678", "--interrupt", "--json"],
                         {"HAO_STATE_DIR": state, "HAO_ABORT_ALLOW": "1"})
