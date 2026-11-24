@@ -134,3 +134,36 @@ hao name w2:p9 forge（已带 -ops scope）→ scope 被静默丢弃
 - **要求**：所有 `cmd_*` 非零整数 return 必须通过 `fail()` 或紧随 `_set_error`；补齐 name/clear/ask/done/abort/say/doctor 的误导性通用文案；AST 守卫测试防回归。
 - **state**：status 无 agent pane 的 `agent_status` 为 null（有 agent 但 unknown 仍为 unknown），protocol 同步。
 - **验收**：AST 扫描 0 违规；五类误导文案有具体目标/状态/--force/--wait 提示。
+
+---
+
+# 合并后跟进（M1–M3）：JSON 契约与 done 语义
+
+PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫描（断言 stdout 为空或恰好一个 JSON 值），并用一次性 pi 实例补测了 `restore` 非 dry-run 与 `abort --interrupt` 成功路径（均通过）。扫描发现三处：
+
+| # | 现象 | 违反的约定 |
+|---|---|---|
+| M1 | `hao abort <sid> --interrupt --json` 输出**两行** JSON（内部 `cmd_cancel` 一行 + abort 自己一行），`json.loads(stdout)` 报 `Extra data` | `--json` 输出单个 JSON 值 |
+| M2 | `ask` / `wait` 出错时 stdout 为空（仅 stderr 原因行） | protocol.md 输出矩阵：ask/wait **恒 JSON** |
+| M3 | `hao done <不存在的任务 id>` 返回 0、打印哨兵并**凭空创建**一条 done 记录 | 设计稿：「TTL 删后 exit3」——记录不存在即 exit 3 |
+
+## 修复项
+
+### M1 `abort --interrupt --json` 单行 JSON
+- 中间的 cancel 不再向 stdout 打印；最终只输出一行：`{"ok":true,"shortid":"…","cancelled":true,"interrupted":true}`（失败时 `{"ok":false,"error":"…","exit":N}`）。
+
+### M2 `ask` / `wait` 出错也输出 JSON
+- 非零退出时 stdout 同样输出 `{"ok":false,"error":"<与 stderr 相同的原因>","exit":N}`，stderr 原因行与退出码不变。「恒 JSON」在成功与失败两种情况下都成立。
+
+### M3 `hao done` 对不存在的任务返回 3
+- 台账**可读**且该 id 无记录（从未派发或已被 TTL 清理）→ 不创建记录、不打印哨兵，stderr `hao done: task <id> not found (exit 3)`。
+- 台账**不可读**（降级）→ 维持现状：打印哨兵 + 一次性 warning。
+- 对已存在的 done 记录重复 done 仍为幂等 rc=0；对 cancelled 仍 rc=6。
+
+### 守卫测试
+- 遍历所有子命令的成功与错误路径（stub `run_herdr`），断言带 `--json`（ask/wait 恒 JSON）时 stdout 为空或恰好一个 JSON 值；`done` 除外（其 stdout 最后一行是哨兵，JSON 走 stderr）。
+- M3 三种情形各有断言：无记录且可读 → 3 且台账无新文件；不可读 → 降级；已有 done → 0。
+
+## 验收（Claude）
+- 重跑系统性 stdout 扫描：16 条命令全部为「恰好一个 JSON」或（done）按文档例外。
+- `hao done <不存在的 12-hex>` → rc=3，台账文件数不变。
