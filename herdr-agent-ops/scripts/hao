@@ -496,7 +496,12 @@ _LEDGER_WARNED = False
 _WAIT_DIAG = None
 
 
-def _timeout_detail(observed_working, last_status, timeout):
+def _timeout_detail(observed_working, last_status, timeout, seen_record=True):
+    if not seen_record:
+        return (f"timeout after {timeout}s; no ledger record was ever seen "
+                f"for this task (not dispatched via hao ask, already consumed, "
+                f"or expired — check HAO_STATE_DIR); only the text sentinel "
+                f"was watched")
     state = last_status or "unknown"
     if observed_working:
         tail = f"agent_status={state}, observed working since dispatch"
@@ -814,7 +819,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         if conf:
             return _finish_done(l, sid, conf)
     global _WAIT_DIAG
-    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout)
+    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
+                                 seen_record=seen_record)
     return 4
 
 
@@ -882,7 +888,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
                    "--until", "idle", "--until", "done", "--until", "blocked",
                    "--timeout", "8000"], machine)
     global _WAIT_DIAG
-    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout)
+    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
+                                 seen_record=seen_record)
     return 4
 
 
