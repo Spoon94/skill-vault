@@ -8,6 +8,8 @@ from importlib.machinery import SourceFileLoader
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 lifecycle_gate = hao.lifecycle_gate
 safe_result_path = hao.safe_result_path

@@ -2,10 +2,13 @@ import unittest
 import os
 import types
 from importlib.machinery import SourceFileLoader
+from unittest import mock
 
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 validate_name = hao.validate_name
 make_label = hao.make_label
@@ -29,10 +32,24 @@ class TestName(unittest.TestCase):
         self.assertEqual(make_label("hawk"), "hao-hawk")
 
     def test_name_dry_run(self):
-        self.assertEqual(cmd_name("w2:p9", "hawk", "api", False, True), 0)
+        def stub(args, machine=None):
+            if args[:2] == ["agent", "list"]:
+                return 0, '{"result":{"agents":[]}}', ""
+            if args[:2] == ["pane", "list"]:
+                return 0, '{"result":{"panes":[]}}', ""
+            if args[:2] == ["pane", "get"]:
+                return 0, '{"result":{"pane":{"pane_id":"w2:p9","label":""}}}', ""
+            return 0, "{}", ""
+        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+            self.assertEqual(cmd_name("w2:p9", "hawk", "api", False, True), 0)
 
     def test_clear_dry_run(self):
-        self.assertEqual(cmd_clear("w2:p9", False, True), 0)  # dry_run=True, no real clear
+        def stub(args, machine=None):
+            if args[:2] == ["pane", "get"]:
+                return 0, '{"result":{"pane":{"pane_id":"w2:p9","label":""}}}', ""
+            return 0, "{}", ""
+        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+            self.assertEqual(cmd_clear("w2:p9", False, True), 0)  # dry_run=True, no real clear
 
 
 if __name__ == "__main__":

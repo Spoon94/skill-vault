@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 import ledger as led  # noqa: E402
 
 
@@ -226,9 +228,15 @@ class TestZ3Consume(unittest.TestCase):
             os.environ["HAO_STATE_DIR"] = state
             try:
                 led.Ledger().write_running("abcd12345678", target="w2:p9")
-                rc, _out, _err = run_cli(
-                    ["cancel", "abcd12345678", "--json"],
-                    {"HAO_STATE_DIR": state})
+                def stub(args, machine=None):
+                    if args[:2] == ["agent", "get"]:
+                        return 0, json.dumps({"result": {"agent": {
+                            "agent_status": "idle"}}}), ""
+                    return 0, "{}", ""
+                with mock.patch.object(hao, "run_herdr", side_effect=stub):
+                    rc, _out, _err = run_cli(
+                        ["cancel", "abcd12345678", "--json"],
+                        {"HAO_STATE_DIR": state})
                 self.assertEqual(rc, 0)
                 self.assertTrue(os.path.exists(os.path.join(state,
                                                             "abcd12345678.json")))

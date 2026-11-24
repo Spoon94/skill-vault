@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger  # noqa: E402
 
 
@@ -113,8 +115,16 @@ class TestM1AbortJson(unittest.TestCase):
 
 class TestM2AlwaysJson(unittest.TestCase):
     def test_ask_error_without_json_flag(self):
-        rc, out, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle"],
-                               {"HAO_STATE_DIR": tempfile.mkdtemp()})
+        def stub(args, machine=None):
+            if args[:2] == ["pane", "layout"]:
+                return 0, '{"result":{"layout":{"panes":[]}}}', ""
+            if args[:2] == ["agent", "get"]:
+                return 0, '{"result":{"agent":{"agent_status":"idle"}}}', ""
+            return 0, "{}", ""
+        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+            rc, out, err = run_cli(
+                ["ask", "w2:p9", "x", "--mode", "lifecycle"],
+                {"HAO_STATE_DIR": tempfile.mkdtemp()})
         self.assertEqual(rc, 2)
         data = one_json_line(self, out)
         self.assertFalse(data["ok"])

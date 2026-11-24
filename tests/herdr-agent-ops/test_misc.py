@@ -4,11 +4,14 @@ import sys
 import tempfile
 import types
 from importlib.machinery import SourceFileLoader
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 cmd_status = hao.cmd_status
 cmd_result = hao.cmd_result
@@ -17,7 +20,10 @@ cmd_say = hao.cmd_say
 
 class TestMisc(unittest.TestCase):
     def test_status_nonexistent(self):
-        self.assertEqual(cmd_status("w2:pZZZZ"), 3)  # nonexistent -> exit 3
+        err_json = '{"error":{"code":"agent_not_found"}}'
+        with mock.patch.object(hao, "run_herdr",
+                               return_value=(1, "", err_json)):
+            self.assertEqual(cmd_status("w2:pZZZZ"), 3)  # nonexistent -> exit 3
 
     def test_result_no_path(self):
         self.assertEqual(cmd_result("deadbeef0000"), 3)

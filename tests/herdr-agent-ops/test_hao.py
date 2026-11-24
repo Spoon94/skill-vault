@@ -11,6 +11,8 @@ from importlib.machinery import SourceFileLoader
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 run_herdr = hao.run_herdr
 resolve_target = hao.resolve_target

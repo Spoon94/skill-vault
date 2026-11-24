@@ -6,6 +6,8 @@ from importlib.machinery import SourceFileLoader
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 build_prompt = hao.build_prompt
 SENTINEL_RE = hao.SENTINEL_RE

@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger, _path  # noqa: E402
 
 
@@ -181,8 +183,15 @@ class TestPhaseBJson(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             Ledger().write_running("abcd12345678", target="w2:p9")
-            rc, out, _ = run_cli(["abort", "abcd12345678", "--json"],
-                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
+            def stub(args, machine=None):
+                if args[:2] == ["agent", "get"]:
+                    return 0, json.dumps({"result": {"agent": {
+                        "agent_status": "idle"}}}), ""
+                return 0, "{}", ""
+            with mock.patch.object(hao, "run_herdr", side_effect=stub):
+                rc, out, _ = run_cli(
+                    ["abort", "abcd12345678", "--json"],
+                    {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 0)
         self.assertTrue(json.loads(out)["ok"])
 

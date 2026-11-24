@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger, _path  # noqa: E402
 
 

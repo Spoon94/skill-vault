@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger  # noqa: E402
 
 
@@ -128,7 +130,14 @@ class TestD6Reasons(unittest.TestCase):
         self.assertIn("--force", err)
 
     def test_ask_lifecycle_requires_wait(self):
-        rc, _, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle"])
+        def stub(args, machine=None):
+            if args[:2] == ["pane", "layout"]:
+                return 0, '{"result":{"layout":{"panes":[]}}}', ""
+            if args[:2] == ["agent", "get"]:
+                return 0, '{"result":{"agent":{"agent_status":"idle"}}}', ""
+            return 0, "{}", ""
+        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+            rc, _, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle"])
         self.assertEqual(rc, 2)
         self.assertIn("lifecycle mode requires --wait", err)
 

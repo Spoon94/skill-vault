@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import (install_offline_guard,  # noqa: E402
+                            restore_real_herdr)
+install_offline_guard(hao)
 from ledger import Ledger  # noqa: E402
 
 
@@ -63,6 +66,8 @@ def _alarm(seconds=8):
 
 class TestR13HerdrTimeout(unittest.TestCase):
     def setUp(self):
+        restore_real_herdr(hao)
+        self.addCleanup(install_offline_guard, hao)
         self.tmp = tempfile.TemporaryDirectory()
         self.bin = os.path.join(self.tmp.name, "bin")
         os.makedirs(self.bin)
