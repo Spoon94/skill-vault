@@ -129,9 +129,11 @@ exit 0
                     os.kill(int(pid), 0)
 
     def _run(self, argv, sleep_mode):
+        if os.path.exists(self.pidlog):
+            os.remove(self.pidlog)
         env = dict(self.env, SHIM_SLEEP=sleep_mode)
         with _alarm(8), mock.patch.object(hao, "_herdr_timeout",
-                                          return_value=0.2):
+                                          return_value=0.5):
             rc, out, err = run_cli(argv, env)
         self._assert_no_live_shim()
         return rc, out, err
@@ -179,6 +181,20 @@ exit 0
         self.assertEqual(rc, 8)
         self.assertEqual(json.loads(out)["exit"], 8)
 
+    def test_wait_all_modes_return_8_without_rescan(self):
+        for mode in ("sentinel", "lifecycle", "file"):
+            with self.subTest(mode=mode):
+                rc, out, err = self._run(
+                    ["wait", "w2:p9", "deadbeef0000", "--mode", mode,
+                     "--timeout", "20", "--json"], "all")
+                self.assertEqual(rc, 8, err)
+                lines = [line for line in out.splitlines() if line.strip()]
+                self.assertEqual(len(lines), 1, out)
+                self.assertEqual(json.loads(lines[0])["exit"], 8)
+                with open(self.pidlog) as f:
+                    self.assertEqual(len(f.read().split()), 1)
+                self.assertFalse(os.path.exists(self.state))
+
     def test_timeout_limits(self):
         self.assertEqual(hao._herdr_timeout(["agent", "prompt", "p"]), 30)
         self.assertEqual(hao._herdr_timeout(["pane", "wait-output", "p",
@@ -186,6 +202,79 @@ exit 0
         self.assertEqual(hao._herdr_timeout(["agent", "wait", "p",
                                              "--timeout", "8000"]), 13)
         self.assertEqual(hao._herdr_timeout(["agent", "get", "p"]), 20)
+
+
+class TestR15SingleAgentGet(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = os.path.join(self.tmp.name, "hao", "tasks")
+        os.environ["HAO_STATE_DIR"] = self.state
+        self.sid = "deadbeef0000"
+
+    def tearDown(self):
+        os.environ.pop("HAO_STATE_DIR", None)
+        self.tmp.cleanup()
+
+    def _stub(self, events):
+        def stub(args, machine=None):
+            if args[:2] == ["agent", "get"]:
+                events.append("get")
+                return 0, json.dumps({"result": {"agent": {
+                    "agent_status": "idle", "state_change_seq": 0}}}), ""
+            if args[:2] == ["agent", "wait"]:
+                events.append("wait")
+                return 0, "{}", ""
+            if args[:2] == ["pane", "read"]:
+                events.append("read")
+                return 0, json.dumps({"result": {"read": {"text": ""}}}), ""
+            return 0, "{}", ""
+        return stub
+
+    def _assert_no_double_get(self, events):
+        gets = [i for i, e in enumerate(events) if e == "get"]
+        self.assertFalse(any(events[i + 1] == "get" for i in gets
+                             if i + 1 < len(events)), events)
+        self.assertLessEqual(len(gets) - events.count("read"), 1, events)
+
+    def test_sentinel_round_does_one_agent_get(self):
+        events = []
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=self._stub(events)), \
+                mock.patch.object(hao, "FAST_PATH_SECONDS", 0), \
+                mock.patch.object(hao.time, "sleep", return_value=None), \
+                _alarm(8):
+            rc = hao.cmd_wait("w2:p9", self.sid, 0.05)
+        self.assertEqual(rc, 4)
+        self._assert_no_double_get(events)
+
+    def test_lifecycle_round_does_one_agent_get(self):
+        events = []
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=self._stub(events)), \
+                mock.patch.object(hao, "_sentinel_check",
+                                  return_value=(None, None)), \
+                mock.patch.object(hao, "_sentinel_scan_tail",
+                                  return_value=(None, None)), \
+                mock.patch.object(hao.time, "sleep", return_value=None), \
+                _alarm(8):
+            rc = hao._wait_lifecycle("w2:p9", self.sid, "deadbeef00000000",
+                                     0.05, None, False, False)
+        self.assertEqual(rc, 4)
+        self.assertFalse(any(events[i] == "get" and events[i + 1] == "get"
+                             for i in range(len(events) - 1)), events)
+
+    def test_file_round_does_one_agent_get(self):
+        events = []
+        with mock.patch.object(hao, "run_herdr",
+                               side_effect=self._stub(events)), \
+                mock.patch.object(hao.time, "sleep",
+                                  side_effect=lambda *a: events.append("sleep")), \
+                _alarm(8):
+            rc = hao._wait_file("w2:p9", self.sid, "deadbeef00000000",
+                                0.05, None)
+        self.assertEqual(rc, 4)
+        self.assertFalse(any(events[i] == "get" and events[i + 1] == "get"
+                             for i in range(len(events) - 1)), events)
 
 
 class TestR14StatusNotFound(unittest.TestCase):

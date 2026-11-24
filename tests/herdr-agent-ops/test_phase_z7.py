@@ -51,8 +51,8 @@ class TestZ7NoRecordTimeout(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             state = os.path.join(d, "hao", "tasks")
             with mock.patch.multiple(
-                    hao, current_state=lambda *a, **k: "idle",
-                    _agent_gate=lambda *a, **k: None,
+                    hao,
+                    _agent_status_gate=lambda *a, **k: (None, "idle", {}),
                     _sentinel_check=lambda *a, **k: (None, None),
                     _sentinel_scan_tail=lambda *a, **k: (None, None),
                     _confirm_sentinel=lambda *a, **k: None):

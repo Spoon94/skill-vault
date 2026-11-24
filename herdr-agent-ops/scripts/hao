@@ -60,33 +60,65 @@ def _herdr_timeout(args):
     return HERDR_TIMEOUT_DEFAULT
 
 
+def _kill_herdr_group(p):
+    if p is None:
+        return
+    try:
+        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+    except Exception:
+        try:
+            p.kill()
+        except Exception:
+            pass
+
+
 def run_herdr(args, machine=None):
-    """Run a herdr command with a bounded, command-specific timeout."""
+    """Run a herdr command with a bounded timeout and always reap its group."""
     cmd = ["herdr"] + (["--machine", machine] if machine else []) + args
     limit = _herdr_timeout(args)
+    p = None
+    old_handlers = {}
+
+    def _terminate(signum, frame):
+        _kill_herdr_group(p)
+        raise SystemExit(128 + signum)
+
     try:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True,
-                             start_new_session=True)
-    except OSError as e:
-        return 8, "", f"herdr unavailable: {e}"
-    try:
-        out, err = p.communicate(timeout=limit)
-    except subprocess.TimeoutExpired:
         try:
-            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-        except Exception:
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True,
+                                 start_new_session=True)
+        except OSError as e:
+            return 8, "", f"herdr unavailable: {e}"
+        for sig in (signal.SIGTERM, signal.SIGHUP):
             try:
-                p.kill()
-            except Exception:
+                old_handlers[sig] = signal.getsignal(sig)
+                signal.signal(sig, _terminate)
+            except (ValueError, OSError):
                 pass
         try:
-            out, err = p.communicate(timeout=1)
-        except Exception:
-            out, err = "", ""
-        return 8, "", (f"herdr command timed out after {limit}s: "
-                       f"{' '.join(cmd)}")
-    return p.returncode, out, err
+            out, err = p.communicate(timeout=limit)
+        except subprocess.TimeoutExpired:
+            _kill_herdr_group(p)
+            try:
+                out, err = p.communicate(timeout=1)
+            except Exception:
+                out, err = "", ""
+            return 8, "", (f"herdr command timed out after {limit}s: "
+                           f"{' '.join(cmd)}")
+        return p.returncode, out, err
+    finally:
+        if p is not None and p.poll() is None:
+            _kill_herdr_group(p)
+            try:
+                p.wait(timeout=1)
+            except Exception:
+                pass
+        for sig, handler in old_handlers.items():
+            try:
+                signal.signal(sig, handler)
+            except (ValueError, OSError):
+                pass
 
 
 def _herdr_err_code(stderr):
@@ -639,6 +671,13 @@ def _timeout_detail(observed_working, last_status, timeout, seen_record=True):
     return f"timeout after {timeout}s; {tail}"
 
 
+def _wait_timeout(observed_working, last_status, timeout, seen_record):
+    global _WAIT_DIAG
+    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
+                                 seen_record=seen_record)
+    return 4
+
+
 def _ledger_warn(err):
     """One-time stderr warning when the ledger is unusable (graceful
     degradation: pane evidence stays authoritative)."""
@@ -684,6 +723,10 @@ def _wait_consumed(l, sid, seen):
     return False
 
 
+def _deadline_passed(deadline):
+    return deadline is not None and time.time() >= deadline
+
+
 def _wait_common_check(rec):
     """Returns (kind, payload): 'done'/'cancelled'/None. rec = fresh heartbeat read."""
     if rec and rec.get("status") == "done":
@@ -694,28 +737,37 @@ def _wait_common_check(rec):
     return None, None
 
 
-def _agent_gate(pane, machine, no_agent, accept_unknown):
-    """Returns an exit code (int) when waiting must stop, else None."""
+def _agent_status_gate(pane, machine, no_agent, accept_unknown,
+                       unknown_code=9):
+    """One agent get per wait round; returns (code, status, agent_obj)."""
     if no_agent:
-        return None
+        return None, None, None
     rc, out, err = run_herdr(["agent", "get", pane], machine)
     if rc != 0:
         if _herdr_err_code(err) == "agent_not_found":
             _set_error(f"agent {pane} not found; for a shell pane use --no-agent (or --mode file)")
-            return 3
-        return herdr_error_rc(err, 8)
+            return 3, None, None
+        return herdr_error_rc(err, 8), None, None
     try:
-        st = json.loads(out)["result"]["agent"].get("agent_status")
+        ag = json.loads(out)["result"]["agent"]
+        st = ag.get("agent_status")
     except Exception:
-        return fail(8, f"herdr returned invalid JSON for agent {pane}")
+        return fail(8, f"herdr returned invalid JSON for agent {pane}"), None, None
     if st == "blocked":
-        return 5
+        return 5, st, ag
     if st in ("exited", "closed"):
-        return 3
+        return 3, st, ag
     if st == "unknown" and not accept_unknown:
         _set_error(f"agent {pane} status unknown; add --accept-unknown")
-        return 9
-    return None
+        return unknown_code, st, ag
+    return None, st, ag
+
+
+def _agent_gate(pane, machine, no_agent, accept_unknown):
+    """Compatibility wrapper: exit code only (tests/legacy callers)."""
+    code, _status, _agent = _agent_status_gate(
+        pane, machine, no_agent, accept_unknown)
+    return code
 
 
 def _token_matches(matched, token, sid, joined=False):
@@ -908,28 +960,42 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             return payload
         if kind == "cancelled":
             return 10
-        last_status = current_state(pane, machine)
+        gate, last_status, _agent = _agent_status_gate(
+            pane, machine, no_agent, accept_unknown)
         if last_status == "working":
             observed_working = True
-        gate = _agent_gate(pane, machine, no_agent, accept_unknown)
         if gate is not None:
-            # before giving up, rescan: sentinel may have arrived right before exit
+            # Herdr-level failure (8) must not trigger another herdr call.
+            if gate == 8:
+                return gate
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
+            # Only status gates (3/5/9) get the pre-give-up rescan.
             last, _e = _sentinel_scan_tail(pane, token, sid, machine)
             if last:
                 return _finish_done(l, sid, last)
             return gate
+        if _deadline_passed(deadline):
+            return _wait_timeout(observed_working, last_status, timeout,
+                                 seen_record)
         if time.time() - start < FAST_PATH_SECONDS:
             ml, errc = _sentinel_check(pane, token, sid, machine)
             if errc is not None:
                 return errc
             if ml:
                 sentinel_seen = True
+                if _deadline_passed(deadline):
+                    return _wait_timeout(observed_working, last_status,
+                                         timeout, seen_record)
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
                     return _finish_done(l, sid, conf)
             time.sleep(0.5)
         else:
-            # backstop: server-side agent wait, then tail rescan
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
             if not no_agent:
                 rw, _, ew = run_herdr(["agent", "wait", pane,
                                        "--until", "idle", "--until", "done",
@@ -937,11 +1003,17 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                                        "--timeout", "8000"], machine)
                 if rw != 0 and "timed out" in ew.lower():
                     return herdr_error_rc(ew, 8)
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
             last, errc = _sentinel_scan_tail(pane, token, sid, machine)
             if errc is not None:
                 return errc
             if last:
                 sentinel_seen = True
+                if _deadline_passed(deadline):
+                    return _wait_timeout(observed_working, last_status,
+                                         timeout, seen_record)
                 conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
                 if conf:
                     return _finish_done(l, sid, conf)
@@ -950,19 +1022,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         response_warned = _maybe_warn_unresponsive(
             pane, time.time() - start, last_status, observed_working,
             sentinel_seen, response_warned)
-    # r8#2 last chance: a wrapped sentinel is invisible to the single-line
-    # fast path — one joined tail rescan before declaring timeout
-    last, errc = _sentinel_scan_tail(pane, token, sid, machine)
-    if errc is not None:
-        return errc  # r9#3: pane read/server error, not a plain timeout
-    if last:
-        conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
-        if conf:
-            return _finish_done(l, sid, conf)
-    global _WAIT_DIAG
-    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
-                                 seen_record=seen_record)
-    return 4
+    return _wait_timeout(observed_working, last_status, timeout,
+                         seen_record)
 
 
 RESPONSE_WARN_S = 15
@@ -1009,41 +1070,55 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             return payload
         if kind == "cancelled":
             return 10
-        rc, out, err = run_herdr(["agent", "get", pane], machine)
-        if rc != 0:
-            return herdr_error_rc(err, 8)
-        try:
-            ag = json.loads(out)["result"]["agent"]
-        except Exception:
-            return fail(8, f"herdr returned invalid JSON for agent {pane}")
-        st = ag.get("agent_status")
+        gate, st, ag = _agent_status_gate(pane, machine, False, True)
         last_status = st
         if st == "working":
             observed_working = True
-        seq = ag.get("state_change_seq") or 0
+        if gate is not None:
+            if gate == 8:
+                return gate
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
+            return gate
+        if _deadline_passed(deadline):
+            return _wait_timeout(observed_working, last_status, timeout,
+                                 seen_record)
         if st == "unknown":
             return 6  # lifecycle does not support unknown agents
-        if st == "blocked":
-            return 5
-        if st in ("exited", "closed"):
-            return 3
+        seq = ag.get("state_change_seq") or 0
         if seq > submit_seq or st == "working":
             saw_activity = True
+        if _deadline_passed(deadline):
+            return _wait_timeout(observed_working, last_status, timeout,
+                                 seen_record)
         # task-level evidence is checked BEFORE the no-activity exit9 (r5#3):
         # a late sentinel wins over the activity gate
+        if _deadline_passed(deadline):
+            return _wait_timeout(observed_working, last_status, timeout,
+                                 seen_record)
         ml, errc = _sentinel_check(pane, token, sid, machine)
         if errc is not None:
             return errc
         if ml:
             sentinel_seen = True
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
                 return _finish_done(l, sid, conf)
+        if _deadline_passed(deadline):
+            return _wait_timeout(observed_working, last_status, timeout,
+                                 seen_record)
         last, errc2 = _sentinel_scan_tail(pane, token, sid, machine)
         if errc2 is not None:
             return errc2
         if last:
             sentinel_seen = True
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
             conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
             if conf:
                 return _finish_done(l, sid, conf)
@@ -1052,16 +1127,17 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             sentinel_seen, response_warned)
         if not saw_activity and time.time() - start > 5:
             return 9  # no activity observed for this task
+        if _deadline_passed(deadline):
+            return _wait_timeout(observed_working, last_status, timeout,
+                                 seen_record)
         rw, _, ew = run_herdr(["agent", "wait", pane,
                                "--until", "idle", "--until", "done",
                                "--until", "blocked", "--timeout", "8000"],
                               machine)
         if rw != 0 and "timed out" in ew.lower():
             return herdr_error_rc(ew, 8)
-    global _WAIT_DIAG
-    _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
-                                 seen_record=seen_record)
-    return 4
+    return _wait_timeout(observed_working, last_status, timeout,
+                         seen_record)
 
 
 def _wait_file(pane, sid, token, timeout, machine):
@@ -1084,11 +1160,15 @@ def _wait_file(pane, sid, token, timeout, machine):
             return payload
         if kind == "cancelled":
             return 10
+        if _deadline_passed(deadline):
+            return 4
         rc, out, err = run_herdr(["agent", "get", pane], machine)
         if rc != 0:
             if _herdr_err_code(err) == "agent_not_found":
                 # herdr returns agent_not_found for missing panes too:
                 # confirm the pane itself still exists before skipping the gate
+                if _deadline_passed(deadline):
+                    return 4
                 rcp, _, errp = run_herdr(["pane", "get", pane], machine)
                 if rcp != 0:
                     return herdr_error_rc(errp, 8)
@@ -1100,9 +1180,9 @@ def _wait_file(pane, sid, token, timeout, machine):
             except Exception:
                 st = None
             if st == "blocked":
-                return 5
+                return 4 if _deadline_passed(deadline) else 5
             if st in ("exited", "closed"):
-                return 3
+                return 4 if _deadline_passed(deadline) else 3
         rec = _safe_get(l, sid) or {}
         rp = rec.get("result_path")
         if not rp:
