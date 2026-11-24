@@ -111,7 +111,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
 - running 记录过 TTL 后，`clean` / `doctor` 会先看 target 的 agent 状态；target pane/agent 已不存在时删除，agent 存在且 working/blocked/unknown 或状态读取异常时保留。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
-- 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）；所有带 `--machine` 的命令先校验 machine，未知 machine → exit7，herdr 不可达 → exit8。wait 在 15s 无响应时只警告一次。
+- 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）；所有带 `--machine` 的命令先校验 machine，未知 machine → exit7，herdr 不可达 → exit8。wait 在 15s 无响应时只警告一次；每次 herdr 调用都有超时上限（prompt 30s，wait 类 N/1000+5s，其余 20s）。
 
 ## 退出码速查
 

@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -42,14 +43,50 @@ def hao_command():
     return f'HAO_STATE_DIR="{state}" {py} "{_hao_script()}"'
 
 
+HERDR_TIMEOUT_DEFAULT = 20
+HERDR_TIMEOUT_PROMPT = 30
+HERDR_TIMEOUT_WAIT_EXTRA = 5
+
+
+def _herdr_timeout(args):
+    if args[:2] == ["agent", "prompt"]:
+        return HERDR_TIMEOUT_PROMPT
+    if args[:2] in (["pane", "wait-output"], ["agent", "wait"]):
+        try:
+            ms = int(args[args.index("--timeout") + 1])
+            return ms / 1000 + HERDR_TIMEOUT_WAIT_EXTRA
+        except (ValueError, IndexError):
+            pass
+    return HERDR_TIMEOUT_DEFAULT
+
+
 def run_herdr(args, machine=None):
-    """Run a herdr command, return (rc, stdout, stderr)."""
+    """Run a herdr command with a bounded, command-specific timeout."""
     cmd = ["herdr"] + (["--machine", machine] if machine else []) + args
+    limit = _herdr_timeout(args)
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True)
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True,
+                             start_new_session=True)
     except OSError as e:
         return 8, "", f"herdr unavailable: {e}"
-    return p.returncode, p.stdout, p.stderr
+    try:
+        out, err = p.communicate(timeout=limit)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+        except Exception:
+            try:
+                p.kill()
+            except Exception:
+                pass
+        try:
+            out, err = p.communicate(timeout=1)
+        except Exception:
+            out, err = "", ""
+        return 8, "", (f"herdr command timed out after {limit}s: "
+                       f"{' '.join(cmd)}")
+    return p.returncode, out, err
 
 
 def _herdr_err_code(stderr):
@@ -63,6 +100,8 @@ def _herdr_err_code(stderr):
 
 def herdr_error_rc(stderr, fallback=8):
     code = _herdr_err_code(stderr)
+    if not code and stderr:
+        _set_error(stderr.strip())
     return ERR.get(code, fallback) if code else fallback
 
 
@@ -561,7 +600,11 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
                 l.cancel(shortid)
             except Exception as ce:
                 _ledger_warn(ce)
-        return herdr_error_rc(err)
+        why = err.strip() or f"herdr exit {rc}"
+        return fail(8 if "timed out" in err.lower() else herdr_error_rc(err),
+                    f"herdr agent prompt failed ({why}); prompt delivery "
+                    f"unknown; inspect with: herdr pane read {pane}; "
+                    f"re-dispatch if needed")
     if wait:
         result = cmd_wait(pane, token, timeout, mode, machine)
         if isinstance(result, dict) and target_cols is not None:
@@ -888,9 +931,12 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         else:
             # backstop: server-side agent wait, then tail rescan
             if not no_agent:
-                run_herdr(["agent", "wait", pane,
-                           "--until", "idle", "--until", "done", "--until", "blocked",
-                           "--timeout", "8000"], machine)
+                rw, _, ew = run_herdr(["agent", "wait", pane,
+                                       "--until", "idle", "--until", "done",
+                                       "--until", "blocked",
+                                       "--timeout", "8000"], machine)
+                if rw != 0 and "timed out" in ew.lower():
+                    return herdr_error_rc(ew, 8)
             last, errc = _sentinel_scan_tail(pane, token, sid, machine)
             if errc is not None:
                 return errc
@@ -1006,9 +1052,12 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             sentinel_seen, response_warned)
         if not saw_activity and time.time() - start > 5:
             return 9  # no activity observed for this task
-        run_herdr(["agent", "wait", pane,
-                   "--until", "idle", "--until", "done", "--until", "blocked",
-                   "--timeout", "8000"], machine)
+        rw, _, ew = run_herdr(["agent", "wait", pane,
+                               "--until", "idle", "--until", "done",
+                               "--until", "blocked", "--timeout", "8000"],
+                              machine)
+        if rw != 0 and "timed out" in ew.lower():
+            return herdr_error_rc(ew, 8)
     global _WAIT_DIAG
     _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
                                  seen_record=seen_record)
@@ -1578,21 +1627,33 @@ def cmd_status(target, text_mode=False):
         return 3
     ag = None
     pane_obj = None
-    rc, out, _ = run_herdr(["agent", "get", pane])
+    agent_err = pane_err = None
+    rc, out, err = run_herdr(["agent", "get", pane])
     if rc == 0:
         try:
             ag = json.loads(out)["result"]["agent"]
         except Exception:
-            ag = None
-    rcp, outp, _ = run_herdr(["pane", "get", pane])
+            agent_err = "invalid JSON for agent get"
+    else:
+        agent_err = err or f"agent get exit {rc}"
+    rcp, outp, errp = run_herdr(["pane", "get", pane])
     if rcp == 0:
         try:
             pane_obj = json.loads(outp)["result"]["pane"]
         except Exception:
-            pane_obj = None
+            pane_err = "invalid JSON for pane get"
+    else:
+        pane_err = errp or f"pane get exit {rcp}"
     if ag is None and pane_obj is None:
-        _set_error("target not found")
-        return 3
+        notfound = {"agent_not_found", "pane_not_found"}
+        if (agent_err and pane_err
+                and _herdr_err_code(agent_err) in notfound
+                and _herdr_err_code(pane_err) in notfound):
+            _set_error("target not found")
+            return 3
+        detail = agent_err or pane_err or "query failed"
+        _set_error(f"herdr status query failed: {detail}")
+        return 8
     label = (pane_obj or {}).get("label") or ""
     agent = (ag or {}).get("agent") or (pane_obj or {}).get("agent")
     agent_status = ag.get("agent_status") if ag is not None else None

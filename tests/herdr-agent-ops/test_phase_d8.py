@@ -99,7 +99,8 @@ class TestD8UniversalJson(unittest.TestCase):
             run = SimpleNamespace(returncode=0, stdout="ok", stderr="")
             with mock.patch.object(hao.subprocess, "run", return_value=run):
                 rc, out, _ = run_cli(["doctor", "--json"],
-                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"), "HERDR_ENV": "1"})
+                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"),
+                                      "HERDR_ENV": "1", "HERDR_PANE_ID": None})
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertTrue(data["ok"])
