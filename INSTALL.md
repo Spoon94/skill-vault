@@ -18,7 +18,7 @@
 | Codex CLI | `~/.codex/skills/` | 环境有 `codex` 命令 |
 | Copilot CLI | `~/.agents/skills/` | 环境有 `copilot` 命令 |
 | OpenCode | `~/.opencode/skills/` | 环境有 `opencode` 命令 |
-| Gemini CLI | 参考各 skill 目录下的 `GEMINI.md` | 环境有 `gemini` 命令 |
+| Gemini CLI | 支持 `SKILL.md`；`~/.gemini/skills/` 或项目内 `.gemini/skills/` | 环境有 `gemini` 命令 |
 
 ## 方式一：拷贝单个 skill（通用）
 
