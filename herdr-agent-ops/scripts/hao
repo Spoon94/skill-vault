@@ -677,7 +677,7 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
         l.write_running(shortid, token=token, target=pane, machine=machine,
                         wake=wake, mode=mode, result_path=result_path,
                         caller=os.environ.get("HERDR_PANE_ID"),
-                        submit_seq=submit_seq, submit_state=st)
+                        prompt=prompt, submit_seq=submit_seq, submit_state=st)
         wrote = True
     except Exception as e:
         if strict_ledger:
@@ -993,8 +993,41 @@ def _set_blocked_hint(pane):
                f"with: hao ask {pane} \"<task>\" --text-only")
 
 
-def _tail_from_pane_text(text, token, sid):
-    """Text before the last matching sentinel, stripped and capped."""
+_MATCH_DECO = set("-*+•·>#>") | _TUI_BORDERS | _TUI_MARKERS
+_MATCH_TAIL = _TUI_BORDERS | _TUI_MARKERS | set("✓✔")
+
+
+def _normalize_for_match(line):
+    line = _strip_tui_line(line)
+    while line and line[0] in _MATCH_DECO:
+        line = line[1:].lstrip()
+    while line and line[-1] in _MATCH_TAIL:
+        line = line[:-1].rstrip()
+    return re.sub(r"\s+", "", line)
+
+
+def _prompt_end_line(lines, prompt):
+    if not prompt:
+        return None
+    norm_prompt = "".join(_normalize_for_match(line)
+                          for line in prompt.splitlines())
+    if not norm_prompt:
+        return None
+    chars = []
+    line_ids = []
+    for i, line in enumerate(lines):
+        norm = _normalize_for_match(line)
+        chars.append(norm)
+        line_ids.extend([i] * len(norm))
+    norm_pane = "".join(chars)
+    pos = norm_pane.rfind(norm_prompt)
+    if pos < 0:
+        return None
+    return line_ids[pos + len(norm_prompt) - 1]
+
+
+def _tail_from_pane_text(text, token, sid, prompt=None):
+    """Answer text: after the prompt echo (if visible) and before sentinel."""
     lines = text.splitlines()
     start = None
     for k in range(1, min(len(lines), 8) + 1):
@@ -1013,15 +1046,20 @@ def _tail_from_pane_text(text, token, sid):
                 break
     if start is None:
         return ""
-    raw = lines[:start]
+    prompt_end = _prompt_end_line(lines, prompt)
+    if prompt_end is not None and prompt_end < start:
+        raw = lines[prompt_end + 1:start]
+    else:
+        raw = lines[:start]
+        cleaned = [_strip_tui_line(line) for line in raw]
+        last_task = None
+        for i, line in enumerate(cleaned):
+            if "--- 任务结束 ---" in line:
+                last_task = i
+        if last_task is not None:
+            raw = raw[last_task + 1:]
+            cleaned = cleaned[last_task + 1:]
     cleaned = [_strip_tui_line(line) for line in raw]
-    last_task = None
-    for i, line in enumerate(cleaned):
-        if "--- 任务结束 ---" in line:
-            last_task = i
-    if last_task is not None:
-        raw = raw[last_task + 1:]
-        cleaned = cleaned[last_task + 1:]
     cleaned = [line for line, orig in zip(cleaned, raw)
                if not _is_harness_noise(orig, line)]
     while cleaned and not cleaned[0]:
@@ -1032,7 +1070,7 @@ def _tail_from_pane_text(text, token, sid):
     return tail[-2000:] if len(tail) > 2000 else tail
 
 
-def _completion_tail(pane, token, sid, machine):
+def _completion_tail(pane, token, sid, machine, prompt=None):
     global _LAST_PANE_TEXT
     text = _LAST_PANE_TEXT
     if text is None:
@@ -1046,7 +1084,7 @@ def _completion_tail(pane, token, sid, machine):
         except Exception:
             text = out
         _LAST_PANE_TEXT = text
-    return _tail_from_pane_text(text, token, sid)
+    return _tail_from_pane_text(text, token, sid, prompt=prompt)
 
 
 def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
@@ -1123,6 +1161,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     global _LAST_PANE_TEXT
     _LAST_PANE_TEXT = None
     l = _led.Ledger()
+    prompt = (_safe_get(l, sid) or {}).get("prompt")
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
     observed_working = False
@@ -1137,6 +1176,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         elif _wait_consumed(l, sid, seen_record):
             return 3
         token = rec.get("token") or token  # ledger holds the full token
+        prompt = rec.get("prompt") or prompt
         kind, payload = _wait_common_check(rec)
         if kind == "done":
             return payload
@@ -1158,7 +1198,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             if last:
                 return _finish_done(
                     l, sid, last,
-                    _completion_tail(pane, token, sid, machine))
+                    _completion_tail(pane, token, sid, machine, prompt=prompt))
             if gate == 5 and not sentinel_seen:
                 _set_blocked_hint(pane)
             return gate
@@ -1178,7 +1218,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                 if conf:
                     return _finish_done(
                         l, sid, conf,
-                        _completion_tail(pane, token, sid, machine))
+                        _completion_tail(pane, token, sid, machine, prompt=prompt))
             time.sleep(0.5)
         else:
             if _deadline_passed(deadline):
@@ -1206,7 +1246,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                 if conf:
                     return _finish_done(
                         l, sid, conf,
-                        _completion_tail(pane, token, sid, machine))
+                        _completion_tail(pane, token, sid, machine, prompt=prompt))
             else:
                 time.sleep(0.5)
         response_warned = _maybe_warn_unresponsive(
@@ -1241,6 +1281,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
     _LAST_PANE_TEXT = None
     l = _led.Ledger()
     rec0 = _safe_get(l, sid) or {}
+    prompt = rec0.get("prompt")
     submit_seq = rec0.get("submit_seq") or 0
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
@@ -1257,6 +1298,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
         elif _wait_consumed(l, sid, seen_record):
             return 3
         token = rec.get("token") or token  # ledger holds the full token
+        prompt = rec.get("prompt") or prompt
         kind, payload = _wait_common_check(rec)
         if kind == "done":
             return payload
@@ -1303,7 +1345,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             if conf:
                 return _finish_done(
                     l, sid, conf,
-                    _completion_tail(pane, token, sid, machine))
+                    _completion_tail(pane, token, sid, machine, prompt=prompt))
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
@@ -1319,7 +1361,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             if conf:
                 return _finish_done(
                     l, sid, conf,
-                    _completion_tail(pane, token, sid, machine))
+                    _completion_tail(pane, token, sid, machine, prompt=prompt))
         response_warned = _maybe_warn_unresponsive(
             pane, time.time() - start, last_status, observed_working,
             sentinel_seen, response_warned)

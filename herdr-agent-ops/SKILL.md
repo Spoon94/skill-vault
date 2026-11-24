@@ -68,7 +68,7 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 
 - 名字 `^[a-z]{4,6}$`（per-machine 唯一），label 前缀 `hao-`。
 - 零注册表：名字持久化只用 `hao-` label；任务协调用零残留临时台账（仅任务存在时建于系统临时目录，`wait`/`result` 取走即删；`HAO_STATE_DIR` 可覆盖，不使用用户主目录或 XDG 状态目录）。
-- 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。prompt 要求最终消息先以哨兵结尾，再仅在可直接执行时调用 done；审批型 peer 走文本通道，结果在 `wait.tail`；wake 依赖 done，属尽力而为。
+- 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。prompt 要求最终消息先以哨兵结尾，再仅在可直接执行时调用 done；审批型 peer 走文本通道，结果在 `wait.tail`（prompt 回显结束后取，回显不可见时回退分隔符启发式）；wake 依赖 done，属尽力而为。
 - 已知审批型/无法访问 hao 的 peer 用 `ask --text-only`：prompt 不含 hao done 命令，只发答复+哨兵；默认模式审批型结果不确定，blocked 且无哨兵会被提示改用 --text-only。
 - cancel 的 tombstone 由观察到 rc10 的 wait 删除；abort --interrupt 只标记，tidy 在无新鲜心跳且标记超过 60s 时回收。
 - `stop`（只停当前一轮，不依赖任务记录）与 `abort --interrupt`（作废任务并停对方）不同；发送后最多 3s 取 settled status，blocked 都需授权。窄 pane（<40 列）会收到警告。

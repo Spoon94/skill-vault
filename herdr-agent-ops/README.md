@@ -109,7 +109,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 - **cancel 不停止对方**：`cancel`/`abort`（不带 `--interrupt`）只作废等待；目标仍 working 时命令输出 `peer_running:true`、`next` 和 stderr 提示，要停对方执行 `abort <sid> --interrupt`。取消 tombstone 由看到 rc10 的 `wait` 删除；`abort --interrupt` 只标记，不立即删除；tidy 在无新鲜心跳且标记超过 60s 时回收（普通取消仍按目标状态/1 小时/clean）。
 - **stop vs abort**：`stop <target>` 只停当前这一轮，不依赖/不读写任务记录；`abort <sid> --interrupt` 先作废任务再停对方。两者对 blocked 都要求 TTY/0600 授权。
 - 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成。prompt 要求先打印最终消息最后一行哨兵，再仅在可直执行时调用 `done`；审批型 peer 经文本通道完成，结果在 `wait.tail`。
-- `--wake` 依赖 `hao done`；审批型 peer 上属于尽力而为。已知审批型或对方无法访问 hao 时用 `ask --text-only`：prompt 不含 `hao done`，结果只走文本通道，`wait` 返回 `tail`。默认模式下审批型对方是否调用命令取决于其判断，结果不确定；blocked 且无哨兵时 wait 会提示 `--text-only`。
+- `--wake` 依赖 `hao done`；审批型 peer 上属于尽力而为。已知审批型或对方无法访问 hao 时用 `ask --text-only`：prompt 不含 `hao done`，结果只走文本通道，`wait` 返回 `tail`（从 prompt 回显结束之后取；回显不可见时回退分隔符启发式）。默认模式下审批型对方是否调用命令取决于其判断，结果不确定；blocked 且无哨兵时 wait 会提示 `--text-only`。
 - running 记录过 TTL 后，`clean` / `doctor` 会先看 target 的 agent 状态；target pane/agent 已不存在时删除，agent 存在且 working/blocked/unknown 或状态读取异常时保留。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
 - 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）；所有带 `--machine` 的命令先校验 machine，未知 machine → exit7，herdr 不可达 → exit8。wait 在 15s 无响应时只警告一次；每次 herdr 调用都有超时上限（prompt 30s，wait 类 N/1000+5s，其余 20s）。
