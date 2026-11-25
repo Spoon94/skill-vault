@@ -17,13 +17,15 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger  # noqa: E402
 
 
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
     saved = {k: os.environ.get(k) for k in
-             ("XDG_STATE_HOME", "HERDR_PANE_ID", "HAO_ABORT_ALLOW")}
+             ("HAO_STATE_DIR", "HERDR_PANE_ID", "HAO_ABORT_ALLOW")}
     if env:
         for key, value in env.items():
             if value is None:
@@ -128,7 +130,14 @@ class TestD6Reasons(unittest.TestCase):
         self.assertIn("--force", err)
 
     def test_ask_lifecycle_requires_wait(self):
-        rc, _, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle"])
+        def stub(args, machine=None):
+            if args[:2] == ["pane", "layout"]:
+                return 0, '{"result":{"layout":{"panes":[]}}}', ""
+            if args[:2] == ["agent", "get"]:
+                return 0, '{"result":{"agent":{"agent_status":"idle"}}}', ""
+            return 0, "{}", ""
+        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+            rc, _, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle"])
         self.assertEqual(rc, 2)
         self.assertIn("lifecycle mode requires --wait", err)
 
@@ -147,20 +156,20 @@ class TestD6Reasons(unittest.TestCase):
 
     def test_done_cancelled_reason(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", token=token)
                 Ledger().cancel("abcd12345678")
-                rc, _, err = run_cli(["done", token], {"XDG_STATE_HOME": d})
+                rc, _, err = run_cli(["done", token], {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 6)
                 self.assertIn("was cancelled", err)
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_done_final_working_reason(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 token = "hao-" + "abcd12345678" + "9900"
                 Ledger().write_running("abcd12345678", token=token,
@@ -172,18 +181,18 @@ class TestD6Reasons(unittest.TestCase):
                     return 0, "{}", ""
                 with mock.patch.object(hao, "run_herdr", side_effect=stub):
                     rc, _, err = run_cli(["done", token, "--final"],
-                                         {"XDG_STATE_HOME": d})
+                                         {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 5)
                 self.assertIn("--final requires idle or done", err)
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_abort_not_found_and_blocked(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 rc, _, err = run_cli(["abort", "deadbeef0000"],
-                                     {"XDG_STATE_HOME": d})
+                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 3)
                 self.assertIn("not found", err)
                 token = "hao-" + "abcd12345678" + "9900"
@@ -196,11 +205,11 @@ class TestD6Reasons(unittest.TestCase):
                     return 0, "{}", ""
                 with mock.patch.object(hao, "run_herdr", side_effect=stub):
                     rc, _, err = run_cli(["abort", "abcd12345678", "--interrupt"],
-                                         {"XDG_STATE_HOME": d})
+                                         {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 5)
                 self.assertIn("TTY or 0600 approval", err)
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_say_reasons(self):
         rc, _, err = run_cli(["say", "hi"], {"HERDR_PANE_ID": None})
@@ -234,7 +243,7 @@ class TestD6Reasons(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch.object(hao, "run_herdr", side_effect=stub):
             rc, out, _ = run_cli(["status", "w2:p9", "--json"],
-                                 {"XDG_STATE_HOME": d})
+                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertIsNone(data["agent"])

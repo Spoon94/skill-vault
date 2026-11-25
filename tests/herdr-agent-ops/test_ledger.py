@@ -13,7 +13,7 @@ class TestLockTimeout(unittest.TestCase):
         import time
         from ledger import _path
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 l = Ledger()
                 l.write_running("aabb11223344")
@@ -26,13 +26,13 @@ class TestLockTimeout(unittest.TestCase):
                     # lock-free get still works while the lock is held
                     self.assertEqual(l.get("aabb11223344")["status"], "running")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
 
 class TestLedger(unittest.TestCase):
     def test_done_tombstone(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             l = Ledger()
             l.write_done("abc123", result_path="/tmp/r.md", summary="ok")
             rec = l.get("abc123")
@@ -41,7 +41,7 @@ class TestLedger(unittest.TestCase):
 
     def test_heartbeat_only_updates_updated(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             l = Ledger()
             l.write_done("abc123", summary="s")
             before = l.get("abc123")["status"]
@@ -50,7 +50,7 @@ class TestLedger(unittest.TestCase):
 
     def test_cancel_running_vs_done(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             l = Ledger()
             l.write_running("run1")
             self.assertEqual(l.cancel("run1"), 0)
@@ -59,7 +59,7 @@ class TestLedger(unittest.TestCase):
 
     def test_cleanup_terminal_only(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             l = Ledger()
             l.write_done("done1")
             # age done1's record to make it stale

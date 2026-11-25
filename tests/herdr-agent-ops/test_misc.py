@@ -4,11 +4,14 @@ import sys
 import tempfile
 import types
 from importlib.machinery import SourceFileLoader
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 cmd_status = hao.cmd_status
 cmd_result = hao.cmd_result
@@ -17,7 +20,10 @@ cmd_say = hao.cmd_say
 
 class TestMisc(unittest.TestCase):
     def test_status_nonexistent(self):
-        self.assertEqual(cmd_status("w2:pZZZZ"), 3)  # nonexistent -> exit 3
+        err_json = '{"error":{"code":"agent_not_found"}}'
+        with mock.patch.object(hao, "run_herdr",
+                               return_value=(1, "", err_json)):
+            self.assertEqual(cmd_status("w2:pZZZZ"), 3)  # nonexistent -> exit 3
 
     def test_result_no_path(self):
         self.assertEqual(cmd_result("deadbeef0000"), 3)
@@ -104,8 +110,8 @@ class TestWaitRoundRec(unittest.TestCase):
             ro = os.path.join(d, "ro")
             os.makedirs(ro)
             os.chmod(ro, 0o500)
-            saved = os.environ.get("XDG_STATE_HOME")
-            os.environ["XDG_STATE_HOME"] = ro
+            saved = os.environ.get("HAO_STATE_DIR")
+            os.environ["HAO_STATE_DIR"] = ro
             try:
                 import ledger as led
                 buf = __import__("io").StringIO()
@@ -115,9 +121,9 @@ class TestWaitRoundRec(unittest.TestCase):
             finally:
                 os.chmod(ro, 0o700)
                 if saved is None:
-                    os.environ.pop("XDG_STATE_HOME", None)
+                    os.environ.pop("HAO_STATE_DIR", None)
                 else:
-                    os.environ["XDG_STATE_HOME"] = saved
+                    os.environ["HAO_STATE_DIR"] = saved
                 hao._LEDGER_WARNED = False
 
 

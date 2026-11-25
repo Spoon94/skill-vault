@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 
 class TestC3Startup(unittest.TestCase):
@@ -28,8 +30,8 @@ class TestC3Startup(unittest.TestCase):
             return original(name, filename)
 
         with tempfile.TemporaryDirectory() as d:
-            saved = os.environ.get("XDG_STATE_HOME")
-            os.environ["XDG_STATE_HOME"] = d
+            saved = os.environ.get("HAO_STATE_DIR")
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             err = io.StringIO()
             try:
                 with mock.patch.object(hao, "_load_module", side_effect=record), \
@@ -43,9 +45,9 @@ class TestC3Startup(unittest.TestCase):
                 hao._JSON_OUTPUT = False
                 hao._JSON_HANDLED = False
                 if saved is None:
-                    os.environ.pop("XDG_STATE_HOME", None)
+                    os.environ.pop("HAO_STATE_DIR", None)
                 else:
-                    os.environ["XDG_STATE_HOME"] = saved
+                    os.environ["HAO_STATE_DIR"] = saved
         self.assertNotIn("names", calls)
 
 

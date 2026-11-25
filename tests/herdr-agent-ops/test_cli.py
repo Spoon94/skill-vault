@@ -8,10 +8,13 @@ import types
 from importlib.machinery import SourceFileLoader
 import contextlib
 from contextlib import redirect_stdout
+from unittest import mock
 
 _loader = SourceFileLoader("hao", os.path.join(os.path.dirname(__file__), "..", "..", "herdr-agent-ops", "scripts", "hao"))
 hao = types.ModuleType(_loader.name)
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 normalize_id = hao.normalize_id
 build_prompt = hao.build_prompt
@@ -78,7 +81,7 @@ class TestIds(unittest.TestCase):
 class TestLedgerFlow(unittest.TestCase):
     def test_done_cancel_by_shortid(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -94,7 +97,7 @@ class TestLedgerFlow(unittest.TestCase):
 
     def test_cancel_unknown(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 self.assertEqual(cmd_cancel("deadbeef0000"), 3)
@@ -105,7 +108,7 @@ class TestLedgerFlow(unittest.TestCase):
 class TestFileWait(unittest.TestCase):
     def test_wait_file(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -145,12 +148,20 @@ class TestFileWait(unittest.TestCase):
     def test_wait_file_missing_pane_exit3(self):
         # r6#2 + error-map fix: nonexistent pane must stop the wait with 3
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
                 Ledger().write_running("feed99998888")
-                r = hao._wait_file("w2:pX", "feed99998888", "hao-feed9999888890", 3, None)
+                def stub(args, machine=None):
+                    if args[:2] == ["agent", "get"]:
+                        return 1, "", '{"error":{"code":"agent_not_found"}}'
+                    if args[:2] == ["pane", "get"]:
+                        return 1, "", '{"error":{"code":"pane_not_found"}}'
+                    return 0, "{}", ""
+                with mock.patch.object(hao, "run_herdr", side_effect=stub):
+                    r = hao._wait_file("w2:pX", "feed99998888",
+                                       "hao-feed9999888890", 3, None)
                 self.assertEqual(r, 3)
             finally:
                 sys.path.pop(0)
@@ -379,7 +390,7 @@ class TestFileConventionPath(unittest.TestCase):
     def test_wait_file_falls_back_to_convention_path(self):
         # r9#2: ledger lost result_path; state_dir/<sid>/result.md still completes
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             sys.path.insert(0, os.path.join(SKILL_DIR, "scripts"))
             try:
                 from ledger import Ledger
@@ -419,7 +430,7 @@ class TestWriteDegradation(unittest.TestCase):
         self.lm.Ledger = self.orig_ledger
         hao.run_herdr = self.orig_run
         hao._LEDGER_WARNED = False
-        os.environ.pop("XDG_STATE_HOME", None)
+        os.environ.pop("HAO_STATE_DIR", None)
 
     def test_done_prints_sentinel_when_ledger_write_fails(self):
         # r8#3 (P1): ledger failure must never swallow the sentinel
@@ -428,7 +439,7 @@ class TestWriteDegradation(unittest.TestCase):
                 raise TimeoutError("ledger lock timeout")
 
             def get(self, sid):
-                return None
+                return {"status": "running"}
 
         self.lm.Ledger = BoomLedger
         out, err = io.StringIO(), io.StringIO()
@@ -448,7 +459,7 @@ class TestWriteDegradation(unittest.TestCase):
 
         hao.run_herdr = stub
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             r = hao.cmd_ask("w2:pX", "task", False, "file", None, 60)
         self.assertIn("result_path", r)
         self.assertTrue(r["result_path"].endswith("result.md"))
@@ -469,7 +480,7 @@ class TestWriteDegradation(unittest.TestCase):
         self.lm.Ledger = BoomLedger
         hao.run_herdr = stub
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
                 r = hao.cmd_ask("w2:pX", "task text", False, "sentinel", None, 60)
@@ -507,21 +518,39 @@ class TestCLI(unittest.TestCase):
         self.assertIn("usage", r.stdout.lower())
 
     def test_no_args_help_and_roster(self):
-        r = subprocess.run(
-            [sys.executable, os.path.join(SKILL_DIR, "scripts", "hao")],
-            capture_output=True, text=True, timeout=15)
+        with tempfile.TemporaryDirectory() as d:
+            shim = os.path.join(d, "herdr")
+            with open(shim, "w") as f:
+                f.write("#!/bin/sh\nexit 1\n")
+            os.chmod(shim, 0o755)
+            env = dict(os.environ, PATH=d + ":" + os.environ.get("PATH", ""))
+            r = subprocess.run(
+                [sys.executable, os.path.join(SKILL_DIR, "scripts", "hao")],
+                capture_output=True, text=True, timeout=15, env=env)
         self.assertEqual(r.returncode, 0)
         self.assertIn("usage", r.stdout.lower())
 
     def test_restore_dry_run_env_workspace(self):
-        env = dict(os.environ)
-        env["HERDR_WORKSPACE_ID"] = os.environ.get("HERDR_WORKSPACE_ID", "w2")
-        r = subprocess.run(
-            [sys.executable, os.path.join(SKILL_DIR, "scripts", "hao"),
-             "restore", "--dry-run"],
-            capture_output=True, text=True, timeout=15, env=env)
-        self.assertIn(r.returncode, (0, 6))
-        self.assertNotIn("Traceback", r.stderr)
+        def stub(args, machine=None):
+            if args[:2] == ["agent", "list"]:
+                return 0, '{"result":{"agents":[]}}', ""
+            if args[:2] == ["pane", "list"]:
+                return 0, '{"result":{"panes":[]}}', ""
+            return 0, "{}", ""
+        env = {"HERDR_WORKSPACE_ID":
+               os.environ.get("HERDR_WORKSPACE_ID", "w2")}
+        saved = {k: os.environ.get(k) for k in env}
+        try:
+            os.environ.update(env)
+            with mock.patch.object(hao, "run_herdr", side_effect=stub):
+                rc = hao.main(["restore", "--dry-run"])
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        self.assertIn(rc, (0, 6))
 
     def test_suggest_json(self):
         r = subprocess.run(

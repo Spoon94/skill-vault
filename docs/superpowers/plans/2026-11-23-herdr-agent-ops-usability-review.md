@@ -134,3 +134,338 @@ hao name w2:p9 forge（已带 -ops scope）→ scope 被静默丢弃
 - **要求**：所有 `cmd_*` 非零整数 return 必须通过 `fail()` 或紧随 `_set_error`；补齐 name/clear/ask/done/abort/say/doctor 的误导性通用文案；AST 守卫测试防回归。
 - **state**：status 无 agent pane 的 `agent_status` 为 null（有 agent 但 unknown 仍为 unknown），protocol 同步。
 - **验收**：AST 扫描 0 违规；五类误导文案有具体目标/状态/--force/--wait 提示。
+
+---
+
+# 合并后跟进（M1–M3）：JSON 契约与 done 语义
+
+PR #8 合并后，对全部子命令做了一次系统性的 `--json` stdout 扫描（断言 stdout 为空或恰好一个 JSON 值），并用一次性 pi 实例补测了 `restore` 非 dry-run 与 `abort --interrupt` 成功路径（均通过）。扫描发现三处：
+
+| # | 现象 | 违反的约定 |
+|---|---|---|
+| M1 | `hao abort <sid> --interrupt --json` 输出**两行** JSON（内部 `cmd_cancel` 一行 + abort 自己一行），`json.loads(stdout)` 报 `Extra data` | `--json` 输出单个 JSON 值 |
+| M2 | `ask` / `wait` 出错时 stdout 为空（仅 stderr 原因行） | protocol.md 输出矩阵：ask/wait **恒 JSON** |
+| M3 | `hao done <不存在的任务 id>` 返回 0、打印哨兵并**凭空创建**一条 done 记录 | 设计稿：「TTL 删后 exit3」——记录不存在即 exit 3 |
+
+## 修复项
+
+### M1 `abort --interrupt --json` 单行 JSON
+- 中间的 cancel 不再向 stdout 打印；最终只输出一行：`{"ok":true,"shortid":"…","cancelled":true,"interrupted":true}`（失败时 `{"ok":false,"error":"…","exit":N}`）。
+
+### M2 `ask` / `wait` 出错也输出 JSON
+- 非零退出时 stdout 同样输出 `{"ok":false,"error":"<与 stderr 相同的原因>","exit":N}`，stderr 原因行与退出码不变。「恒 JSON」在成功与失败两种情况下都成立。
+
+### M3 `hao done` 对不存在的任务返回 3
+- 台账**可读**且该 id 无记录（从未派发或已被 TTL 清理）→ 不创建记录、不打印哨兵，stderr `hao done: task <id> not found (exit 3)`。
+- 台账**不可读**（降级）→ 维持现状：打印哨兵 + 一次性 warning。
+- 对已存在的 done 记录重复 done 仍为幂等 rc=0；对 cancelled 仍 rc=6。
+
+### 守卫测试
+- 遍历所有子命令的成功与错误路径（stub `run_herdr`），断言带 `--json`（ask/wait 恒 JSON）时 stdout 为空或恰好一个 JSON 值；`done` 除外（其 stdout 最后一行是哨兵，JSON 走 stderr）。
+- M3 三种情形各有断言：无记录且可读 → 3 且台账无新文件；不可读 → 降级；已有 done → 0。
+
+## 验收（Claude）
+- 重跑系统性 stdout 扫描：16 条命令全部为「恰好一个 JSON」或（done）按文档例外。
+- `hao done <不存在的 12-hex>` → rc=3，台账文件数不变。
+
+---
+
+# 追加（R1–R3）：直接控制对方 agent + 窄 pane 警告
+
+## 背景
+
+用户看到 forge 持续刷屏，要求「控制它、把进程杀掉」。核查后并没有失控进程（forge 空闲、无子进程、屏幕 22 秒内无变化），但暴露两个缺口：
+
+1. **没有任务记录时，hao 无法让一个 agent 停下当前这一轮**。唯一的办法是 `abort <sid> --interrupt`，而它依赖任务记录；今天这种情形只能手写原生 `herdr agent send-keys`。
+2. **窄 pane 不提示**。本次 forge 的 pane 只有 25 列。窄 pane 既让任何输出看起来像疯狂滚动，也是此前哨兵连续失配（关键字被拆行、token 被折断，r7–r13）的根源，但派发时没有任何提醒。
+
+## R1 `hao stop <target>`：让 agent 停下当前这一轮
+
+- 语义：向目标 agent 发送 `esc` → `ctrl+c`，不依赖任务记录，不读写台账。
+- 守卫（安全优先，宁可不发也不误发）：
+  | 目标状态 | 行为 |
+  |---|---|
+  | working | 发送 `esc`、`ctrl+c`；回读状态写入输出 |
+  | idle / done / exited / closed | **不发按键**（对空闲的 TUI 发 `ctrl+c` 可能触发退出），exit 0，输出 `already idle` |
+  | blocked | 与 `abort --interrupt` 相同的用户级授权：TTY 确认，或 0600 的 `~/.config/hao/abort-approval` 文件内容含该 pane id；无授权 exit 5 |
+  | unknown | 不发按键，exit 9，提示 |
+  | pane 无 agent | exit 3，不发按键 |
+- flag：`--dry-run`、`--json`、`--machine`。JSON：`{"ok":true,"pane_id":"…","agent_status_before":"working","sent":["esc","ctrl+c"],"agent_status_after":…}`；already idle 时 `sent: []`。
+- 文档（README / SKILL.md / protocol.md / 顶层 help）写清与 abort 的区别：`abort <sid> --interrupt` = 作废任务并停对方；`stop` = 只停当前这一轮。
+
+## R2 窄 pane 警告
+
+- `ask`：解析目标 pane 后取 `herdr pane layout --pane <id>` 中该 pane 的宽度；小于 40 列 → stderr 输出一行警告（不阻塞、不改退出码）：对方 TUI 会折断每一行、文本哨兵可能无法识别、台账通道不受影响、建议加宽 pane。JSON 输出增加 `target_cols`。取不到布局时静默跳过。
+- `doctor`：`HERDR_PANE_ID` 可用时报告当前 pane 宽度（小于 40 列记为 warn），取不到则跳过；不创建任何文件。
+- 测试（stub 布局）：窄 → 有警告且有 `target_cols`；宽 → 无警告；布局获取失败 → 静默。
+
+## R3 验收（Claude）
+
+一次性实例放在**后台标签页**，不再挤用户当前标签页。
+
+- `hao stop`：working 的 agent → 停下；idle → 不发按键、rc=0；无 agent 的 pane → rc=3；blocked → 无授权 rc=5、有 0600 授权文件 rc=0（若能人为制造 blocked 状态）。
+- `ask` 对小于 40 列的 pane 给出警告，对宽 pane 不给。
+
+## 追加（R4–R6）：验收与真实使用中带出的三处
+
+### R4 `agent_status_after` 读得太早
+- 现象：`hao stop`（以及 `abort --interrupt`）发出按键后立刻回读状态，herdr 尚未更新，输出仍是 `working` / `blocked`，agent 读到会以为没停成功。
+- 修复：发送后每 0.3s 轮询一次，直到状态相对按键前发生变化或满 3s；输出最后观察到的 `agent_status_after`。3s 内未变化时 stderr 追加一句「状态 3s 内未变化，对方可能没有响应」。
+
+### R5 清理不得删除对方仍在工作的 running 记录
+- 现象：真实使用中，异步 + 唤醒的任务从派发起就没有等待方、也就没有心跳（实测一条任务 34 分钟无更新，对方仍在工作）。按现有 TTL 规则（running 且无心跳超过 24h 即清），超过 24h 的长任务其记录会在对方完成前被 `doctor` / `clean` 清掉，之后对方的 `hao done` 得到 exit 3、唤醒也不会发出，结果丢失。
+- 修复：`clean` / `doctor` / tidy 在删除 running 记录前检查其 target 的 agent 状态；对方仍 working 或 blocked 时**保留**该记录（不计入可清理）。台账不可读等异常情况维持原有保守行为。
+
+### R6 升级说明
+- 旧版本（PR #9 之前）的台账在 `~/.local/state/hao/tasks/`，新版本默认在系统临时目录。升级时若有旧版本派出、尚未取走的任务，用 `HAO_STATE_DIR=~/.local/state/hao/tasks` 运行 `hao wait` 即可读取。
+- README 增加一小节「从旧版本升级」写明这一点。
+
+## 验收（Claude）
+- R4：对工作中的一次性 agent 执行 `stop`，输出中的 `agent_status_after` 为按键后的新状态。
+- R5：构造 running 记录且其 target 为 working，`hao clean --all` 不删除；target 不 working 时按原规则删除。
+
+## 追加（R7）：目标 pane 已不存在的过期记录永远删不掉
+
+### 现象（验收 R5 时实测）
+- 对一个已关闭的目标 pane，`current_state()` 返回 `'unknown'`。
+- R5 的 `_record_peer_active` 把 `unknown` 视为「对方可能仍在工作」而保留记录。
+- 结果：目标 pane 或 agent 已不存在的过期 running 记录，`hao clean --ttl 0`、`--all`、`doctor` 都删不掉，记录与锁文件永久残留。一次性 pane 关闭、agent 退出、herdr 重启后 pane 编号变化都会触发，违背零残留。
+
+### 修复
+- `_record_peer_active` 区分「对方不存在」与「状态读不到」：
+  - herdr 返回 `pane_not_found` / `agent_not_found`（或 pane 上已无 agent）→ 视为不活跃，过期后可删除；
+  - agent 存在且状态为 `working` / `blocked` → 保留；
+  - agent 存在且状态为 `unknown` → 保留（保守）；
+  - 其他错误（herdr 不可达等）→ 保留（保守）。
+- `hao stop` / `abort --interrupt` 的守卫不变（unknown 一律不发按键）。
+
+### 测试
+- 过期 running 记录 + 目标 pane 不存在 → `clean --ttl 0` 删除；
+- 过期 running 记录 + 目标 pane 存在但无 agent → 删除；
+- 过期 running 记录 + 目标 agent working → 保留；
+- 过期 running 记录 + agent 状态 unknown → 保留；
+- 过期 running 记录 + herdr 报其他错误 → 保留。
+
+## 追加（R8–R9）：真实使用中暴露的两处
+
+### R8 用 agent 名字作 target 时没有被解析成 pane id
+- 现象：`hao ask verse …` 可以送达（herdr 自己认得 agent 名字），但 `resolve_target("verse")` 原样返回名字，于是所有依赖 pane id 的功能对名字目标静默失效：窄 pane 警告不触发、输出里 `target_cols` 为 null、台账记录的 `target` 存的是名字而不是 pane id（`status` 按 pane 列任务时对不上）。help 里明确写着 target 可以是 agent name。
+- 原因：`resolve_target` 只按 pane label 和 agent 类型（claude/pi）匹配，不按 herdr 的 agent 名字匹配。
+- 修复：`resolve_target` 在常规匹配落空后，用 `herdr agent list`（或 `agent get`）按 `name == target` 解析出 pane id；解析不到才原样返回。解析成功后上述功能全部对名字目标生效。
+- 测试：名字 → pane id；label / pane id / `w:t:p` 行为不变；不存在的名字原样返回。
+
+### R9 长等待中执行 `abort --interrupt`，等待方可能得到错误的退出码
+- 现象：等待超过 30s 进入兜底阶段后，每轮在 server 侧 `agent wait` 里阻塞最长 8s 才查一次台账；`abort --interrupt` 写入取消记录、发按键，约 3s 后把记录删除。等待方很可能错过取消记录存在的窗口，再查时记录已消失，得到 rc=3「task record already consumed」，而不是 rc=10 cancelled。（实测：快速轮询阶段的等待方得到正确的 rc=10。）
+- 修复：`abort --interrupt` 不再立即删除取消记录，改为标记已中断；记录由观察到 cancelled 的等待方删除；tidy 仅在该记录**没有新鲜心跳**（没有活跃等待方）且标记超过 60s 时回收。C2 的规则相应改为「取消的记录保留到被等待方观察到，或对方已不 working，或取消超过 1 小时，或 `clean`；`abort --interrupt` 只标记不删除」。
+- 测试：等待方处于兜底阶段（用 stub 让首轮即进入兜底，或把 8s 阻塞做成可注入）时执行 `abort --interrupt` → 等待方 rc=10；没有活跃等待方时 60s 后由 tidy 回收。
+
+## 追加（R10–R12）：跨机器错误路径与第三种 agent 的实测
+
+### R10 `--machine` 指向不可用的 machine 时行为不一致
+实测对 `--machine no-such-profile-xyz`（herdr 的报错是纯文本 `error: unknown machine '…'`，不是 JSON）：
+
+| 命令 | 现状 | 应为 |
+|---|---|---|
+| `name … --dry-run` | rc=0，报告成功 | rc=7 |
+| `clear … --dry-run` | rc=0，报告成功 | rc=7 |
+| `suggest` | **rc=1，Traceback 崩溃** | rc=7 |
+| `list` / `restore` / `ask` / `wait` | rc=8 | rc=7 |
+| `stop` | rc=3「target not found」 | rc=7 |
+| `doctor` | rc=7 | 不变 |
+
+- 修复：`main()` 在解析参数后，对除 `doctor` 外所有带 `--machine` 的命令做一次前置校验（`herdr machine status <m>`）；不可用则统一返回 7 并给出 machine 名与原因，不执行任何后续动作。`herdr_error_rc` 同时识别纯文本的 `unknown machine`。`doctor` 保持自己的报告形式。
+- 健壮性：任何 `json.loads(out)` 之前必须检查 `run_herdr` 的返回码；herdr 不可达或返回非 JSON 时返回 8 并给出原因，不得抛出 Traceback（`suggest` 的崩溃即由此而来）。
+- 测试：stub `run_herdr` 模拟「未知 machine」与「herdr 不可达」两种失败，遍历所有带 `--machine` 的命令与 `suggest` / `list` / `restore` / `name`，断言退出码正确、无异常、stdout 恰好一个 JSON、且没有派发或写台账。
+
+### R11 对方从未响应时尽早提醒
+- 现象：刚启动的 agent 尚未初始化完时，`herdr agent prompt` 返回成功但 TUI 丢弃了输入（qodercli 实测）。`wait` 要等满整个超时才报告「never observed working」。
+- 修复：等待循环在派发后约 15s 内，若对方状态始终未离开 idle/done，且没有任何台账或哨兵证据，输出一次 stderr 警告：「对方在派发 15s 后仍无反应，可能没有收到 prompt（例如它还在启动中）；可用 herdr pane read <pane> 查看」。**只警告，不失败**（对方状态不可检测的 agent 仍可能在工作）。状态为 unknown 时不发此警告。
+- 测试：stub 状态恒为 idle → 15s 左右出现一次警告且等待继续；状态变为 working → 无警告。
+
+### R12 需要人工审批才能执行命令的 agent 会被 `hao done` 卡住
+- 现象：qodercli 默认权限模式下，peer 执行 prompt 里给出的 `hao done …` 命令时会弹出「Allow this command to run?」，于是 blocked，台账主通道用不了（实测）。
+- 修复：build_prompt 的首选上报一句改为明确包含这种情况：「若无法执行该命令，或执行它需要向用户申请审批，**不要请求审批**，直接只打印备份信号。」对方因此走文本哨兵通道完成。
+- protocol.md 记录：需要审批的 agent 默认走备份通道（拿不到 summary）；用户可为其放行该命令或使用免审批模式以启用台账通道（实测 qodercli 以 `--permission-mode bypass_permissions` 启动并等其初始化完成后，13s 经台账完成）。
+
+### 实测记录（2026-11-25）
+- pi、Claude Code、qodercli：端到端通过。agy：本机未登录，无法测试。
+- 跨机器 `--machine`：本机无 SSH machine，端到端无法验证；调用点传递经静态审计完整，错误路径由 R10 覆盖。
+
+## 追加（R13–R14）：herdr 调用无超时导致 hao 无限挂起
+
+### R13 `hao ask` 在 herdr 客户端挂住时无限期挂起
+- 现象（实测）：对 qodercli 派活时，子进程 `herdr agent prompt` 一直没有返回，`hao ask … --wait --timeout 150` 因此挂了 **3 小时 50 分钟**，直到人工结束该 herdr 客户端才返回 rc=8。`--timeout` 只约束等待循环，派发动作本身没有任何上限。
+- 根因：`run_herdr` 用 `subprocess.run(cmd, capture_output=True, text=True)` 调用 herdr，没有 timeout。**所有** herdr 调用都受影响：任何一个 herdr 客户端挂住，对应的 hao 命令就永远不返回。
+- 修复：`run_herdr` 对每次调用设上限，超时即结束子进程并返回失败（rc 视为 herdr 错误，退出码 8，消息写明是哪条 herdr 命令、等了多久）：
+  | 调用 | 上限 |
+  |---|---|
+  | `agent prompt`（派发） | 30s |
+  | `pane wait-output --timeout N`（毫秒） | N/1000 + 5s |
+  | `agent wait --timeout N` | N/1000 + 5s |
+  | 其余（get / list / rename / send-keys / pane read / machine status 等） | 20s |
+- `ask` 在派发调用失败或超时时：记录取消（现有行为保留），错误文案明确写出「prompt 是否送达未知」，并提示用 `herdr pane read <pane>` 查看、必要时重新派发。
+- 测试：用 PATH 上会 `sleep 60` 的 herdr shim，逐个验证带每种调用的命令都能在上限内返回 rc=8、无异常、无残留（台账、进程）。
+
+### R14 herdr 不可达时 `status` 误报为「target not found」
+- 现象（实测，herdr 不可达）：`hao status w2:p9` → rc=3「target not found」。实际原因是 herdr 连不上。
+- 修复：`status` 区分「查询失败」与「确实不存在」，前者返回 8 并写明原因。
+- 测试：herdr shim 返回非 0 → `status` rc=8；正常返回但无匹配 → rc=3。
+
+## 追加（R15）：herdr 挂住时 `wait` 不遵守 `--timeout`，且每轮重复请求
+
+### 现象（R13 验收时实测，herdr 替身每次调用都挂住）
+- `hao wait … --timeout 20` 用了 **60s** 才返回 rc=8。已有上限、不再无限挂起，但没有遵守调用方给的超时。
+- 一轮等待里连续三次各 20s 上限的 herdr 调用：①R11 的响应检查 `current_state` → `agent get`；②状态门槛 `_agent_gate` → 又一次 `agent get`；③门槛失败后「放弃前重扫」`pane read`。
+- 另：即使 herdr 正常，①和②也是**每轮对同一个 `agent get` 请求发两次**（R11 引入的额外开销，快路径约每 1.5s 多起一个 herdr 进程）。
+- 另：hao 进程被外部终止时，正在进行的 herdr 子进程（独立会话）会成为孤儿残留。
+
+### 修复
+1. **每轮只发一次 `agent get`**：状态门槛函数同时返回状态，供响应检查复用。lifecycle / file 模式同理。
+2. **herdr 自身故障不重扫**：门槛因 herdr 失败（超时、不可达、非 JSON，即 8）而失败时立即返回 8；「放弃前重扫」只用于 agent 状态类门槛（3 / 5 / 9）。
+3. **步骤之间检查截止时间**：任何一步之后若已超过 deadline，不再发起新的 herdr 调用，直接返回（因 herdr 失败而停 → 8，否则 → 4）。
+4. **子进程必收**：`run_herdr` 用 try/finally 保证任何退出路径（含 hao 被 SIGTERM 终止）都会结束它启动的 herdr 进程组，不留孤儿。
+
+### 验收标准
+- herdr 替身挂住时：`wait --timeout 20`（sentinel / lifecycle / file 三种模式）都在约一个调用上限内返回（不超过 25s），rc=8，stdout 恰好一个 JSON，无孤儿进程。
+- herdr 正常时：等待循环每轮恰好一次 `agent get`（stub 计数），已有行为（超时诊断、R11 警告、blocked / exited 门槛、取消）不变。
+
+## 追加（R16）：超时错误信息不得带出整条 prompt
+
+- 现象（实测）：`herdr agent prompt` 超时时，错误信息是「herdr command timed out after 30s: 」加上完整命令行（所有参数用空格拼接），于是整条 prompt（任务正文与协议说明，含换行）都被塞进了 stderr 和 `--json` 的 `error` 字段：stderr 被刷十几行，JSON 错误体长达上千字符。
+- 修复：超时信息里的命令摘要只保留子命令与目标（如 `herdr agent prompt w2:p4E`），其余参数省略；任何参数超过 60 字符一律截断。派发超时的错误文案保持「prompt 是否送达未知」的指引。
+- 测试：构造带超长参数的 herdr 调用超时，断言错误信息不超过 120 字符且不含 prompt 正文。
+
+## 追加（R17）：派发前重复请求，且 herdr 故障后仍继续调用
+
+### 现象（R16 验收时实测）
+- `hao ask` 在 herdr 完全挂住时用了 **90s** 才返回 rc=8（有界，但偏慢）：派发前依次执行 `pane layout`（窄 pane 警告用）、`agent get`（取 state_change_seq）、又一次 `agent get`（取 agent_status），各 20s 上限，再加 `agent prompt` 的 30s。
+- 即使 herdr 正常，每次派发也对同一个 `agent get` 请求发两次，外加一次仅为警告服务的布局查询——与 R15 修复的等待循环是同一类重复。
+- 第一次调用已经因 herdr 故障失败后，后续调用仍然照发。
+
+### 修复
+1. `cmd_ask` 只发一次 `agent get`，同时取 `state_change_seq` 与 `agent_status`。
+2. 仅为提示服务的调用（`pane layout` 取宽度）使用较短的上限（5s），超时按「取不到」处理、不阻塞派发。
+3. 派发前任一步骤因 herdr 故障（超时、不可达，即 8）失败时立即返回 8，不再继续后续调用（不写台账、不派发）。
+4. 其他命令里同类「一次失败后继续调用」的路径照此检查。
+
+### 验收标准
+- herdr 替身挂住时：`hao ask` 在 30s 内返回 rc=8，不写台账记录。
+- herdr 正常时：每次 `hao ask` 恰好一次 `agent get`（计数断言）；lifecycle 模式的预检复用同一次结果。
+- 现有测试与集成冒烟全绿。
+
+## 追加（R18）：单元测试不得依赖真实的 herdr
+
+### 现象（实测）
+- 全量回归约 23 次里出现 1 次间歇性失败（整套用时不变，说明不是慢测试超时）。
+- 让 herdr 不可达（PATH 上放一个直接 `exit 1` 的替身）后跑单元测试：**311 个里 10 个失败**——
+  `test_restore_dry_run_env_workspace`、`test_wait_file_missing_pane_exit3`、`test_status_nonexistent`、
+  `test_clear_dry_run`、`test_name_dry_run`、`test_ask_mode_error`、`test_abort_json`、
+  `test_ask_lifecycle_requires_wait`、`test_ask_error_without_json_flag`、`test_cancel_tombstone_remains_until_wait`。
+- 原因：这些测试直接调用真实 herdr（例如用真实的 `agent get` 查一个不存在的 pane 来验证退出码 3），herdr 任何一次瞬时故障都会让它们失败；没有 herdr 的环境里整套单元测试跑不过。
+
+### 修复
+1. 上述 10 个测试（以及任何会触达真实 herdr 的单元测试）改为 stub `run_herdr`：它们验证的是 hao 对特定 herdr 返回的处理，用 stub 给出确定的返回（如 `pane_not_found`、`agent_not_found`、超时、非 JSON）即可，语义不变。
+2. 加一道离线守卫：测试加载 hao 后，默认把 `run_herdr` 替换为一个「记录调用并返回失败」的桩；需要特定 herdr 行为的测试必须显式安装自己的 stub。于是任何新的单元测试若隐式依赖真实 herdr，会确定性地失败，而不是偶发。
+3. 真实 herdr 的覆盖保留在集成冒烟（`integration/test_integration.py`，需 `HERDR_ENV=1`）。
+
+### 验收标准
+- herdr 不可达（替身 `exit 1`）时：单元测试 0 失败。
+- herdr 正常时：全部通过；连续运行 10 次无失败。
+- 集成冒烟照常通过。
+
+## 追加（R19）：离线守卫需要自我强制
+
+### 现象（R18 验收）
+- 离线守卫 `hao_test_guard.install_offline_guard(hao)` 由每个测试模块**显式**安装。当前未安装的两个模块（`test_ledger.py`、`test_names.py`）只测台账与词表、不加载 hao，没有问题。
+- 但没有任何检查能发现「新写的测试模块加载了 hao 却忘了安装守卫」——那种模块会悄悄用回真实 herdr，R18 修掉的间歇性失败会原样回来。
+
+### 修复
+增加一条元测试：扫描 `tests/herdr-agent-ops/test_*.py`，凡加载了 `scripts/hao` 的模块，必须调用 `install_offline_guard(hao)`（或等价地显式声明自己不需要）。不加载 hao 的模块不受约束。
+
+### 验收标准
+- 当前全部模块通过。
+- 临时加入一个「加载 hao 但不装守卫」的测试模块时，元测试必须失败；移除后恢复通过。
+- herdr 不可达时整套 0 失败；正常时全部通过。
+
+## 追加（R20）：R12 的思路不成立——完成信号必须先于 `hao done`
+
+### 真机结论（首次造出真正会弹审批的 Claude Code 实例后验证）
+- 本机 shell 里 `claude` 是别名（带跳过审批参数），所以经 herdr 启动的 Claude Code 实例始终是免审批模式，此前无法验证审批场景。用 `command claude`（绕过别名）在带 `permissions.defaultMode=default` 的临时项目里启动，才得到真正的审批型实例。
+- 结果：对方无视「需要审批就别请求审批」的提示，照样发起 `hao done`，随即卡在「This command requires approval」，`hao wait` 7s 后返回 rc=5，**任务没有任何完成信号**。
+- 根因：审批由对方的工具层在命令发出时拦截，模型决定调用命令时并不知道会不会弹审批，这类提示对模型不可执行。当前 prompt 的顺序也有问题：它要求「输出正文后调用 hao done，同时把备份信号作为最终消息最后一行」，而工具调用发生在最终消息之前，一旦被卡住，哨兵永远不会出现。
+
+### 修复
+1. **调换顺序，让完成信号不依赖任何命令执行**：最终消息 = 完整答复正文 + 最后一行备份哨兵；**打印哨兵之后**再调用 `hao done`（仅当能直接执行时）。这样即使工具调用被审批卡住，哨兵已经出现在屏幕上，等待方能经文本通道完成。等待循环现有的「门槛失败前重扫」逻辑会在对方 blocked 时找到哨兵并完成。
+2. **文本通道也带回结果**：经哨兵完成且台账没有 done 记录时，`wait` 的返回体增加 `tail` 字段——哨兵行之前对方的最终答复文本（剥离 TUI 装饰，最多 40 行、2000 字符）。调用方因此仍能拿到答复，而不只是一个「done」。`summary` 仍只来自台账。
+3. prompt 措辞相应改写：说明先打印哨兵、再调用命令；不要为了调用命令而请求审批。`--wake` 的唤醒依赖 `hao done`，在审批型对方上属于尽力而为，文档写明。
+4. protocol.md / README / SKILL.md 同步：审批型对方（默认权限模式的 Claude Code 等）的完成经文本通道，结果在 `tail` 里；要启用台账通道可为其放行该命令或使用免审批模式。
+
+### 验收标准
+- 真机（审批型 Claude Code 实例）：`ask --wait` 返回 rc=0，`matched_line` 非空，`tail` 含对方答复（如「48」），屏幕上可以出现审批框但不得阻止完成。
+- 免审批的对方（pi / 普通方式启动的 Claude Code）：行为不变，仍经台账完成并带 `summary`；`hao done` 在哨兵之后调用。
+- 单元测试：哨兵在审批框出现之前打印的场景 → 经门槛重扫路径完成并带 `tail`；`tail` 的行数与字符数上限；窄 pane 折行时 `tail` 仍可读。
+- 现有 312 个测试三方式全绿，集成冒烟通过。
+
+## 追加（R21）：审批型对方需要确定性的路径；`tail` 要去掉协议回显
+
+### 现象（R20 真机验证，审批型 Claude Code 实例，同一份 prompt 跑两次）
+- 一次成功：对方选择不调用命令，直接输出答复与哨兵，`wait` rc=0，`tail` 末尾带回答复「48」。
+- 一次失败：对方认为自己能执行，先调用 `hao done`，卡在审批框，`wait` rc=5，没有完成信号。
+- 结论：「是否调用命令」取决于对方模型的临场判断，R20 的改法有效但**不确定**。仅凭 prompt 措辞无法保证。
+- 另：`tail` 取的是哨兵前 40 行，在窄 pane 里把回显的协议说明（几十行折行）也截了进去，真正的答复被淹没在末尾。
+
+### 修复
+1. **新增 `hao ask --text-only`**：prompt 里完全不出现 `hao done` 命令，只要求对方输出答复并在最后一行打印哨兵。用于已知是审批型的对方，或对方无法访问 hao 的场景（跨机器）。调用方因此有一条**确定性的**路径，不依赖对方的判断。
+2. **blocked 时的错误提示给出可操作的出路**：`wait` 因对方 blocked 返回 5 时，若此前没见过哨兵，错误信息写明「对方可能是审批型：可请用户批准一次该命令，或用 `hao ask --text-only` 重新派发」。
+3. **`tail` 去噪**：从最后一个「--- 任务结束 ---」标记之后开始取（那是我们自己的任务分隔符，会出现在回显里）；剥离 harness 的状态行（如「Thought for …」「✻ … for …」「Update available」、分隔线、空提示符）；仍受 40 行 / 2000 字符上限约束。目标是 `tail` 只含对方的答复正文。
+4. 文档同步（README / SKILL.md / protocol.md，受守卫保护）：`--text-only` 的用途；默认模式下审批型对方的结果不确定。
+
+### 验收标准
+- 真机（审批型 Claude Code 实例）：`hao ask --text-only … --wait` 连续 3 次都 rc=0，`matched_line` 非空，`tail` 含「48」且不含协议说明文字，屏幕上不出现审批框。
+- 真机（免审批对方）：默认行为不变，仍经台账完成并带 `summary`；`--text-only` 时经文本通道完成并带 `tail`。
+- 单元测试：`--text-only` 的 prompt 不含 `hao done`；`tail` 去噪（含任务分隔符之前的内容被丢弃、状态行被剥离、上限仍生效）；blocked 且无哨兵时的错误提示。
+- 现有测试三方式全绿，集成冒烟通过。
+
+## 追加（R22）：`tail` 的边界应取 prompt 回显的结尾（R21 的去噪方案设计有误）
+
+### 现象（R21 真机验证，审批型 Claude Code，窄 pane，`--text-only` 连跑 3 次）
+- 3 次都 rc=0、`matched_line` 非空、无审批框，答复（42 / 44 / 46）在 `tail` 末尾——确定性路径成立。
+- 但 `tail` 仍混着协议说明的回显，例如「务要求只回复多少字或不输出其他内容…一段 2e04ca25，第二段 f20c3d25…息的最后一行打印备份信号…」。
+- 原因：R21 规定「从最后一个『--- 任务结束 ---』之后开始取」。而 prompt 的结构是 任务正文 →「--- 任务结束 ---」→ 协议说明，所以协议说明本来就在分隔符之后，那个分隔符隔开的是任务与协议，不是 prompt 回显与对方答复。**这是 quill 的方案设计错误，不是实施偏差。**
+
+### 修复
+1. `tail` 从 **prompt 回显的结尾**开始取。调用方知道自己发出的 prompt（`build_prompt` 的返回值），把它传给结果提取：在 pane 文本里定位 prompt 的结尾，取其后的内容作为答复区域。
+   - 定位方法要容忍折行与 TUI 装饰：把 pane 文本与 prompt 都做归一化（去掉所有空白，并剥掉已知的行首装饰符如 ⏺、│、缩进、列表符号），在归一化后的 pane 文本中查找归一化后的 prompt，取匹配结束位置之后的内容；再按原文行还原（遍历原文行并累计归一化长度来确定起点）。
+   - prompt 回显已滚出窗口（长答复、窗口只有 200 行）而找不到时，退回现有启发式；仍受 40 行 / 2000 字符上限。
+2. 剥离 harness 状态行（「Thought for …」「✻ … for …」「Update available」、分隔线、空提示符）保持不变。
+3. 测试：窄 pane 折行 + 带装饰符的 pane 文本，prompt 完整可见时 `tail` 恰为对方答复；prompt 已滚出窗口时退回启发式；`--text-only` 与默认两种 prompt；上限仍生效。
+
+### 验收标准
+- 真机（审批型 Claude Code，窄 pane，`--text-only`）连续 3 次：`tail` 恰为答复（如 `"42"`），不含任何协议说明文字。
+- 免审批对方经文本通道完成时 `tail` 同样干净。
+- 现有测试三方式全绿，集成冒烟通过。
+
+## 追加（R23）：已见过的哨兵不能丢；`tail` 可能含对方的思考过程
+
+### 现象一：对方先打印哨兵、再调用 `hao done` 并被审批框卡住时，等待方仍返回 rc=5
+- 真机（审批型 Claude Code，默认模式）：等待循环先经增量输出（`pane wait-output`）看到并验证了本任务的哨兵行，记为 `sentinel_seen`；随后稳定性确认因对方 blocked 不通过；门槛返回 5；「放弃前重扫」去读屏幕——**审批框盖住了屏幕，herdr 的屏幕快照三种来源都只剩约 30 行可见区域**，哨兵行已不在快照里——重扫失败；因为 `sentinel_seen` 为真，`--text-only` 提示也被抑制；最终返回笼统的 rc=5。
+- 也就是说：对方已经发出了完成信号，等待方手里有那一行，却把证据丢了并报告失败。
+
+### 修复一
+- 快路径（`pane wait-output`）验证到哨兵行时，把**那一行文本**保存下来（不只是置一个布尔标志）。
+- 门槛返回状态类结果（3 / 5 / 9）时：先照旧重扫；重扫找不到、但手里存有已验证的哨兵行 → 用它完成（经文本通道），不要返回门槛码。herdr 故障（8）仍立即返回。
+- 此时 `tail` 尽力从快照提取；哨兵行不在快照里（被对话框盖住）则 `tail` 为 null，并在返回体里加一句说明字段（如 `"tail_note": "peer screen not readable (dialog may cover it)"`），不要用协议回显充数。
+- 测试：stub 让 `pane wait-output` 返回本任务哨兵行、随后 `agent get` 返回 blocked、`pane read` 返回不含哨兵的短快照 → 断言 rc=0、`matched_line` 等于那一行、`tail` 为 null 且带说明。
+
+### 现象二：`tail` 可能包含对方界面显示的思考过程
+- 真机（pi，`--text-only`）：`tail` 是「The task: 9 + 6 = 15. Only answer the number. Then print sentinel last line: …」——pi 的界面会把推理内容显示出来，屏幕文本无法可靠区分推理与正文。
+
+### 修复二
+- 返回体增加 `last_line`：哨兵行之前最后一条非空、非界面状态行的文本（对「只回答数字」类任务即答复本身）。
+- 文档（protocol.md / README）写明：`tail` 是对方在哨兵之前显示的文本，可能含其界面显示的思考过程；`last_line` 是其中最后一行。
+- 测试：`last_line` 剥离状态行与装饰；无可用行时为 null。
+
+### 验收标准
+- 真机（审批型 Claude Code，默认模式）：若对方先打印哨兵再被审批框卡住 → `ask --wait` rc=0、`matched_line` 非空；若对方先被卡住没打印哨兵 → rc=5 且提示含 `--text-only`。
+- 真机（pi，`--text-only`）：`last_line` 为答复（如 `"15"`）。
+- 现有测试三方式全绿，集成冒烟通过。

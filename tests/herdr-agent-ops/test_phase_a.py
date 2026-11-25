@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 from ledger import Ledger, _path  # noqa: E402
 
@@ -24,7 +26,7 @@ from ledger import Ledger, _path  # noqa: E402
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
     saved = {}
-    for key in ("XDG_STATE_HOME", "HERDR_PANE_ID", "HAO_ABORT_ALLOW"):
+    for key in ("HAO_STATE_DIR", "HERDR_PANE_ID", "HAO_ABORT_ALLOW"):
         saved[key] = os.environ.get(key)
     if env:
         for key, value in env.items():
@@ -79,7 +81,14 @@ class TestPhaseAErrors(unittest.TestCase):
         self.assert_error(rc, err, "restore", 7)
 
     def test_ask_mode_error(self):
-        rc, _, err = run_cli(["ask", "w2:p9", "task", "--mode", "lifecycle"])
+        def stub(args, machine=None):
+            if args[:2] == ["pane", "layout"]:
+                return 0, '{"result":{"layout":{"panes":[]}}}', ""
+            if args[:2] == ["agent", "get"]:
+                return 0, '{"result":{"agent":{"agent_status":"idle"}}}', ""
+            return 0, "{}", ""
+        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+            rc, _, err = run_cli(["ask", "w2:p9", "task", "--mode", "lifecycle"])
         self.assert_error(rc, err, "ask", 2)
 
     def test_wait_invalid_token(self):
@@ -99,13 +108,13 @@ class TestPhaseAErrors(unittest.TestCase):
     def test_cancel_unknown(self):
         with tempfile.TemporaryDirectory() as d:
             rc, _, err = run_cli(["cancel", "deadbeef0000"],
-                                 {"XDG_STATE_HOME": d})
+                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assert_error(rc, err, "cancel", 3)
 
     def test_abort_unknown(self):
         with tempfile.TemporaryDirectory() as d:
             rc, _, err = run_cli(["abort", "deadbeef0000"],
-                                 {"XDG_STATE_HOME": d})
+                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assert_error(rc, err, "abort", 3)
 
     def test_suggest_missing_arg(self):
@@ -134,7 +143,7 @@ class TestPhaseAErrors(unittest.TestCase):
     def test_result_task_not_found(self):
         with tempfile.TemporaryDirectory() as d:
             rc, _, err = run_cli(["result", "deadbeef0000"],
-                                 {"XDG_STATE_HOME": d})
+                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assert_error(rc, err, "result", 3)
         self.assertIn("task not found", err)
 
@@ -214,7 +223,7 @@ class TestPhaseAStatus(unittest.TestCase):
 
     def test_json_schema_and_tasks(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 Ledger().write_running("abcd12345678", target="w2:p9")
                 Ledger().write_done("deadbeef0000", target="w2:p9")
@@ -234,11 +243,11 @@ class TestPhaseAStatus(unittest.TestCase):
                 self.assertEqual(data["tasks"]["cancelled"], 1)
                 self.assertEqual(err, "")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_orphan_flag(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 sid = "abcd12345678"
                 Ledger().write_running(sid, target="w2:p9")
@@ -250,11 +259,11 @@ class TestPhaseAStatus(unittest.TestCase):
                     _, out, _ = run_cli(["status", "w2:p9"])
                 self.assertTrue(json.loads(out)["tasks"]["running"][0]["orphan"])
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_shell_pane_has_null_agent(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 with mock.patch.object(hao, "run_herdr",
                                        side_effect=self._stub(agent_rc=1)):
@@ -265,11 +274,11 @@ class TestPhaseAStatus(unittest.TestCase):
                 self.assertIsNone(data["agent_status"])
                 self.assertIsNone(data["name"])
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_text_mode(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 with mock.patch.object(hao, "run_herdr", side_effect=self._stub()):
                     rc, out, _ = run_cli(["status", "w2:p9", "--text"])
@@ -277,7 +286,7 @@ class TestPhaseAStatus(unittest.TestCase):
                 self.assertTrue(out.startswith("pane: w2:p9"))
                 self.assertFalse(out.lstrip().startswith("{"))
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_status_error_path(self):
         with mock.patch.object(hao, "run_herdr",

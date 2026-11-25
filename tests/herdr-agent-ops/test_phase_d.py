@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger  # noqa: E402
 
 
@@ -39,7 +41,7 @@ class TestD1Prompt(unittest.TestCase):
 class TestD4Summary(unittest.TestCase):
     def test_done_summary_is_returned_by_wait(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 sid = "abcd12345678"
                 token = "hao-" + sid + "9900"
@@ -50,11 +52,11 @@ class TestD4Summary(unittest.TestCase):
                 self.assertEqual(result["status"], "done")
                 self.assertEqual(result["summary"], "answer body")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_done_summary_roundtrip_via_cli(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 sid = "abcd12345678"
                 token = "hao-" + sid + "9900"
@@ -67,7 +69,7 @@ class TestD4Summary(unittest.TestCase):
                 result = json.loads(out.getvalue().strip().splitlines()[-1])
                 self.assertEqual(result["summary"], "cli body")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
 
 class TestD2Diagnostics(unittest.TestCase):
@@ -86,7 +88,7 @@ class TestD2Diagnostics(unittest.TestCase):
 class TestD3Heartbeat(unittest.TestCase):
     def test_heartbeat_does_not_create_stub(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 self.assertIsNone(Ledger().heartbeat("deadbeef0000"))
                 self.assertIsNone(Ledger().get("deadbeef0000"))
@@ -94,16 +96,16 @@ class TestD3Heartbeat(unittest.TestCase):
                     os.path.join(d, "hao", "tasks")) else []
                 self.assertFalse([f for f in files if f.endswith(".json")])
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_wait_round_does_not_create_stub(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 self.assertEqual(hao._wait_round_rec(Ledger(), "deadbeef0000"), {})
                 self.assertIsNone(Ledger().get("deadbeef0000"))
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
 
 if __name__ == "__main__":

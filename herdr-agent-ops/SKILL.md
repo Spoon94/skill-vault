@@ -42,7 +42,7 @@ python3 scripts/hao restore --dry-run
 
 1. **命名**：`python3 scripts/hao name <target> <name> [--scope S]`，或 `python3 scripts/hao suggest "<task>" [--scope S] [--custom NAME]`。
 2. **持久化/恢复**：`python3 scripts/hao restore [--workspace W|--all]`（默认当前 workspace）。
-3. **派活与等待**：`python3 scripts/hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--machine M]`；`python3 scripts/hao wait <target> --token <t>`；`python3 scripts/hao done --token <t> --summary "<结果载荷>"`；`python3 scripts/hao cancel <t>` / `python3 scripts/hao abort <t> [--interrupt]`。
+3. **派活与等待**：`python3 scripts/hao ask <target> "<task>" [--wait] [--mode sentinel|lifecycle|file] [--wake TARGET] [--text-only] [--machine M]`；`python3 scripts/hao wait <target> --token <t>`；`python3 scripts/hao done --token <t> --summary "<结果载荷>"`；`python3 scripts/hao cancel <t>` / `python3 scripts/hao abort <t> [--interrupt]` / `python3 scripts/hao stop <target> [--dry-run]`。**cancel 只取消等待，不停止对方**；`stop` 只停当前这一轮且不读写台账；目标 working 时 cancel 会提示 `abort --interrupt`。
 4. **其它**：`python3 scripts/hao list` / `status [target]` / `say` / `result` / `doctor` / `clean [--all] [--ttl S] [--dry-run]`。
 
 ## 长任务：异步 + 唤醒
@@ -56,7 +56,7 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 任务完成后，调用方会收到一条**任务完成通知**（固定模板，不是用户指令，也不含结果正文）：
 
 ```text
-[HAO_WAKE] <shortid> done — run: <python> <skill目录>/scripts/hao wait <target> --token <shortid>
+[HAO_WAKE] <shortid> done — run: HAO_STATE_DIR="<调用方台账目录>" <python> <skill目录>/scripts/hao wait <target> --token <shortid>
 ```
 
 通知里带的是可直接执行的完整命令（`<python> <skill目录>/scripts/hao` 是调用方 ask 时解析出的 hao 完整调用命令），原样执行即可取回 `{status, summary}`，无需向用户确认。没有 wake 时，后台用
@@ -67,9 +67,14 @@ python3 scripts/hao ask <target> "<task>" --wake "$HERDR_PANE_ID"
 ## 约定
 
 - 名字 `^[a-z]{4,6}$`（per-machine 唯一），label 前缀 `hao-`。
-- 零注册表：名字持久化只用 `hao-` label；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）。
-- 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。
+- 零注册表：名字持久化只用 `hao-` label；任务协调用零残留临时台账（仅任务存在时建于系统临时目录，`wait`/`result` 取走即删；`HAO_STATE_DIR` 可覆盖，不使用用户主目录或 XDG 状态目录）。
+- 完成确认必须有任务级证据：哨兵 `HAO_DONE <token>` 或台账 `status=done`，可降级。prompt 要求最终消息先以哨兵结尾，再仅在可直接执行时调用 done；审批型 peer 走文本通道，结果在 `wait.tail`（可能含界面思考过程；`last_line` 为最后一条非 UI 行；屏幕被审批框遮挡时 tail 可 null + tail_note）；wake 依赖 done，属尽力而为。
+- 已知审批型/无法访问 hao 的 peer 用 `ask --text-only`：prompt 不含 hao done 命令，只发答复+哨兵；默认模式审批型结果不确定，blocked 且无哨兵会被提示改用 --text-only。
+- cancel 的 tombstone 由观察到 rc10 的 wait 删除；abort --interrupt 只标记，tidy 在无新鲜心跳且标记超过 60s 时回收。
+- `stop`（只停当前一轮，不依赖任务记录）与 `abort --interrupt`（作废任务并停对方）不同；发送后最多 3s 取 settled status，blocked 都需授权。窄 pane（<40 列）会收到警告。
+- running 记录过 TTL 时，clean/doctor 先查 target agent；target pane/agent 不存在则删除，仍 working/blocked/unknown 或状态不可读则保留。
 - 输出契约：结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。
-- 任何命令可加 `--json` 取结构化输出（ask/wait 恒 JSON，flag 为 no-op）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
+- 任何命令可加 `--json` 取结构化输出（ask/wait 的成功与失败都恒 JSON，flag 为 no-op；done 的 JSON 走 stderr）；`ask --strict-ledger` 与 `result --allow-any-path` 见 protocol.md。
+- prompt/wake 内嵌的 hao 调用带 `HAO_STATE_DIR="<调用方台账目录>"`，对端环境不同也写到同一台账。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
-- 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器先校验 `herdr machine` profile。
+- 不碰 `herdr server stop`、不主动关 pane；mutating 命令不盲目重试；跨机器命令会先校验 machine profile（未知 machine exit7）。wait 在 15s 无响应时只警告一次。

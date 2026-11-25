@@ -15,12 +15,14 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger, _path  # noqa: E402
 
 
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
-    saved = {k: os.environ.get(k) for k in ("XDG_STATE_HOME", "HERDR_PANE_ID")}
+    saved = {k: os.environ.get(k) for k in ("HAO_STATE_DIR", "HERDR_PANE_ID")}
     if env:
         for key, value in env.items():
             if value is None:
@@ -101,13 +103,13 @@ class TestB6WriteAhead(unittest.TestCase):
 
     def test_prompt_failure_cancels_record(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             calls = []
             with mock.patch.object(
                     hao, "run_herdr",
                     side_effect=prompt_stub(calls, 1, '{"error":{"code":"agent_not_found"}}')):
                 rc, _, err = run_cli(["ask", "w2:p9", "task"],
-                                     {"XDG_STATE_HOME": d})
+                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
             self.assertEqual(rc, 3)
             files = [f for f in os.listdir(os.path.join(d, "hao", "tasks"))
                      if f.endswith(".json")]
@@ -115,7 +117,7 @@ class TestB6WriteAhead(unittest.TestCase):
             rec = json.load(open(_path(files[0][:-5])))
             self.assertEqual(rec.get("status"), "cancelled")
             self.assertIn("hao ask:", err)
-            os.environ.pop("XDG_STATE_HOME", None)
+            os.environ.pop("HAO_STATE_DIR", None)
 
 
 if __name__ == "__main__":

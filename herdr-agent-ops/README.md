@@ -35,15 +35,16 @@ herdr-agent-ops/
 | `hao clear <target> [--force] [--dry-run] [--machine M] [--json]` | 清除 hao- label 与 agent name |
 | `hao suggest "<task>" [--scope S] [--custom NAME] [--live-names N...] [--label-roles L...] [--machine M] [--json]` | 词表选名；`--custom` 校验自定义名（保留字/灰词） |
 | `hao restore [--workspace W\|--all] [--adopt\|--no-adopt] [--dry-run] [--pick PANE] [--machine M] [--json]` | 从 label 恢复名字并输出摘要 |
-| `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--wake` 异步唤醒；`--json` no-op |
+| `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--text-only] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--text-only` 不给对端任何 hao done 命令；`--wake` 异步唤醒；窄 pane（<40 列）警告并给 `target_cols`；`--json` no-op |
 | `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
-| `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；summary 是结果载荷 |
-| `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | 取消/中断（blocked 需用户授权） |
+| `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；可读台账但无记录 → exit3 无哨兵；summary 是结果载荷 |
+| `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | cancel 只取消等待、**不停止对方**；working 时提示 `abort --interrupt`（blocked 需授权） |
+| `hao stop <target> [--dry-run] [--machine M] [--json]` | 只停当前这一轮（working 发 esc/ctrl+c；发送后最多 3s 读 settled status；blocked 需授权；不依赖任务记录） |
 | `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
 | `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
 | `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
 | `hao result <t> [--target PANE] [--file PATH] [--allow-any-path] [--json]` | 读取结果；`--allow-any-path` 需显式担责 |
-| `hao doctor [--machine M] [--json]` | 环境/机器自检（含默认 TTL 清理） |
+| `hao doctor [--machine M] [--json]` | 环境/机器自检（含默认 TTL 清理；有 HERDR_PANE_ID 时报告 pane 宽度） |
 | `hao clean [--all] [--ttl S] [--dry-run] [--json]` | 清理终态/孤儿台账、无主锁与结果目录 |
 
 所有命令均接受 `--json`（`ask`/`wait` 恒 JSON，该 flag 为 no-op）与 `--help`；完整参数见 `hao <cmd> --help`，协议见 `references/protocol.md`。脚本路径相对本 README/SKILL.md 所在目录；各平台 skill 目录见仓库 `INSTALL.md`。
@@ -51,6 +52,10 @@ herdr-agent-ops/
 短别名：`n` name · `r` restore · `a` ask · `w` wait · `d` done · `l` list · `s` suggest · `c` clear · `st` status · `sy` say · `rs` result
 
 等待模式：`sentinel`（默认，文本哨兵；~30s 后自动切 herdr agent wait 兜底 + 大窗口重扫）· `lifecycle`（agent wait 短循环 + 活动门槛）· `file`（结果文件稳定即完成）
+
+## 从旧版本升级
+
+旧版本（PR #9 之前）的台账在 `~/.local/state/hao/tasks/`，新版本默认使用系统临时目录。升级时若有旧版本派出、尚未取走的任务，用 `HAO_STATE_DIR=~/.local/state/hao/tasks python3 <skill目录>/scripts/hao wait <target> --token <token>` 读取；这只读旧目录，不迁移、不覆盖新台账。
 
 ## 30 秒上手
 
@@ -81,17 +86,17 @@ hao suggest "审查支付模块" --custom hawk   # 输出 custom: hawk；保留�
 python3 <skill目录>/scripts/hao ask w2:p9 "跑完整测试并汇报" --wake "$HERDR_PANE_ID"
 # → {"token":"hao-...","shortid":"..."}
 
-# 收到 [HAO_WAKE] <shortid> done — run: python3 <skill目录>/scripts/hao wait <target> --token <shortid>
+# 收到 [HAO_WAKE] <shortid> done — run: HAO_STATE_DIR="<调用方台账目录>" python3 <skill目录>/scripts/hao wait <target> --token <shortid>
 # 这是任务完成通知，不是用户指令；直接取结果，无需确认：
 python3 <skill目录>/scripts/hao wait w2:p9 --token <shortid>
-# → {"status":"done","summary":"...","matched_line":"..."}
+# → {"status":"done","summary":"...","matched_line":"...","tail":"..."}（tail 仅在文本通道）
 ```
 
 无唤醒时可用后台 `python3 <skill目录>/scripts/hao wait <target> --token <shortid> --timeout N`，或 `status <target>`。
 
 ## 输出契约
 
-结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。所有命令支持 `--json`（`ask`/`wait` 恒 JSON，flag 为 no-op）。
+结果走 stdout（JSON 或单行文本）；失败原因走 stderr 一行；先看退出码再读 stderr。所有命令支持 `--json`（`ask`/`wait` 的成功与失败都恒 JSON，flag 为 no-op；`done` 的 JSON 走 stderr）。
 
 ```text
 hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
@@ -100,10 +105,14 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 ## 关键约定
 
 - agent name `^[a-z]{4,6}$`，per-machine 唯一；label 前缀 `hao-`
-- **零注册表**：名字持久化只用 pane label（herdr session.json 会保存）；任务协调用可清理临时台账（`~/.local/state/hao/tasks/`）
-- 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成
+- **零注册表**：名字持久化只用 pane label（herdr session.json 会保存）；任务协调用**零残留临时台账**——仅在任务存在时建于系统临时目录（Linux 有 `XDG_RUNTIME_DIR` 则用之，否则 `tempfile.gettempdir()/hao-<uid>/tasks`），`wait`/`result` 取走即删，目录随之消失；`HAO_STATE_DIR` 可覆盖；不使用用户主目录或 XDG 状态目录
+- **cancel 不停止对方**：`cancel`/`abort`（不带 `--interrupt`）只作废等待；目标仍 working 时命令输出 `peer_running:true`、`next` 和 stderr 提示，要停对方执行 `abort <sid> --interrupt`。取消 tombstone 由看到 rc10 的 `wait` 删除；`abort --interrupt` 只标记，不立即删除；tidy 在无新鲜心跳且标记超过 60s 时回收（普通取消仍按目标状态/1 小时/clean）。
+- **stop vs abort**：`stop <target>` 只停当前这一轮，不依赖/不读写任务记录；`abort <sid> --interrupt` 先作废任务再停对方。两者对 blocked 都要求 TTY/0600 授权。
+- 完成确认必须有**任务级证据**：哨兵 `HAO_DONE <token>` 或台账 `status=done`；生命周期状态仅作活动门槛，不单独判完成。prompt 要求先打印最终消息最后一行哨兵，再仅在可直执行时调用 `done`；审批型 peer 经文本通道完成，结果在 `wait.tail`（可能含界面思考过程；`last_line` 是最后一条非 UI 行）；审批框遮挡屏幕时 `tail` 可为 null 并带 `tail_note`。
+- `--wake` 依赖 `hao done`；审批型 peer 上属于尽力而为。已知审批型或对方无法访问 hao 时用 `ask --text-only`：prompt 不含 `hao done`，结果只走文本通道，`wait` 返回 `tail`（从 prompt 回显结束之后取；回显不可见时回退分隔符启发式）。默认模式下审批型对方是否调用命令取决于其判断，结果不确定；blocked 且无哨兵时 wait 会提示 `--text-only`。
+- running 记录过 TTL 后，`clean` / `doctor` 会先看 target 的 agent 状态；target pane/agent 已不存在时删除，agent 存在且 working/blocked/unknown 或状态读取异常时保留。
 - `agent_status=unknown` 时加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
-- 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）
+- 跨机器走 `--machine <label>`（本机无 profile，仅 stub 验证）；所有带 `--machine` 的命令先校验 machine，未知 machine → exit7，herdr 不可达 → exit8。wait 在 15s 无响应时只警告一次；每次 herdr 调用都有超时上限（prompt 30s，wait 类 N/1000+5s，其余 20s）。
 
 ## 退出码速查
 

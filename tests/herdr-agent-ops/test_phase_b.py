@@ -16,13 +16,15 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 from ledger import Ledger, _path  # noqa: E402
 
 
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
     saved = {k: os.environ.get(k) for k in
-             ("XDG_STATE_HOME", "HERDR_PANE_ID", "HAO_ABORT_ALLOW")}
+             ("HAO_STATE_DIR", "HERDR_PANE_ID", "HAO_ABORT_ALLOW")}
     if env:
         for key, value in env.items():
             if value is None:
@@ -139,21 +141,21 @@ class TestPhaseBJson(unittest.TestCase):
 
     def test_cancel_json(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 Ledger().write_running("abcd12345678")
                 rc, out, err = run_cli(["cancel", "abcd12345678", "--json"],
-                                       {"XDG_STATE_HOME": d})
+                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
                 self.assertEqual(rc, 0)
                 self.assertTrue(json.loads(out)["ok"])
                 self.assertEqual(err, "")
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_json_error_stdout_and_stderr(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, err = run_cli(["cancel", "deadbeef0000", "--json"],
-                                   {"XDG_STATE_HOME": d})
+                                   {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 3)
         data = json.loads(out)
         self.assertFalse(data["ok"])
@@ -179,10 +181,17 @@ class TestPhaseBJson(unittest.TestCase):
 
     def test_abort_json(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             Ledger().write_running("abcd12345678", target="w2:p9")
-            rc, out, _ = run_cli(["abort", "abcd12345678", "--json"],
-                                 {"XDG_STATE_HOME": d})
+            def stub(args, machine=None):
+                if args[:2] == ["agent", "get"]:
+                    return 0, json.dumps({"result": {"agent": {
+                        "agent_status": "idle"}}}), ""
+                return 0, "{}", ""
+            with mock.patch.object(hao, "run_herdr", side_effect=stub):
+                rc, out, _ = run_cli(
+                    ["abort", "abcd12345678", "--json"],
+                    {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 0)
         self.assertTrue(json.loads(out)["ok"])
 
@@ -199,7 +208,7 @@ class TestPhaseBJson(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch.object(hao, "run_herdr", side_effect=stub):
             rc, out, _ = run_cli(["status", "w2:p9", "--json"],
-                                 {"XDG_STATE_HOME": d})
+                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 0)
         self.assertTrue(json.loads(out)["ok"])
 
@@ -210,21 +219,29 @@ class TestPhaseBJson(unittest.TestCase):
             os.makedirs(os.path.dirname(rp))
             with open(rp, "w") as f:
                 f.write("body")
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             try:
                 Ledger().write_done(sid, result_path=rp)
+                state = os.environ["HAO_STATE_DIR"]
                 rc, out, _ = run_cli(["result", sid, "--json"],
-                                     {"XDG_STATE_HOME": d})
+                                     {"HAO_STATE_DIR": state})
                 self.assertEqual(rc, 0)
                 self.assertEqual(json.loads(out)["content"], "body")
-                self.assertTrue(json.load(open(_path(sid))).get("result_consumed"))
+                self.assertFalse(os.path.exists(_path(sid)))
+                self.assertFalse(os.path.exists(state))
             finally:
-                os.environ.pop("XDG_STATE_HOME", None)
+                os.environ.pop("HAO_STATE_DIR", None)
 
     def test_done_json(self):
         with tempfile.TemporaryDirectory() as d:
-            rc, out, err = run_cli(["done", "hao-" + "abcd12345678" + "9900",
-                                    "--json"], {"XDG_STATE_HOME": d})
+            token = "hao-" + "abcd12345678" + "9900"
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
+            try:
+                Ledger().write_running("abcd12345678", token=token)
+                rc, out, err = run_cli(["done", token, "--json"],
+                                       {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
+            finally:
+                os.environ.pop("HAO_STATE_DIR", None)
         self.assertEqual(rc, 0)
         self.assertIn("HAO_DONE", out)
         self.assertTrue(json.loads(err.splitlines()[-1])["ok"])
@@ -317,7 +334,7 @@ class TestPhaseBResultPath(unittest.TestCase):
             with open(path, "w") as f:
                 f.write("outside")
             rc, out, err = run_cli(["result", "deadbeef0000", "--file", path,
-                                    "--allow-any-path"], {"XDG_STATE_HOME": d})
+                                    "--allow-any-path"], {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 0)
         self.assertEqual(out, "outside\n")
         self.assertIn("warning", err)
@@ -328,7 +345,7 @@ class TestPhaseBResultPath(unittest.TestCase):
             with open(path, "w") as f:
                 f.write("outside")
             rc, _, err = run_cli(["result", "deadbeef0000", "--file", path],
-                                 {"XDG_STATE_HOME": d})
+                                 {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
         self.assertEqual(rc, 2)
         self.assertIn("hao result:", err)
 
@@ -344,10 +361,10 @@ class TestPhaseBCallerConsumed(unittest.TestCase):
                         "agent_status": "idle", "state_change_seq": 1}}}), ""
                 return 0, "{}", ""
 
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             with mock.patch.object(hao, "run_herdr", side_effect=stub):
                 rc, out, _ = run_cli(["ask", "w2:p9", "task"],
-                                     {"XDG_STATE_HOME": d, "HERDR_PANE_ID": "w2:p1"})
+                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"), "HERDR_PANE_ID": "w2:p1"})
             self.assertEqual(rc, 0)
             sid = json.loads(out)["shortid"]
             rec = json.load(open(_path(sid)))
@@ -356,14 +373,14 @@ class TestPhaseBCallerConsumed(unittest.TestCase):
     def test_wait_consumed(self):
         with tempfile.TemporaryDirectory() as d:
             sid = "abcd12345678"
-            os.environ["XDG_STATE_HOME"] = d
+            os.environ["HAO_STATE_DIR"] = os.path.join(d, "hao", "tasks")
             Ledger().write_running(sid, target="w2:p9")
             with mock.patch.object(hao, "_wait_sentinel",
                                    return_value={"status": "done"}):
                 rc, _, _ = run_cli(["wait", "w2:p9", sid],
-                                   {"XDG_STATE_HOME": d})
+                                   {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks")})
             self.assertEqual(rc, 0)
-            self.assertTrue(json.load(open(_path(sid))).get("wait_consumed"))
+            self.assertFalse(os.path.exists(_path(sid)))
 
 
 if __name__ == "__main__":

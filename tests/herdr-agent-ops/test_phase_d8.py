@@ -16,11 +16,13 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 _loader = SourceFileLoader("hao", os.path.join(SKILL, "scripts", "hao"))
 hao = types.ModuleType("hao")
 _loader.exec_module(hao)
+from hao_test_guard import install_offline_guard  # noqa: E402
+install_offline_guard(hao)
 
 
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
-    saved = {k: os.environ.get(k) for k in ("XDG_STATE_HOME", "HERDR_PANE_ID")}
+    saved = {k: os.environ.get(k) for k in ("HAO_STATE_DIR", "HERDR_PANE_ID")}
     if env:
         for key, value in env.items():
             if value is None:
@@ -51,7 +53,8 @@ class TestD8UniversalJson(unittest.TestCase):
             "name": ["w2:p9", "hawk"], "clear": ["w2:p9"], "restore": [],
             "ask": ["w2:p9", "task"], "wait": ["w2:p9", "deadbeef0000"],
             "done": ["deadbeef0000"], "cancel": ["deadbeef0000"],
-            "abort": ["deadbeef0000"], "suggest": ["task"], "list": [],
+            "abort": ["deadbeef0000"], "stop": ["w2:p9"],
+            "suggest": ["task"], "list": [],
             "status": [], "say": ["hi"], "result": ["deadbeef0000"],
             "doctor": [], "clean": [],
         }
@@ -98,13 +101,14 @@ class TestD8UniversalJson(unittest.TestCase):
             run = SimpleNamespace(returncode=0, stdout="ok", stderr="")
             with mock.patch.object(hao.subprocess, "run", return_value=run):
                 rc, out, _ = run_cli(["doctor", "--json"],
-                                     {"XDG_STATE_HOME": d, "HERDR_ENV": "1"})
+                                     {"HAO_STATE_DIR": os.path.join(d, "hao", "tasks"),
+                                      "HERDR_ENV": "1", "HERDR_PANE_ID": None})
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertTrue(data["ok"])
         self.assertTrue(all(c["ok"] for c in data["checks"]))
         self.assertEqual([c["name"] for c in data["checks"]],
-                         ["python3", "herdr", "HERDR_ENV", "XDG default", "ledger"])
+                         ["python3", "herdr", "HERDR_ENV", "state dir", "ledger"])
 
 
 if __name__ == "__main__":
