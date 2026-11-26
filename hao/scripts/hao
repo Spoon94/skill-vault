@@ -1189,6 +1189,8 @@ def _confirm_sentinel(pane, token, sid, machine, no_agent):
 
 
 FAST_PATH_SECONDS = 30
+WORKING_SCAN_INTERVAL = 10
+SETTLED_SCAN_INTERVAL = 2
 
 
 def _finish_sentinel(l, sid, ml, pane, token, machine, prompt=None):
@@ -1237,6 +1239,7 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     sentinel_seen = False
     validated_ml = None
     response_warned = False
+    last_pane_scan = start
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
         if rec:
@@ -1277,31 +1280,49 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
         if time.time() - start < FAST_PATH_SECONDS:
-            ml, errc, stale = _sentinel_check(pane, token, sid, machine)
-            if errc is not None:
-                return errc
-            if stale:
-                # wait-output returns the first sentinel on screen, which
-                # may be an older task's. It returned instantly, so pause
-                # for the time a real 1s wait would have taken, then scan
-                # the tail for this task's sentinel in the same round.
-                time.sleep(1)
-                last, serr = _sentinel_scan_tail(pane, token, sid, machine)
-                if serr is not None:
-                    return serr
-                ml = last
-            if ml:
-                sentinel_seen = True
-                validated_ml = ml
+            if (last_status == "working"
+                    and time.time() - last_pane_scan
+                    < WORKING_SCAN_INTERVAL):
+                # Active TUI output: reading the pane here makes herdr
+                # scroll it. Wait on agent state instead; the pane scan
+                # below still runs as a low-frequency fallback.
+                rw, _, ew = run_herdr(["agent", "wait", pane,
+                                       "--until", "idle", "--until", "done",
+                                       "--until", "blocked",
+                                       "--timeout", "2000"], machine)
+                if (rw != 0 and _herdr_err_code(ew) != "timeout"
+                        and "timed out" in ew.lower()):
+                    return herdr_error_rc(ew, 8)
                 if _deadline_passed(deadline):
                     return _wait_timeout(observed_working, last_status,
                                          timeout, seen_record)
-                conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
-                if conf:
-                    return _finish_sentinel(
-                        l, sid, conf, pane, token, machine,
-                        prompt=prompt)
-            time.sleep(0.5)
+            else:
+                last_pane_scan = time.time()
+                ml, errc, stale = _sentinel_check(pane, token, sid, machine)
+                if errc is not None:
+                    return errc
+                if stale:
+                    # wait-output returns the first sentinel on screen, which
+                    # may be an older task's. It returned instantly, so pause
+                    # for the time a real 1s wait would have taken, then scan
+                    # the tail for this task's sentinel in the same round.
+                    time.sleep(1)
+                    last, serr = _sentinel_scan_tail(pane, token, sid, machine)
+                    if serr is not None:
+                        return serr
+                    ml = last
+                if ml:
+                    sentinel_seen = True
+                    validated_ml = ml
+                    if _deadline_passed(deadline):
+                        return _wait_timeout(observed_working, last_status,
+                                             timeout, seen_record)
+                    conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
+                    if conf:
+                        return _finish_sentinel(
+                            l, sid, conf, pane, token, machine,
+                            prompt=prompt)
+                time.sleep(0.5)
         else:
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
@@ -1332,7 +1353,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                         l, sid, conf, pane, token, machine,
                         prompt=prompt)
             else:
-                time.sleep(0.5)
+                time.sleep(SETTLED_SCAN_INTERVAL
+                           if last_status in ("idle", "done") else 0.5)
         response_warned = _maybe_warn_unresponsive(
             pane, time.time() - start, last_status, observed_working,
             sentinel_seen, response_warned)
@@ -1451,6 +1473,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
             if conf:
                 return _finish_sentinel(
                     l, sid, conf, pane, token, machine, prompt=prompt)
+        elif st in ("idle", "done"):
+            time.sleep(SETTLED_SCAN_INTERVAL)
         response_warned = _maybe_warn_unresponsive(
             pane, time.time() - start, last_status, observed_working,
             sentinel_seen, response_warned)
