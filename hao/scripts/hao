@@ -1298,7 +1298,8 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
                                        "--until", "idle", "--until", "done",
                                        "--until", "blocked",
                                        "--timeout", "8000"], machine)
-                if rw != 0 and "timed out" in ew.lower():
+                if (rw != 0 and _herdr_err_code(ew) != "timeout"
+                        and "timed out" in ew.lower()):
                     return herdr_error_rc(ew, 8)
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
@@ -1449,7 +1450,8 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
                                "--until", "idle", "--until", "done",
                                "--until", "blocked", "--timeout", "8000"],
                               machine)
-        if rw != 0 and "timed out" in ew.lower():
+        if (rw != 0 and _herdr_err_code(ew) != "timeout"
+                and "timed out" in ew.lower()):
             return herdr_error_rc(ew, 8)
     return _wait_timeout(observed_working, last_status, timeout,
                          seen_record)
