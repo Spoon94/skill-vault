@@ -560,7 +560,7 @@ class TestCLI(unittest.TestCase):
         r = subprocess.run(
             [sys.executable, os.path.join(SKILL_DIR, "scripts", "hao"),
              "suggest", "审查 PR", "--json",
-             "--live-names", "--label-roles"],
+             "--live-names", "--live-labels"],
             capture_output=True, text=True, timeout=15)
         self.assertEqual(r.returncode, 0)
         import json

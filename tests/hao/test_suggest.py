@@ -30,6 +30,16 @@ class TestSuggest(unittest.TestCase):
         r = cmd_suggest("build a new adapter", json_out=True, live_names=[], label_roles=[])
         self.assertIn(r["group"], ["实现构建", "后端服务", "架构接口"])
 
+    def test_live_labels_flag_is_accepted(self):
+        args = hao.build_parser().parse_args(
+            ["suggest", "task", "--live-labels", "hao-hawk-developer"])
+        self.assertEqual(args.live_labels, ["hao-hawk-developer"])
+
+    def test_old_label_roles_flag_is_rejected(self):
+        with self.assertRaises(SystemExit):
+            hao.build_parser().parse_args(
+                ["suggest", "task", "--label-roles", "hao-hawk-developer"])
+
 
 if __name__ == "__main__":
     unittest.main()

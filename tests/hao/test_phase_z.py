@@ -116,7 +116,7 @@ class TestZ2ReadOnlyNoCreate(unittest.TestCase):
                 ["status", "w2:p9", "--json"],
                 ["list", "--json"],
                 ["restore", "--dry-run", "--json"],
-                ["suggest", "task", "--live-names", "--label-roles", "--json"],
+                ["suggest", "task", "--live-names", "--live-labels", "--json"],
                 ["clean", "--dry-run", "--json"],
                 ["cancel", "deadbeef0000", "--json"],
                 ["result", "deadbeef0000", "--json"],

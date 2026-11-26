@@ -2564,14 +2564,14 @@ def build_parser():
     sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
     sp = add("suggest", lambda a: cmd_suggest(a.task, a.json, a.live_names,
-                                               a.label_roles, a.machine,
+                                               a.live_labels, a.machine,
                                                a.custom), ["s"],
              "Suggest short agent names from a keyword-matched pool.")
     sp.add_argument("task", help="task description used for keyword matching")
     sp.add_argument("--json", action="store_true", help="emit JSON only")
     sp.add_argument("--live-names", nargs="*", metavar="NAME",
                     help="names already live; overrides automatic lookup")
-    sp.add_argument("--label-roles", nargs="*", metavar="LABEL",
+    sp.add_argument("--live-labels", nargs="*", metavar="LABEL",
                     help="labels already in use; overrides automatic lookup")
     sp.add_argument("--custom", metavar="NAME", help="validate and return a custom name")
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")

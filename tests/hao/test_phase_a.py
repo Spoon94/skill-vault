@@ -184,14 +184,14 @@ class TestPhaseAIds(unittest.TestCase):
 
 class TestPhaseASuggest(unittest.TestCase):
     def test_default_is_one_human_line(self):
-        rc, out, err = run_cli(["suggest", "审查 PR", "--live-names", "--label-roles"])
+        rc, out, err = run_cli(["suggest", "审查 PR", "--live-names", "--live-labels"])
         self.assertEqual(rc, 0)
         self.assertEqual(out, "验证审阅: hawk, lens, prism\n")
         self.assertEqual(err, "")
 
     def test_json_is_json_only(self):
         rc, out, err = run_cli(["suggest", "审查 PR", "--json",
-                                "--live-names", "--label-roles"])
+                                "--live-names", "--live-labels"])
         self.assertEqual(rc, 0)
         self.assertEqual(len(out.splitlines()), 1)
         self.assertIsInstance(json.loads(out), dict)
@@ -199,7 +199,7 @@ class TestPhaseASuggest(unittest.TestCase):
 
     def test_json_has_no_human_prefix(self):
         rc, out, _ = run_cli(["suggest", "审查 PR", "--json",
-                              "--live-names", "--label-roles"])
+                              "--live-names", "--live-labels"])
         self.assertEqual(rc, 0)
         self.assertFalse(out.startswith("验证审阅"))
 
