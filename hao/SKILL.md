@@ -39,7 +39,7 @@ python3 scripts/hao restore --dry-run
 
 ## 角色目录
 
-角色写在 pane label 的 `<role>` 段：`hao-<name>-<role>`。角色说明「做什么」，档位决定「怎么派活」：`top` 精简简报（默认 ≤15 行）、`mid` 标准简报（≤40 行）、`low` 完整简报（不限）。
+角色写在 pane label 的 `<role>` 段：`hao-<name>-<role>`。角色说明「做什么」，档位决定「怎么派活」：`top` 精简简报、默认输出不超过 15 行；`mid` 与 `low` 用同一份完整简报，`mid` 默认输出不超过 40 行，`low` 不限。
 
 - **决策 — top**：`strategist`、`product-manager`、`planner`、`architect`、`arbiter`
 - **协调 — mid**：`project-manager`、`orchestrator`、`synthesizer`

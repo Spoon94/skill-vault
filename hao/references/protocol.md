@@ -21,11 +21,12 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 ## label、角色与档位
 
 - 受管 label 形如 `hao-<name>[-<role>]`，正则 `^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,19}))?$`。`name` 是 agent 名；`role` 取自 `references/roles.md`，最长 20 字符。旧 label 的非角色段原样保留为 `role`，`tier` 为 `null`。
-- 角色决定 `ask` 的简报与默认输出上限：`top` 15 行（精简模板）、`mid` 40 行（标准模板）、`low` 或不带角色不限（完整模板）。`ask --max-lines N` 覆盖默认值，`0` 不限，负数 exit2；实际生效值在 ask JSON 的 `max_lines`。
+- 角色决定 `ask` 的简报与默认输出上限：`top` 用精简简报，默认输出不超过 15 行；`mid` 与 `low` 用同一份完整简报，`mid` 默认不超过 40 行，`low` 不限；不带角色的目标同 `low`。`ask --max-lines N` 覆盖默认值，`0` 不限，负数 exit2；实际生效值在 ask JSON 的 `max_lines`。
 - `hao name <target> <name> --role R` 设置角色；省略 `--role` 沿用现有角色；`--role ""` 清除角色（label 变为 `hao-<name>`，JSON 的 `role`/`tier` 为 null、`kept` 为 false）；其它未知值 exit2 并列出可用角色。
 
 ## 等待协议
 
+- **派发前确认输入框为空**：herdr `agent prompt` 会把任务追加到目标输入框已有的未提交文字之后一起提交（实测 prompt 形如 `UNSENT DRAFT WORDS[TASK …]`），草稿会随任务发出并丢失。派发前先看对方 pane；有未提交文字时，让其用户先清空或发送。
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。部分 agent（如 Claude Code）的工具 stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
 - **已验证哨兵**：快路径 `pane wait-output` 已验证到本任务哨兵行时保存该行；随后状态门槛返回 3/5/9 且屏幕重扫找不到哨兵（例如审批框盖住屏幕）时，使用已验证哨兵完成，`tail` 尽力提取、不可读则为 null + `tail_note`。herdr 故障（8）仍立即返回。三种等待模式中具备哨兵证据的路径同样处理。
 - **需要审批的 agent**：完成顺序固定为「最终答复正文 → 最后一行备份哨兵 → 仅当可直执行时再调 `hao done`」。审批由工具层在命令发出时拦截，模型事先无法可靠判断，因此默认模式对审批型 peer 的结果**不确定**；prompt 明确：需要审批或不确定时**不要请求审批，直接只打印备份信号**。默认模式结果在 `wait.tail`；需要确定性时用 `hao ask --text-only`，其 prompt 完全不出现 `hao done`，只要求答复+哨兵，结果只走文本通道。`tail` 从调用方 prompt 回显结束之后取（按归一化文本定位，容忍折行/TUI 装饰；回显滚出窗口时回退任务分隔符启发式），剥离 harness 状态行/分隔线，最多 40 行/2000 字符，`summary` 仅来自台账。可放行该命令或使用免审批模式启用台账通道；`--wake` 依赖 `hao done`，审批型 peer 上属于尽力而为。

@@ -53,7 +53,7 @@ hao/
 
 ## 角色目录
 
-27 个角色分五组，档位决定 `ask` 的简报长度（`top` ≤15 行、`mid` ≤40 行、`low` 不限）：
+27 个角色分五组，档位决定对方答复的默认输出上限（`top` 精简简报、≤15 行；`mid` 与 `low` 共用完整简报，`mid` ≤40 行、`low` 不限）：
 
 | 组 | 档位 | 角色 |
 |---|---|---|
@@ -151,7 +151,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 ```bash
 cd tests/hao
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（357 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（368 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 

@@ -4,6 +4,8 @@
 
 命令中的 `python3 scripts/hao` 均相对 SKILL.md 目录；`<pane>` 是 pane id、label 或 agent 名。
 
+派发前确认对方输入框为空：`herdr agent prompt` 会把任务追加到输入框里已有的未提交文字之后一起提交，草稿会随任务发出并丢失。看到未提交文字时，先请对方用户清空或发送。
+
 ## 1. 规划
 
 - **谁来派**：调用方，或已就位的 `project-manager`。
@@ -40,8 +42,11 @@
 
   ```bash
   python3 scripts/hao name w2:p11 fern --role developer
+  # 方式一：--wake；完成后按 wake 通知里的 hao wait 命令取结果
   python3 scripts/hao ask w2:p11 "实现任务 3：<目标与验收>；改动限定在 <路径>" --wake "$HERDR_PANE_ID"
-  # 全部派完后集中等待
+
+  # 方式二（替代方式一）：不带 --wake；派发后用 hao wait 轮询
+  python3 scripts/hao ask w2:p11 "实现任务 3：<目标与验收>；改动限定在 <路径>"
   python3 scripts/hao wait w2:p11 --token <shortid> --timeout 600
   ```
 
@@ -87,10 +92,13 @@ python3 scripts/hao ask w2:p9 "为登录限流写方案与验收标准" --wait -
 python3 scripts/hao name w2:p10 moss --role project-manager
 python3 scripts/hao ask w2:p10 "把方案拆成任务清单：<上一步 summary>" --wait --json
 
-# 3 实施（可并行多个 pane）
+# 3 实施（可并行多个 pane；下面两种取结果方式二选一）
 python3 scripts/hao name w2:p11 fern --role developer
+# 方式一：--wake，完成后按 wake 通知里的命令取结果
 python3 scripts/hao ask w2:p11 "实现任务 1：<清单项>" --wake "$HERDR_PANE_ID"
-python3 scripts/hao wait w2:p11 --token <shortid> --timeout 600
+# 方式二：不用 --wake，派发后手动等待
+# python3 scripts/hao ask w2:p11 "实现任务 1：<清单项>"
+# python3 scripts/hao wait w2:p11 --token <shortid> --timeout 600
 
 # 4 初审
 python3 scripts/hao name w2:p12 lens --role reviewer
