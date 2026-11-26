@@ -87,6 +87,24 @@ class TestNameRole(unittest.TestCase):
         self.assertIn(["pane", "rename", "w2:p9", "hao-lens-reviewer"], calls)
         self.assertTrue(out["kept"])
 
+    def test_empty_role_clears_it(self):
+        fake, calls = fake_herdr("hao-moth-reviewer")
+        hao.run_herdr = fake
+        rc, out = run_json(hao.cmd_name, "w2:p9", "lens", "", False, False)
+        self.assertEqual(rc, 0)
+        self.assertIn(["pane", "rename", "w2:p9", "hao-lens"], calls)
+        self.assertEqual((out["role"], out["tier"], out["kept"]), (None, None, False))
+        self.assertEqual(out["label"], "hao-lens")
+
+    def test_empty_role_dry_run_reports_nulls(self):
+        fake, _ = fake_herdr("hao-moth-reviewer")
+        hao.run_herdr = fake
+        rc, out = run_json(hao.cmd_name, "w2:p9", "lens", "", False, True)
+        self.assertEqual(rc, 0)
+        self.assertTrue(out["dry_run"])
+        self.assertEqual((out["role"], out["tier"], out["kept"]), (None, None, False))
+        self.assertEqual(out["label"], "hao-lens")
+
     def test_legacy_scope_is_kept_verbatim_with_null_tier(self):
         fake, calls = fake_herdr("hao-verse-ops")
         hao.run_herdr = fake

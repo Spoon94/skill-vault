@@ -268,6 +268,9 @@ def cmd_name(target, name, role=None, force=False, dry_run=False, machine=None):
         _set_error(f"invalid name {name!r}; expected ^[a-z]{{4,6}}$")
         return 2
     nm = _load_module("names", "names.py")
+    clear_role = role == ""
+    if clear_role:
+        role = None
     if role is not None and role not in nm.ROLES:
         return fail(2, f"unknown role {role!r}; available roles: " +
                     ", ".join(sorted(nm.ROLES)))
@@ -309,7 +312,7 @@ def cmd_name(target, name, role=None, force=False, dry_run=False, machine=None):
         except Exception:
             return fail(8, "herdr returned invalid JSON for pane get")
     kept = False
-    if role is None:
+    if role is None and not clear_role:
         existing = label_role(cur)
         if existing:
             role = existing
@@ -2423,7 +2426,8 @@ def build_parser():
     sp.add_argument("target", help="pane id, label, or agent name")
     sp.add_argument("name", help="new agent name matching ^[a-z]{4,6}$")
     sp.add_argument("--role", metavar="ROLE",
-                    help="role from references/roles.md, carried in the pane label")
+                    help="role from references/roles.md, carried in the pane label; "
+                         "omit to keep the current role, empty string to clear")
     sp.add_argument("--force", action="store_true", help="allow replacing a non-hao label")
     sp.add_argument("--dry-run", action="store_true", help="show the planned label/name only")
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
