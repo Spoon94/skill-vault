@@ -441,8 +441,8 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
         return 6
     if full["ambiguous"] and not pick:
         if not _JSON_OUTPUT:
-            print("ambiguous roles across workspaces; rerun with --pick <pane>")
-        _set_error("ambiguous roles across workspaces")
+            print("ambiguous names across workspaces; rerun with --pick <pane>")
+        _set_error("ambiguous names across workspaces")
         return 6
     if all_:
         panes = all_panes
@@ -461,8 +461,8 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
     plan = preflight(panes, agents, ws)
     if plan["ambiguous"] and not pick:
         if not _JSON_OUTPUT:
-            print("ambiguous roles; rerun with --pick <pane>")
-        _set_error("ambiguous roles")
+            print("ambiguous names; rerun with --pick <pane>")
+        _set_error("ambiguous names")
         return 6
     agent_names = {a.get("pane_id"): a.get("name") for a in agents if a.get("name")}
     stats = {"restored": 0, "skipped": 0, "shell_only": 0,
@@ -483,7 +483,9 @@ def cmd_restore(workspace=None, all_=False, adopt=True, dry_run=False, pick=None
             if dry_run:
                 stats["restored"] += 1
                 if not _JSON_OUTPUT:
-                    print(f"would restore {role} on {p['pane_id']} (scope={label_scope(p.get('label'))})")
+                    seg = label_scope(p.get("label"))
+                    role_txt = f"role {seg}" if seg else "no role"
+                    print(f"would restore name {role} ({role_txt}) on {p['pane_id']}")
                 continue
             scope = label_scope(p.get("label"))
             r1, _, _ = run_herdr(["pane", "rename", p["pane_id"], make_label(role, scope)], machine)
@@ -2292,7 +2294,7 @@ _GENERIC_REASON = {
 }
 _EXIT_REASON = {
     ("result", 3): "task not found",
-    ("name", 2): "invalid name or scope; expected name ^[a-z]{4,6}$",
+    ("name", 2): "invalid name or unknown role; expected name ^[a-z]{4,6}$ and a role from references/roles.md",
     ("wait", 2): "invalid token; expected 12-hex shortid or hao- token",
     ("wait", 4): "timeout",
     ("status", 3): "target not found",
@@ -2472,7 +2474,7 @@ def build_parser():
     sp.add_argument("--no-adopt", dest="adopt", action="store_false",
                     help="only fill unnamed agents")
     sp.add_argument("--dry-run", action="store_true", help="preview without renaming")
-    sp.add_argument("--pick", metavar="PANE", help="choose one pane when roles are ambiguous")
+    sp.add_argument("--pick", metavar="PANE", help="choose one pane when names are ambiguous")
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
     sp.add_argument("--json", action="store_true", help="emit one JSON summary line")
 
