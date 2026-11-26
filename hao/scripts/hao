@@ -651,8 +651,8 @@ def build_prompt(task, token, result_path=None, text_only=False, tier=None, max_
         if not text_only:
             lines.append(
                 "打印哨兵之后，只有确认命令能直接执行（不会向用户请求审批）时才调用："
-                f"{hao_command()} done --token <完整令牌> --summary \"<结论>\"；"
-                "不确定或需要审批就只打印哨兵，不要请求审批。")
+                f"{hao_command()} done --token {shortid} --summary \"<结论>\"；"
+                "不确定、需要审批或命令失败都只打印哨兵，不要重试。")
     else:
         lines = head + [
             "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
@@ -666,9 +666,10 @@ def build_prompt(task, token, result_path=None, text_only=False, tier=None, max_
         else:
             lines += [
                 "完成顺序：先输出最终答复的全部正文；随后在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
-                f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token <完整令牌> "
+                f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token {shortid} "
                 '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
-                "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。",
+                "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。"
+                "命令失败或被拒绝时不要重试、不要排查，直接输出最终答复和最后一行哨兵。",
                 "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
             ]
         if cap:

@@ -21,7 +21,7 @@ class TestG1HaoCommand(unittest.TestCase):
         token = "hao-" + "aabbccddeeff0011"
         prompt = hao.build_prompt("task", token)
         cmd = hao.hao_command()
-        self.assertIn(f"{cmd} done --token <完整令牌>", prompt)
+        self.assertIn(f"{cmd} done --token {token[4:16]}", prompt)
         self.assertIn("若无法执行该命令", prompt)
         self.assertNotIn(token, prompt)
 

@@ -38,6 +38,17 @@ class TestTierBriefs(unittest.TestCase):
         self.assertEqual(prompt("low", text_only=True), golden("prompt_low_text_only.golden"))
         self.assertNotIn("不超过", prompt("low"))
 
+    def test_top_matches_the_golden_prompt(self):
+        self.assertEqual(prompt("top"), golden("prompt_top.golden"))
+
+    def test_done_command_uses_the_shortid_not_the_full_token(self):
+        for tier in ("top", "mid", "low", None):
+            with self.subTest(tier=tier):
+                p = prompt(tier)
+                self.assertIn("done --token aabbccddeeff", p)
+                self.assertNotIn("<完整令牌>", p)
+                self.assertIn("不要重试", p)
+
     def test_max_lines_overrides_and_zero_means_unlimited(self):
         self.assertIn("不超过 5 行", prompt("top", max_lines=5))
         self.assertIn("不超过 5 行", prompt("low", max_lines=5))

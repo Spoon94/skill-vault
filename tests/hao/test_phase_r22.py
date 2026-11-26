@@ -19,7 +19,7 @@ TOKEN = "hao-" + "aabbccddeeff0011"
 SID = TOKEN[4:16]
 
 
-def echo_prompt(prompt, width=18):
+def echo_prompt(prompt, width=40):
     out = []
     for line in prompt.splitlines():
         for i in range(0, len(line), width):
