@@ -1,6 +1,7 @@
-# hao：分档角色协作 skill 设计（v1）
+# hao：分档角色协作 skill 设计（v2）
 
 > 状态：待用户审阅。前序设计见 `2026-11-22-herdr-agent-ops-design.md`（v33，已实现并合并）。
+> v2 相对 v1：角色从写死的三个改为**带档位的角色目录**（可扩充）；**命名与角色解耦**。
 
 ## 1. 目标
 
@@ -24,60 +25,78 @@
 - CLI 名不变（仍是 `hao`）；历史设计文档（`docs/superpowers/` 下已合并的 5 份）保持原样
 - 仓库之外：已安装的副本由用户同步（`hao` 进技能库，移除旧名 `herdr-agent-ops`）
 
-## 3. 角色
+## 3. 角色：一份带档位的目录
 
-三个内置角色。角色名都不少于 7 个字符，因此不可能与 agent 名（4–6 个字符）混淆。
+### 3.1 标注方式——命名与角色解耦
 
-| 角色 | 档位 | 职责 | 取名的推荐组（词表里的组） |
-|---|---|---|---|
-| `architect` | 顶级 | 整体规划、设计、终审 | 规划编排、架构接口、战略分析、验证审阅 |
-| `captain` | 中间 | 拆解规划、细化设计、初审 | 项目管理、验证审阅、测试实验、调试修复 |
-| `builder` | 垫底 | 实施、优化 | 实现构建、调试修复、测试实验；其余技术组按任务关键词参与 |
+pane label 的格式是 **`hao-<name>-<role>`**：
 
-- **标注在 pane label**：`hao-<name>-<role>`，沿用现有 label 格式。`hao name` 的 `--scope` 改为 `--role`，取值限定为三个角色之一。重启后 `hao restore` 连同角色一起恢复。
-- **agent 名体现角色**：`hao suggest "<task>" --role <role>` 只在角色的推荐组里选名；任务关键词命中的组优先。
-- `hao list` / `hao status` 显示角色。
+- `name` 是 agent 的代号，怎么选与角色无关（`hao suggest "<task>"` 保持现状，按任务关键词从词表里选）。
+- `role` 是独立的字段，来自角色目录。`hao name <target> <name> --role <role>`；取值必须是目录里的角色，否则返回 2 并列出可用角色。
+- 重启后 `hao restore` 连同角色一起恢复；不带 `--role` 重跑 `hao name` 时保留原有角色。
+- `hao list` / `hao status` 显示角色与档位。
 - 已有的非角色 scope（如 `hao-verse-ops`）仍能解析，视为「无角色」。
-- 不带 `--role` 重跑 `hao name` 时保留原有角色（与现有「沿用 scope」的行为一致）。
 
-## 4. 协作：按角色选择简报
+### 3.2 角色目录（初始 11 个，可扩充）
 
-`hao ask` 读取目标 label 里的角色，自动选择简报的繁简与输出上限；`--max-lines N` 可覆盖输出上限。
+角色名都不少于 7 个字符，因此不可能与 agent 名（4–6 个字符）混淆。
 
-| 目标角色 | 简报 | 默认输出上限 |
+| 档位 | 角色 | 职责 |
 |---|---|---|
-| `architect` | 精简：任务正文 + 一句完成规则 | 结论先行，不超过 15 行 |
-| `captain` | 标准 | 不超过 40 行 |
-| `builder` 或无角色 | 完整协议（现状） | 不限 |
+| 顶级 `top` | `architect` | 整体规划、架构设计 |
+| | `arbiter` | 最终审核、裁决 |
+| 中间 `mid` | `captain` | 拆解任务、派活、协调 |
+| | `designer` | 细化设计、接口与数据结构 |
+| | `reviewer` | 初审、代码评审 |
+| | `analyst` | 调研分析、定位问题 |
+| 垫底 `low` | `builder` | 实现功能 |
+| | `patcher` | 修复缺陷、优化 |
+| | `verifier` | 测试与验证 |
+| | `recorder` | 文档、记录、整理 |
+| | `explorer` | 检索代码库与资料 |
+
+目录是数据，放在 `references/roles.md`（一张表：角色、档位、职责）。新增角色只需在表里加一行；档位只有 `top` / `mid` / `low` 三种。
+
+## 4. 协作：按档位选择简报
+
+**角色说明「做什么」，档位决定「怎么派活」。** `hao ask` 读取目标 label 里的角色，查出档位，据此选择简报的繁简与输出上限；`--max-lines N` 可覆盖输出上限。
+
+| 目标档位 | 简报 | 默认输出上限 |
+|---|---|---|
+| `top` | 精简：任务正文 + 一句完成规则 | 结论先行，不超过 15 行 |
+| `mid` | 标准 | 不超过 40 行 |
+| `low` 或无角色 | 完整协议（现状） | 不限 |
 
 - 完成信号协议不变（先打印哨兵，再视情况调用 `hao done`；审批型对方用 `--text-only`），只是措辞随简报繁简而不同。精简模板同样遵守「哨兵在前」的顺序。
 - 其余命令（`wait` / `done` / `cancel` / `abort` / `stop` / `clean` 等）不变。
 
 ## 5. 工作流（写进文档，不新增流水线命令）
 
-`SKILL.md` 以三档流程为主工作流，细节放在 `references/workflow.md`：
+`SKILL.md` 以分档流程为主工作流，细节放在 `references/workflow.md`：
 
 ```
-1 规划   architect   产出方案与验收标准
+1 规划   architect   产出方案与验收标准（需要调研时先让 analyst / explorer 摸底）
 2 拆解   captain     把方案拆成任务清单
 3 实施   builder     可并行多个；captain 派活并等待
-4 初审   captain     不通过则回到 3
-5 终审   architect   只看结论与必须修改项
+4 初审   reviewer    不通过则交给 patcher 修复后回到 4
+5 终审   arbiter     只看结论与必须修改项
 ```
 
 每一步写明：谁来派、用什么命令、产物怎么交给下一步（`summary` 或报告路径）、失败怎么处理（对方被审批卡住 → 交用户；超时 → `cancel` 或 `abort`）。
-编排动作由调用方（通常是 captain）完成；architect 只在第 1 步和第 5 步出现。
+编排动作由调用方（通常是 captain）完成；顶级角色只在第 1 步和第 5 步出现。
 
 ## 6. 不做的事
 
 - 不做「按任务 id 自动拼接上下文」、不做流水线命令、不做摘要长度分档——用户明确表示「主要就是角色、协作、工作流，没那么复杂」。
+- 不按角色约束取名（用户要求命名与角色解耦）。
 - 不记录 agent 使用的模型。
 
 ## 7. 验收标准
 
 1. 改名后仓库内没有 `herdr-agent-ops` 的活引用（历史文档除外）；根 README 索引与文档守卫测试全部通过。
-2. `hao name w2:p9 moth --role builder` 得到 label `hao-moth-builder`；`--role foo` 返回 2；`hao restore` 之后角色仍在。
-3. `hao suggest "重构模块" --role architect` 的候选全部来自 architect 的推荐组；`--role builder` 同理。
-4. 同一句任务分别派给三种角色，prompt 的长度与输出上限符合第 4 节的表；`--max-lines` 能覆盖默认值。
-5. 真机：一次性实例分别以三种角色命名后派活，都能完成；派给 architect 的 prompt 明显短于派给 builder 的。
-6. 单元测试在三种运行方式下全部通过（正常、herdr 不可达、集成冒烟）。
+2. `hao name w2:p9 moth --role builder` 得到 label `hao-moth-builder`；`--role foo` 返回 2 并列出可用角色；`hao restore` 之后角色仍在；不带 `--role` 重跑保留角色。
+3. 在 `roles.md` 加一行自定义角色后，`hao name … --role <新角色>` 立即可用，且按其档位选择简报。
+4. 同一句任务分别派给 `top` / `mid` / `low` 三种档位的角色，prompt 的长度与输出上限符合第 4 节的表；`--max-lines` 能覆盖默认值。
+5. `hao list` / `hao status` 正确显示角色与档位。
+6. 真机：一次性实例分别以三种档位的角色命名后派活，都能完成；派给 `top` 的 prompt 明显短于派给 `low` 的。
+7. 单元测试在三种运行方式下全部通过（正常、herdr 不可达、集成冒烟）。
