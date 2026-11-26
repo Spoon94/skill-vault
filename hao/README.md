@@ -15,23 +15,25 @@
 
 ```
 hao/
-├── SKILL.md                 # 入口：何时用、三条工作流
+├── SKILL.md                 # 入口：角色、协作流程与命令
 ├── README.md                # 本文件
 ├── scripts/
 │   ├── hao                  # CLI（Python 3 单文件，stdlib only）
 │   ├── ledger.py            # 任务台账（per-shortid 锁 + 字段 merge + TTL）
-│   └── names.py             # 词表解析（读 references/names.md）
+│   └── names.py             # 词表与角色目录解析（读 references/names.md、roles.md）
 └── references/
     ├── names.md             # 40 组 × 40 = 1600 个名字（含中英关键词别名）
+    ├── roles.md             # 27 个角色（五组）与档位 top/mid/low
     ├── protocol.md          # 等待协议、错误码表、JSON schema
-    └── restore.md           # label 解析、pre-flight、adopt、TTL 清理
+    ├── restore.md           # label 解析、pre-flight、adopt、TTL 清理
+    └── workflow.md          # 五步协作流程与失败处理
 ```
 
 ## 命令面
 
 | 命令 | 作用（完整说明见 `hao <cmd> --help`） |
 |---|---|
-| `hao name <target> <name> [--role ROLE] [--force] [--dry-run] [--machine M] [--json]` | agent 改名 + pane label 设为 `hao-<name>[-role]`；role 默认沿用 |
+| `hao name <target> <name> [--role ROLE] [--force] [--dry-run] [--machine M] [--json]` | agent 改名 + pane label 设为 `hao-<name>[-role]`；省略 `--role` 沿用现有角色，`--role ""` 清除角色 |
 | `hao clear <target> [--force] [--dry-run] [--machine M] [--json]` | 清除 hao- label 与 agent name |
 | `hao suggest "<task>" [--custom NAME] [--live-names N...] [--label-roles L...] [--machine M] [--json]` | 词表选名；`--custom` 校验自定义名（保留字/灰词） |
 | `hao restore [--workspace W\|--all] [--adopt\|--no-adopt] [--dry-run] [--pick PANE] [--machine M] [--json]` | 从 label 恢复名字并输出摘要 |
@@ -40,14 +42,28 @@ hao/
 | `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；可读台账但无记录 → exit3 无哨兵；summary 是结果载荷 |
 | `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | cancel 只取消等待、**不停止对方**；working 时提示 `abort --interrupt`（blocked 需授权） |
 | `hao stop <target> [--dry-run] [--machine M] [--json]` | 只停当前这一轮（working 发 esc/ctrl+c；发送后最多 3s 读 settled status；blocked 需授权；不依赖任务记录） |
-| `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane |
-| `hao status [target] [--text] [--json]` | pane/agent/任务概览；默认当前 pane |
+| `hao list [--workspace W] [--machine M] [--json]` | 列出 hao- pane（含 role、tier；缺失显示 `-`） |
+| `hao status [target] [--text] [--json]` | pane/agent/任务概览（role、tier、group）；默认当前 pane |
 | `hao say TEXT... [--strict] [--json]` | 发普通 prompt，不建任务 |
 | `hao result <t> [--target PANE] [--file PATH] [--allow-any-path] [--json]` | 读取结果；`--allow-any-path` 需显式担责 |
 | `hao doctor [--machine M] [--json]` | 环境/机器自检（含默认 TTL 清理；有 HERDR_PANE_ID 时报告 pane 宽度） |
 | `hao clean [--all] [--ttl S] [--dry-run] [--json]` | 清理终态/孤儿台账、无主锁与结果目录 |
 
 所有命令均接受 `--json`（`ask`/`wait` 恒 JSON，该 flag 为 no-op）与 `--help`；完整参数见 `hao <cmd> --help`，协议见 `references/protocol.md`。脚本路径相对本 README/SKILL.md 所在目录；各平台 skill 目录见仓库 `INSTALL.md`。
+
+## 角色目录
+
+27 个角色分五组，档位决定 `ask` 的简报长度（`top` ≤15 行、`mid` ≤40 行、`low` 不限）：
+
+| 组 | 档位 | 角色 |
+|---|---|---|
+| 决策 | top | strategist · product-manager · planner · architect · arbiter |
+| 协调 | mid | project-manager · orchestrator · synthesizer |
+| 设计评审 | mid | designer · ux-designer · reviewer · evaluator · analyst · auditor |
+| 实施 | low | developer · frontend-developer · backend-developer · debugger · refactorer · test-engineer |
+| 支撑 | low | explorer · researcher · doc-writer · devops-engineer · data-engineer · prompt-engineer · memory-curator |
+
+角色写在 label 的 `<role>` 段；不写角色也可以派活（完整简报、不限行）。新增角色只需在 `references/roles.md` 对应表加一行（角色名 7–20 个字符，小写字母和连字符），`name --role` 与 `ask` 立即生效。
 
 短别名：`n` name · `r` restore · `a` ask · `w` wait · `d` done · `l` list · `s` suggest · `c` clear · `st` status · `sy` say · `rs` result
 
@@ -135,13 +151,14 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 ```bash
 cd tests/hao
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（331 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（357 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
 ## 设计文档
 
-完整设计稿（33 轮 forge 审核，2026-11-22 设计稿），含错误码映射、并发原子性、安全路径（dirfd 链）等细节。
+- 当前设计：[docs/superpowers/specs/2026-11-26-hao-skill-design.md](../docs/superpowers/specs/2026-11-26-hao-skill-design.md)（分档角色、简报、工作流）
+- 历史设计：[docs/superpowers/specs/2026-11-22-herdr-agent-ops-design.md](../docs/superpowers/specs/2026-11-22-herdr-agent-ops-design.md)（旧名保留，含错误码映射、并发原子性、安全路径等细节）
 
 ## 来源
 

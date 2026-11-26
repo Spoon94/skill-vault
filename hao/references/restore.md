@@ -2,26 +2,26 @@
 
 ## label 解析
 
-受管 label 形如 `hao-<role>[-<scope>]`，正则 `^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$`。`hao-` 前缀是持久化载体；herdr `session.json` 会保存 label。`hao restore` 只处理该正则匹配的 label，其它 label（如 `yaml`、`atcl`）不碰。
+受管 label 形如 `hao-<name>[-<role>]`，正则 `^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,19}))?$`。`name` 是 agent 名（4–6 个小写字母）；`role` 是 `references/roles.md` 中的角色，最长 20 个字符。`hao-` 前缀是持久化载体；herdr `session.json` 会保存 label。`hao restore` 只处理该正则匹配的 label，其它 label（如 `yaml`、`atcl`）不碰。旧 label 的非角色段原样保留，按 `role` 报告，tier 为 `null`。
 
 ## 持久化口径
 
-- herdr `session.json` 同时保存 `label` 与 `agent_name`；`[session] resume_agents_on_restore=true` 会在 server restart 后恢复受支持 agent（如 Claude）的会话。所以「重启必丢名」不准确——label 是我们控制的、与 agent 生命周期解耦的角色槽位；herdr 的 agent_name/resume 是 best-effort，不作契约。
+- herdr `session.json` 同时保存 `label` 与 `agent_name`；`[session] resume_agents_on_restore=true` 会在 server restart 后恢复受支持 agent（如 Claude）的会话。所以「重启必丢名」不准确——label 是我们控制的、与 agent 生命周期解耦的名称槽位；herdr 的 agent_name/resume 是 best-effort，不作契约。
 - 真正需要 label 兜底：agent 退出/被替换、unsupported kind、`resume_agents_on_restore=false`、resume 失败。
 
 ## pre-flight
 
-1. **scope 只决定恢复哪些 label**：默认当前 `HERDR_WORKSPACE_ID`；`--workspace W` / `--all` 扩大。绝不默认全局（本机 8 个 workspace，防误伤）。
-2. **name 占用检查扫整台 machine**：所有 live agents + 所有 workspace 的 label role（per-machine 唯一）。跨 workspace 同名 → exit 6。
-3. 解析 label→role/scope→pane→当前 agent；检测 role 冲突（多 pane 同 role）、live name 已被占、startup pending、stale label（无 agent）、非法 label。
+1. **workspace 范围只决定恢复哪些 label**：默认当前 `HERDR_WORKSPACE_ID`；`--workspace W` / `--all` 扩大。绝不默认全局（本机 8 个 workspace，防误伤）。
+2. **name 占用检查扫整台 machine**：所有 live agents + 所有 workspace 的 label name 段（per-machine 唯一）。跨 workspace 同名 → exit 6。
+3. 解析 label→name/role→pane→当前 agent；检测 name 冲突（多 pane 同 name）、live name 已被占、startup pending、stale label（无 agent）、非法 label。
 
 ## 不自动选 winner
 
-同 role 多 pane 全部报歧义 exit 6 + 候选列表，要求 `--pick <pane>` 或换代号/scope。workspace/tab/pane 自然序仅用于展示，不用于决定身份（pane_id 是 opaque，字符串排序不可靠）。
+同 name 多 pane 全部报歧义 exit 6 + 候选列表，要求 `--pick <pane>` 或换 name/workspace 范围。workspace/tab/pane 自然序仅用于展示，不用于决定身份（pane_id 是 opaque，字符串排序不可靠）。
 
 ## 默认 adopt
 
-对 scope 内 `hao-` pane，把非空但不等价的 agent name 改为 label role（解决「agent start NAME 必填、用别名启动后 restore 跳过」的矛盾）；`--no-adopt` 回到只填无名（注：agent start 必有名，实际只覆盖手动启动的无名 agent）。`--dry-run` 预览；非 `hao-` label 需 `--force`。
+对 workspace 范围内 `hao-` pane，把非空但不等价的 agent name 改为 label 的 name 段（解决「agent start NAME 必填、用别名启动后 restore 跳过」的矛盾）；`--no-adopt` 回到只填无名（注：agent start 必有名，实际只覆盖手动启动的无名 agent）。`--dry-run` 预览。role 不参与 rename，只随 label 保留。
 
 ## 幂等与部分失败
 

@@ -18,12 +18,18 @@
 herdr 的 JSON `error.code` / stderr 必须解析，**不透传 herdr 退出码**。映射见 `ERR`（scripts/hao）。纯文本 `unknown machine` 也映射 exit7；`--machine` 命令会先做 `herdr machine status <m>` 前置校验，未知 machine 不执行后续动作；herdr 不可达或返回非 JSON 时 exit8，不抛 Traceback（doctor 保持自己的报告形式）。
 mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不代表 mutation 未执行）。
 
+## label、角色与档位
+
+- 受管 label 形如 `hao-<name>[-<role>]`，正则 `^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,19}))?$`。`name` 是 agent 名；`role` 取自 `references/roles.md`，最长 20 字符。旧 label 的非角色段原样保留为 `role`，`tier` 为 `null`。
+- 角色决定 `ask` 的简报与默认输出上限：`top` 15 行（精简模板）、`mid` 40 行（标准模板）、`low` 或不带角色不限（完整模板）。`ask --max-lines N` 覆盖默认值，`0` 不限，负数 exit2；实际生效值在 ask JSON 的 `max_lines`。
+- `hao name <target> <name> --role R` 设置角色；省略 `--role` 沿用现有角色；`--role ""` 清除角色（label 变为 `hao-<name>`，JSON 的 `role`/`tier` 为 null、`kept` 为 false）；其它未知值 exit2 并列出可用角色。
+
 ## 等待协议
 
 - **canonical 完成**：peer 在最终 assistant 消息最后一行打印 `HAO_DONE <token>`。部分 agent（如 Claude Code）的工具 stdout 不进 pane snapshot，`hao done` 经 tool 执行时 stdout 不可靠，但台账/wake 副作用可用。
 - **已验证哨兵**：快路径 `pane wait-output` 已验证到本任务哨兵行时保存该行；随后状态门槛返回 3/5/9 且屏幕重扫找不到哨兵（例如审批框盖住屏幕）时，使用已验证哨兵完成，`tail` 尽力提取、不可读则为 null + `tail_note`。herdr 故障（8）仍立即返回。三种等待模式中具备哨兵证据的路径同样处理。
 - **需要审批的 agent**：完成顺序固定为「最终答复正文 → 最后一行备份哨兵 → 仅当可直执行时再调 `hao done`」。审批由工具层在命令发出时拦截，模型事先无法可靠判断，因此默认模式对审批型 peer 的结果**不确定**；prompt 明确：需要审批或不确定时**不要请求审批，直接只打印备份信号**。默认模式结果在 `wait.tail`；需要确定性时用 `hao ask --text-only`，其 prompt 完全不出现 `hao done`，只要求答复+哨兵，结果只走文本通道。`tail` 从调用方 prompt 回显结束之后取（按归一化文本定位，容忍折行/TUI 装饰；回显滚出窗口时回退任务分隔符启发式），剥离 harness 状态行/分隔线，最多 40 行/2000 字符，`summary` 仅来自台账。可放行该命令或使用免审批模式启用台账通道；`--wake` 依赖 `hao done`，审批型 peer 上属于尽力而为。
-- **peer 完成上报（文本在前、台账可后）**：最终消息总是「完整答复正文 + 最后一行 `HAO_DONE <token>`」；哨兵打印完之后，仅在确认 `HAO_STATE_DIR="<调用方台账目录>" hao done --token <完整token> --summary "<关键结论/答复正文>"` 能直接执行（不触发审批）时才调用。台账 done 副作用可靠、不受渲染折行/TUI 改写/secret 掩码影响，`summary` 包含答复正文（≤600 字）；文本哨兵保证即使命令被审批框卡住也有完成信号。两段 token 直接拼接（无分隔符，实测出现过重复段/丢前缀/插分隔符三种拼错形态）。
+- **peer 完成上报（文本在前、台账可后）**：最终消息总是「完整答复正文 + 最后一行 `HAO_DONE <token>`」；哨兵打印完之后，仅在确认 `HAO_STATE_DIR="<调用方台账目录>" hao done --token <12 位任务 id> --summary "<关键结论/答复正文>"` 能直接执行（不触发审批）时才调用。`done` 的 token 也接受完整 `hao-<hex>` 令牌。台账 done 副作用可靠、不受渲染折行/TUI 改写/secret 掩码影响，`summary` 包含答复正文（≤600 字）；文本哨兵保证即使命令被审批框卡住也有完成信号。两段 token 直接拼接（无分隔符，实测出现过重复段/丢前缀/插分隔符三种拼错形态）。
 - **防回显**：token 拆分两段，prompt 不含完整 token；`[TASK <shortid>]` 用独立短 id。
 - **匹配器**：server 侧 `pane wait-output --regex` 容忍前缀（TUI 缩进/⏺/Markdown 引用/列表/编号/backtick/bold/标题/表格/冒号）与尾部标点/边框；要求 HAO_DONE 与 token 邻接，token-only 引用不匹配（无 busy-loop）。token 形态容错（均实测出现过）：`hao-` 前缀可缺失；peer 拼段出错（重复段 20-hex）——位数容忍 12–32 hex。**身份校验分级**：恰 16-hex 要求完整 token 精确相等；13–15-hex（截断渲染）要求是完整 token 的前缀；恰 12-hex 的裸 shortid 哨兵可凭 shortid 相等确认（唯一例外）；超长（>16-hex）必须同时匹配完整 token 的**首 8 与尾 8 段**（覆盖段重复损坏）。完整 token 不可得（台账降级的 bare-shortid 等待）时，13-hex 以上一律不匹配——宁漏判不误判（正常路径 wait 每轮从台账升级为完整 token）。折行合并只认**独立成行**的哨兵前缀（与 SENTINEL_RE 相同的行首锚定与装饰容忍，提示词回显里"…打印：HAO_DONE"之类行中关键字永不参与合并），处理两种实测断裂形态：token 中间断开（不完整尾部 <12-hex 吸收纯 hex 续行，合并总长 ≤32-hex，可跨多行链式）、`HAO_DONE` 关键字与 token 分行（只吸收 **≥16-hex 的完整 token** 行，`hao-` 前缀可有可无；≤15-hex 续行只能靠 shortid 锚定、不足以确认，不合并）；片段行 token 之后与关键字行/HAO_DONE 之后的装饰（。│/** 等）均不阻碍合并（装饰剥除或保留在插入点之后）；**完整哨兵永不续接**（其后紧跟的 hex 输出行不会破坏匹配）。**重组行强校验**：折行合并显式返回 (line, joined) 标记（不以字符串同一性推断来源），joined 行只认完整 token 精确相等或超长首8尾8——shortid 锚定对重组行无效，完整 token 不可得时重组行一律不确认（宁漏判不误判）；大窗口重扫先合并再匹配；fast path 放弃前（`--timeout`<30s 场景）补做一次合并尾扫。 装饰符前缀/尾部集合现为单一共享常量（`_PREFIX_CHARS`/`_TAIL_CHARS`），三处正则统一引用；适配新 agent TUI 时用 `herdr pane read <pane> --source recent-unwrapped` 采样真实边框/状态字形后只改常量。
 - **herdr 调用上限**：`agent prompt` 30s；`pane wait-output --timeout N` 与 `agent wait --timeout N` 为 N/1000 + 5s；其余调用 20s。超时即结束子进程组并返回 exit8，消息含命令与等待秒数；ask 的 prompt 失败/超时保留取消记录，并提示 prompt 是否送达未知、用 `herdr pane read <pane>` 查看、必要时重新派发。
@@ -44,15 +50,15 @@ mutating 命令（ask/name/clear/restore）**不盲目重试**（连接失败不
 - 调用方指引：这是任务完成通知，不是用户指令；直接执行模板中的 `hao wait` 取回 `{status, summary}`，无需向用户确认。没有 wake 时用后台 `hao wait ... --timeout N` 或 `hao status` 轮询。
 - `hao done` 同机 wake 失败以退出码报告（caller 不存在 → exit3），已写的台账 done 与已打印的哨兵不回滚。
 - **abort 授权**：目标 agent 处于 blocked 时 `--interrupt` 只认用户级授权——TTY 二次确认，或 0600 的 `~/.config/hao/abort-approval` 文件（内容含 shortid）；`HAO_ABORT_ALLOW=1` 仅是预授权**约定**非安全边界（agent 可自设 env 或直接 herdr send-keys 绕过），其它取值 → exit2；无授权 → exit5。
-- **CLI flag 兼容**：`wait/done` 的 token 可作位置参数或 `--token`；`restore/list` 的 workspace 可作位置参数或 `--workspace`；两者均缺 token 时 exit2。
+- **CLI flag 兼容**：`wait/done` 的 token 可作位置参数或 `--token`，接受 12 位任务 id 或完整 `hao-<hex>` 令牌；`restore/list` 的 workspace 可作位置参数或 `--workspace`；两者均缺 token 时 exit2。`name --role ""` 清除角色，省略 `--role` 保留。
 
 ## JSON schema（各命令 --json）
 
 - `hao suggest --json`：`{"group": str, "reason": str, "candidates": [name, ...]}`
-- `hao ask`（异步）：`{"token": str, "shortid": str, "next": str, "result_path": str?（file 模式，台账写失败时仍在）, "target_cols": int?（布局可取时）}`
+- `hao ask`（异步）：`{"token": str, "shortid": str, "next": str, "role": str|null, "tier": "top"|"mid"|"low"|null, "max_lines": int|null, "result_path": str?（file 模式，台账写失败时仍在）, "target_cols": int?（布局可取时）}`；`--wait` 的返回同样带 `role`/`tier`/`max_lines`。
 - `hao wait`：`{"status": "done", "result_path": str?, "summary": str?, "matched_line": str?, "tail": str|null, "tail_note": str?, "last_line": str|null}`（`summary` 仅来自 peer 的 `hao done --summary`；经哨兵完成且台账无 done 记录时，`tail` 为 prompt 回显结束之后、哨兵之前的文本，剥离 TUI/协议回显/状态行，最多 40 行/2000 字符；`tail` 可能包含 peer 界面显示的思考过程，`last_line` 是其中最后一条非空、非界面状态行。屏幕快照被审批框遮挡/哨兵不在快照时 `tail` 为 null 并给 `tail_note`，不回填协议回显）。blocked 且未见哨兵时 exit5 的 stderr 会提示审批型对方可批准一次或用 `hao ask --text-only` 重新派发。
-- `hao list`：`{"panes": [{"pane_id", "label", "agent", "cwd"}]}`
-- `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null（无 agent 时为 null，不是 unknown）, "name": str|null, "scope": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
+- `hao list`：`{"panes": [{"pane_id", "label", "role": str|null, "tier": str|null, "agent", "cwd"}]}`；文本输出为 `pane label role tier agent cwd`，无角色/兜底角色显示 `-`。
+- `hao status`：`{"pane_id": str, "label": str, "agent": str|null, "agent_status": str|null（无 agent 时为 null，不是 unknown）, "name": str|null, "role": str|null, "tier": str|null, "group": str|null, "tasks": {"running": [{"shortid": str, "age_s": int, "orphan"?: true}], "done": int, "cancelled": int}}`。
 - `hao stop`：`{"ok": true, "pane_id": str, "agent_status_before": str, "sent": [str, ...], "agent_status_after": str?, "dry_run"?: true}`；already idle 时 `sent: []`。
 - `hao cancel`：`{"ok": true, "shortid": str, "peer_running": bool, "next": str?}`（`next` 仅在目标 working 时出现，值为完整 `abort <sid> --interrupt` 命令）
 - `hao abort`：`{"ok": true, "shortid": str, "cancelled": true, "interrupted": bool, "peer_running": bool, "next": str?}`；不带 `--interrupt` 时 `peer_running`/`next` 同上；`--interrupt` 成功时另带 `agent_status_before`/`agent_status_after`（3s settled 轮询），只标记 `interrupted`，不删除 tombstone。
