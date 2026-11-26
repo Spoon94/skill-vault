@@ -29,7 +29,7 @@ def _load(path=None):
         try:
             here = os.path.dirname(os.path.abspath(__file__))
         except NameError:
-            here = os.getcwd()
+            here = os.path.dirname(os.path.abspath(_load.__code__.co_filename))
         for cand in (os.path.join(here, "..", "references", "names.md"),
                      os.path.join(os.getcwd(), "references", "names.md")):
             if os.path.exists(cand):
@@ -58,3 +58,41 @@ def _load(path=None):
 
 
 NAMES = _load()
+
+
+ROLE_RE = re.compile(r"^[a-z][a-z-]{6,19}$")
+TIERS = ("top", "mid", "low")
+_ROLE_ROW = re.compile(
+    r"^\|\s*`([a-z][a-z-]*)`\s*\|\s*(top|mid|low)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$")
+
+
+def _load_roles(path=None):
+    if path is None:
+        try:
+            here = os.path.dirname(os.path.abspath(__file__))
+        except NameError:
+            here = os.path.dirname(os.path.abspath(
+                _load_roles.__code__.co_filename))
+        for cand in (os.path.join(here, "..", "references", "roles.md"),
+                     os.path.join(os.getcwd(), "references", "roles.md")):
+            if os.path.exists(cand):
+                path = cand
+                break
+    roles = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            m = _ROLE_ROW.match(line)
+            if m:
+                roles[m.group(1)] = {"tier": m.group(2), "group": m.group(3), "duty": m.group(4)}
+    for role in roles:
+        if not ROLE_RE.match(role):
+            raise ValueError(f"invalid role name: {role!r}")
+    return roles
+
+
+ROLES = _load_roles()
+
+
+def tier_of(role):
+    meta = ROLES.get(role or "")
+    return meta["tier"] if meta else None

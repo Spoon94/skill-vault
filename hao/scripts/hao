@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 
-HAO_LABEL_RE = re.compile(r"^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,11}))?$")
+HAO_LABEL_RE = re.compile(r"^hao-([a-z]{4,6})(?:-([a-z0-9][a-z0-9-]{0,19}))?$")
 PANE_ID_RE = re.compile(r"^w\w+:p\w+$")
 _PREFIX_CHARS = r"⏺●✻│⎿`>*+\-•·#┃┆┇┊┄┈─━└┘✓✔"
 _TAIL_CHARS = r"\s.。!！│`*|┃┆┇┊┄┈─━└┘✓✔"
@@ -249,13 +249,16 @@ def validate_name(name):
     return bool(re.fullmatch(r"[a-z]{4,6}", name or ""))
 
 
-def make_label(name, scope=None):
-    return f"hao-{name}" + (f"-{scope}" if scope else "")
+def make_label(name, role=None):
+    return f"hao-{name}" + (f"-{role}" if role else "")
 
 
-def label_scope(label):
+def label_role(label):
     m = HAO_LABEL_RE.match(label or "")
     return m.group(2) if m else None
+
+
+label_scope = label_role  # legacy alias
 
 
 # ---------------------------------------------------------------- name/clear
