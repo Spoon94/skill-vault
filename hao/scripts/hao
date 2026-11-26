@@ -192,7 +192,7 @@ def _resolve_target_ex(target, machine=None):
     if rc != 0:
         return target, herdr_error_rc(err, 8)
     try:
-        agents = json.loads(out)["result"].get("agents", []) if out else []
+        agents = json.loads(out)["result"]["agents"] if out else []
     except Exception:
         return target, fail(8, "herdr returned invalid JSON for agent list")
     for a in agents:
@@ -278,7 +278,7 @@ def cmd_name(target, name, role=None, force=False, dry_run=False, machine=None):
     if rc != 0:
         return herdr_error_rc(err, 8)
     try:
-        agents = json.loads(out)["result"].get("agents", []) if out else []
+        agents = json.loads(out)["result"]["agents"] if out else []
     except Exception:
         return fail(8, "herdr returned invalid JSON for agent list")
     for a in agents:
@@ -289,7 +289,7 @@ def cmd_name(target, name, role=None, force=False, dry_run=False, machine=None):
     if rcp != 0:
         return herdr_error_rc(errp, 8)
     try:
-        pane_rows = json.loads(outp)["result"].get("panes", []) if outp else []
+        pane_rows = json.loads(outp)["result"]["panes"] if outp else []
     except Exception:
         return fail(8, "herdr returned invalid JSON for pane list")
     if rcp == 0 and outp:

@@ -14,7 +14,7 @@ def fake_herdr(label):
             return 0, json.dumps({"result": {"pane": {"pane_id": "w2:p9", "label": label}}}), ""
         if args[:2] == ["agent", "get"]:
             return 1, "", '{"error":{"code":"agent_not_found"}}'   # shell pane: label only
-        return 0, '{"result":{}}', ""
+        return 0, json.dumps({"result": {"agents": [], "panes": []}}), ""
     return fake, calls
 
 
@@ -51,6 +51,32 @@ class TestNameRole(unittest.TestCase):
         hao.run_herdr = lambda args, machine=None: (0, '{"result":{}}', "")
         self.assertEqual(hao.cmd_name("w2:p9", "moth", "foo", False, False), 2)
         self.assertIn("frontend-developer", hao._ERROR_DETAIL)
+        hao._ERROR_DETAIL = None
+
+    def test_missing_list_key_exits_8(self):
+        cases = {
+            "agents": [(["agent", "list"], '{"result":{}}')],
+            "panes": [(["agent", "list"], '{"result":{"agents":[]}}'),
+                      (["pane", "list"], '{"result":{}}')],
+        }
+        for key, responses in cases.items():
+            with self.subTest(key=key):
+                def fake(args, machine=None):
+                    for prefix, out in responses:
+                        if args[:2] == prefix:
+                            return 0, out, ""
+                    return 0, json.dumps({"result": {"agents": [], "panes": []}}), ""
+                hao.run_herdr = fake
+                hao._ERROR_DETAIL = None
+                self.assertEqual(hao.cmd_name("w2:p9", "moth", "reviewer", False, False), 8)
+                self.assertIn("invalid JSON", hao._ERROR_DETAIL)
+                hao._ERROR_DETAIL = None
+
+    def test_non_json_list_exits_8(self):
+        hao.run_herdr = lambda args, machine=None: (0, "not json", "")
+        hao._ERROR_DETAIL = None
+        self.assertEqual(hao.cmd_name("w2:p9", "moth", "reviewer", False, False), 8)
+        self.assertIn("invalid JSON", hao._ERROR_DETAIL)
         hao._ERROR_DETAIL = None
 
     def test_rerun_without_role_keeps_existing_role(self):
