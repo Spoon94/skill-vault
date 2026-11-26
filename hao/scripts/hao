@@ -1057,11 +1057,7 @@ _MATCH_TAIL = _TUI_BORDERS | _TUI_MARKERS | set("✓✔")
 
 def _normalize_for_match(line):
     line = _strip_tui_line(line)
-    while line and line[0] in _MATCH_DECO:
-        line = line[1:].lstrip()
-    while line and line[-1] in _MATCH_TAIL:
-        line = line[:-1].rstrip()
-    return re.sub(r"\s+", "", line)
+    return re.sub(r"[\s" + re.escape("".join(sorted(_MATCH_DECO | _MATCH_TAIL))) + r"]+", "", line)
 
 
 def _prompt_end_line(lines, prompt):

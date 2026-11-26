@@ -34,15 +34,17 @@ def clean(text):
 class TestR22PromptBoundary(unittest.TestCase):
     def _assert_answer(self, text_only, answer):
         prompt = hao.build_prompt("task body", TOKEN, text_only=text_only)
-        lines = echo_prompt(prompt)
-        lines += ["│ " + line + " │" for line in answer]
-        lines.append("│ HAO_DONE " + TOKEN + " │")
-        text = "\n".join(lines)
-        tail = hao._tail_from_pane_text(text, TOKEN, SID, prompt=prompt)
-        self.assertEqual(tail, "\n".join(answer))
         protocol = "以下完成上报是协议步骤"
         self.assertIn(protocol, prompt)
-        self.assertNotIn(clean(protocol), clean(tail))
+        for width in range(8, 81):
+            with self.subTest(width=width):
+                lines = echo_prompt(prompt, width=width)
+                lines += ["│ " + line + " │" for line in answer]
+                lines.append("│ HAO_DONE " + TOKEN + " │")
+                text = "\n".join(lines)
+                tail = hao._tail_from_pane_text(text, TOKEN, SID, prompt=prompt)
+                self.assertEqual(tail, "\n".join(answer))
+                self.assertNotIn(clean(protocol), clean(tail or ""))
 
     def test_default_prompt_wrapped_and_decorated(self):
         self._assert_answer(False, ["answer line one", "answer line two"])
@@ -103,13 +105,15 @@ class TestR22PromptBoundary(unittest.TestCase):
 
     def test_protocol_echo_absent_even_with_ansi(self):
         prompt = hao.build_prompt("task body", TOKEN)
-        decorated = [("\x1b[2m│ " + line + " │\x1b[0m")
-                     for line in echo_prompt(prompt)]
-        text = "\n".join(decorated + ["│ answer │",
-                                      "│ HAO_DONE " + TOKEN + " │"])
-        tail = hao._tail_from_pane_text(text, TOKEN, SID, prompt=prompt)
-        self.assertEqual(tail, "answer")
-        self.assertNotIn(clean("完成时，将令牌"), clean(tail))
+        for width in range(8, 81):
+            with self.subTest(width=width):
+                decorated = [("\x1b[2m│ " + line + " │\x1b[0m")
+                             for line in echo_prompt(prompt, width=width)]
+                text = "\n".join(decorated + ["│ answer │",
+                                              "│ HAO_DONE " + TOKEN + " │"])
+                tail = hao._tail_from_pane_text(text, TOKEN, SID, prompt=prompt)
+                self.assertEqual(tail, "answer")
+                self.assertNotIn(clean("完成时，将令牌"), clean(tail or ""))
 
 
 if __name__ == "__main__":
