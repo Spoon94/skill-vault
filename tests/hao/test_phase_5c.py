@@ -96,5 +96,69 @@ class TestAWaitsSurviveHerdrTimeout(WaitCase):
         self.assertEqual(calls["wait"], 1)
 
 
+STALE = "hao-" + "deadbeef" + "00000000"
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 1000.0
+
+    def time(self):
+        return self.t
+
+    def sleep(self, seconds):
+        self.t += seconds
+
+
+class TestBStaleSentinel(WaitCase):
+    def _stub(self, read_lines):
+        calls = {"get": 0, "wait": 0, "wait_output": 0, "read": 0}
+
+        def fake(args, machine=None):
+            if args[:2] == ["agent", "get"]:
+                calls["get"] += 1
+                return 0, json.dumps({"result": {"agent": {
+                    "agent_status": "done",
+                    "state_change_seq": 2}}}), ""
+            if args[:2] == ["pane", "wait-output"]:
+                calls["wait_output"] += 1
+                return 0, json.dumps({"result": {
+                    "matched_line": f"HAO_DONE {STALE}"}}), ""
+            if args[:2] == ["pane", "read"]:
+                calls["read"] += 1
+                return 0, json.dumps({"result": {"read": {
+                    "text": "\n".join(read_lines)}}}), ""
+            if args[:2] == ["agent", "wait"]:
+                calls["wait"] += 1
+                return 1, "", HERDR_TIMEOUT_JSON
+            return 0, '{"result":{}}', ""
+        return fake, calls
+
+    def _wait(self, read_lines, fast_seconds=1.0, timeout=10):
+        clock = FakeClock()
+        fake, calls = self._stub(read_lines)
+        with mock.patch.object(hao, "run_herdr", side_effect=fake), \
+                mock.patch.object(hao, "FAST_PATH_SECONDS", fast_seconds), \
+                mock.patch.object(hao.time, "time", clock.time), \
+                mock.patch.object(hao.time, "sleep", clock.sleep):
+            result = hao.cmd_wait("w2:p9", TOKEN, timeout)
+        return result, calls
+
+    def test_stale_sentinel_triggers_rescan_in_the_fast_path(self):
+        result, calls = self._wait([f"HAO_DONE {STALE}",
+                                    f"HAO_DONE {TOKEN}"])
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["status"], "done")
+        self.assertEqual(calls["wait"], 0)
+        self.assertLessEqual(calls["get"], 4)
+
+    def test_rescan_without_the_current_sentinel_keeps_waiting(self):
+        result, calls = self._wait([f"HAO_DONE {STALE}"],
+                                   fast_seconds=2.0, timeout=4)
+        self.assertEqual(result, 4)
+        self.assertGreaterEqual(calls["wait_output"], 2)
+        self.assertGreaterEqual(calls["get"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

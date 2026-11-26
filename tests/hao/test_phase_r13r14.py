@@ -357,7 +357,7 @@ class TestR15SingleAgentGet(unittest.TestCase):
         with mock.patch.object(hao, "run_herdr",
                                side_effect=self._stub(events)), \
                 mock.patch.object(hao, "_sentinel_check",
-                                  return_value=(None, None)), \
+                                  return_value=(None, None, False)), \
                 mock.patch.object(hao, "_sentinel_scan_tail",
                                   return_value=(None, None)), \
                 mock.patch.object(hao.time, "sleep", return_value=None), \

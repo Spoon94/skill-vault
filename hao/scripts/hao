@@ -927,22 +927,27 @@ def _token_matches(matched, token, sid, joined=False):
 
 
 def _sentinel_check(pane, token, sid, machine):
-    """Quick probe; returns (matched_line | None, error_rc | None)."""
+    """Quick probe; returns (matched_line | None, error_rc | None, stale).
+
+    stale=True means wait-output matched a sentinel line that belongs to
+    another task; the caller should rescan the tail for the current one."""
     rc, out, err = run_herdr(
         ["pane", "wait-output", pane, "--regex", SENTINEL_RE.pattern, "--timeout", "1000"],
         machine)
     if rc != 0:
         if _herdr_err_code(err) == "timeout":
-            return None, None  # normal "not yet"
-        return None, herdr_error_rc(err, 8)
+            return None, None, False  # normal "not yet"
+        return None, herdr_error_rc(err, 8), False
     try:
         ml = json.loads(out).get("result", {}).get("matched_line", "") or ""
     except Exception:
         ml = out
     m = SENTINEL_RE.search(ml)
     if not m:
-        return None, None
-    return (ml, None) if _token_matches(m.group(1), token, sid) else (None, None)
+        return None, None, False
+    if _token_matches(m.group(1), token, sid):
+        return ml, None, False
+    return None, None, True
 
 
 _PREFIX_LINE_RE = re.compile(
@@ -1274,9 +1279,19 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
         if time.time() - start < FAST_PATH_SECONDS:
-            ml, errc = _sentinel_check(pane, token, sid, machine)
+            ml, errc, stale = _sentinel_check(pane, token, sid, machine)
             if errc is not None:
                 return errc
+            if stale:
+                # wait-output returns the first sentinel on screen, which
+                # may be an older task's. It returned instantly, so pause
+                # for the time a real 1s wait would have taken, then scan
+                # the tail for this task's sentinel in the same round.
+                time.sleep(1)
+                last, serr = _sentinel_scan_tail(pane, token, sid, machine)
+                if serr is not None:
+                    return serr
+                ml = last
             if ml:
                 sentinel_seen = True
                 validated_ml = ml
@@ -1409,7 +1424,7 @@ def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
-        ml, errc = _sentinel_check(pane, token, sid, machine)
+        ml, errc, _stale = _sentinel_check(pane, token, sid, machine)
         if errc is not None:
             return errc
         if ml:

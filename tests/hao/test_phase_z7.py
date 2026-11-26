@@ -55,7 +55,7 @@ class TestZ7NoRecordTimeout(unittest.TestCase):
             with mock.patch.multiple(
                     hao,
                     _agent_status_gate=lambda *a, **k: (None, "idle", {}),
-                    _sentinel_check=lambda *a, **k: (None, None),
+                    _sentinel_check=lambda *a, **k: (None, None, False),
                     _sentinel_scan_tail=lambda *a, **k: (None, None),
                     _confirm_sentinel=lambda *a, **k: None):
                 rc, _out, err = run_cli(
@@ -79,7 +79,7 @@ class TestZ7NoRecordTimeout(unittest.TestCase):
             with mock.patch.object(hao, "run_herdr", side_effect=stub), \
                     mock.patch.multiple(
                         hao,
-                        _sentinel_check=lambda *a, **k: (None, None),
+                        _sentinel_check=lambda *a, **k: (None, None, False),
                         _sentinel_scan_tail=lambda *a, **k: (None, None),
                         _confirm_sentinel=lambda *a, **k: None):
                 rc, _out, err = run_cli(
