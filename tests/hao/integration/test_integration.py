@@ -43,10 +43,10 @@ def _main():
 
     try:
         # name on shell pane: label set even though agent rename may fail (no agent)
-        rc = hao.cmd_name(pane, "hawk", "api", False, False)
+        rc = hao.cmd_name(pane, "hawk", "reviewer", False, False)
         rc2, out2, _ = hao.run_herdr(["pane", "get", pane])
         lbl = json.loads(out2)["result"]["pane"].get("label")
-        assert lbl == "hao-hawk-api", f"label not set: {lbl} (rc={rc})"
+        assert lbl == "hao-hawk-reviewer", f"label not set: {lbl} (rc={rc})"
         print("label set ok:", lbl)
 
         # restore dry-run must not error

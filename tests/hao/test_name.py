@@ -41,7 +41,7 @@ class TestName(unittest.TestCase):
                 return 0, '{"result":{"pane":{"pane_id":"w2:p9","label":""}}}', ""
             return 0, "{}", ""
         with mock.patch.object(hao, "run_herdr", side_effect=stub):
-            self.assertEqual(cmd_name("w2:p9", "hawk", "api", False, True), 0)
+            self.assertEqual(cmd_name("w2:p9", "hawk", "reviewer", False, True), 0)
 
     def test_clear_dry_run(self):
         def stub(args, machine=None):

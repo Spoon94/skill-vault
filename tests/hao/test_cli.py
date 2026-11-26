@@ -53,7 +53,7 @@ class TestParser(unittest.TestCase):
 
     def test_aliases(self):
         p = build_parser()
-        a = p.parse_args(["n", "w2:p9", "hawk", "--scope", "api"])
+        a = p.parse_args(["n", "w2:p9", "hawk", "--role", "reviewer"])
         self.assertEqual(a.name, "hawk")
         a2 = p.parse_args(["s", "审查 PR"])
         self.assertEqual(a2.task, "审查 PR")

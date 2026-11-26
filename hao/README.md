@@ -31,9 +31,9 @@ hao/
 
 | 命令 | 作用（完整说明见 `hao <cmd> --help`） |
 |---|---|
-| `hao name <target> <name> [--scope S] [--force] [--dry-run] [--machine M] [--json]` | agent 改名 + pane label 设为 `hao-<name>[-scope]`；scope 默认沿用 |
+| `hao name <target> <name> [--role ROLE] [--force] [--dry-run] [--machine M] [--json]` | agent 改名 + pane label 设为 `hao-<name>[-role]`；role 默认沿用 |
 | `hao clear <target> [--force] [--dry-run] [--machine M] [--json]` | 清除 hao- label 与 agent name |
-| `hao suggest "<task>" [--scope S] [--custom NAME] [--live-names N...] [--label-roles L...] [--machine M] [--json]` | 词表选名；`--custom` 校验自定义名（保留字/灰词） |
+| `hao suggest "<task>" [--custom NAME] [--live-names N...] [--label-roles L...] [--machine M] [--json]` | 词表选名；`--custom` 校验自定义名（保留字/灰词） |
 | `hao restore [--workspace W\|--all] [--adopt\|--no-adopt] [--dry-run] [--pick PANE] [--machine M] [--json]` | 从 label 恢复名字并输出摘要 |
 | `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--text-only] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--text-only` 不给对端任何 hao done 命令；`--wake` 异步唤醒；窄 pane（<40 列）警告并给 `target_cols`；`--json` no-op |
 | `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
@@ -63,7 +63,7 @@ hao/
 python3 <skill目录>/scripts/hao doctor    # 0. 自检
 # 1. 给 agent 取名
 hao suggest "审查 PR"            # → 验证审阅: hawk, lens, prism
-hao name w2:p9 hawk --scope api  # → agent hawk + label hao-hawk-api
+hao name w2:p9 hawk --role reviewer  # → agent hawk + label hao-hawk-reviewer
 
 # 2. 派活并等完成
 hao ask w2:p9 "审查 PR 7" --wait  # → {"status":"done","summary":"审查结论：...","matched_line":"HAO_DONE ..."}

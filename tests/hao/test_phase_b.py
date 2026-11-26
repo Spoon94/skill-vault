@@ -108,18 +108,18 @@ class TestPhaseBName(unittest.TestCase):
         self.assertIn("hao-forge-ops", renames)
         self.assertEqual(err, "")
 
-    def test_name_scope_empty_clears(self):
+    def test_name_explicit_role(self):
         renames = []
         with mock.patch.object(hao, "run_herdr", side_effect=name_stub(renames=renames)):
-            rc, _, _ = run_cli(["name", "w2:p9", "forge", "--scope", ""])
+            rc, _, _ = run_cli(["name", "w2:p9", "forge", "--role", "reviewer"])
         self.assertEqual(rc, 0)
-        self.assertIn("hao-forge", renames)
+        self.assertIn("hao-forge-reviewer", renames)
 
     def test_name_dry_run_marks_kept(self):
         with mock.patch.object(hao, "run_herdr", side_effect=name_stub()):
             rc, out, _ = run_cli(["name", "w2:p9", "forge", "--dry-run"])
         self.assertEqual(rc, 0)
-        self.assertIn("scope=ops (kept)", out)
+        self.assertIn("role=ops (kept)", out)
 
     def test_name_json(self):
         renames = []

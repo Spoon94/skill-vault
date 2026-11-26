@@ -107,7 +107,7 @@ class TestR10MachinePreflight(unittest.TestCase):
     def test_suggest_non_json_does_not_crash(self):
         with mock.patch.object(hao, "run_herdr",
                                return_value=(0, "not json", "")):
-            rc = hao.cmd_suggest("task", None, True, None, None, None, None)
+            rc = hao.cmd_suggest("task", True, None, None, None, None)
         self.assertEqual(rc, 8)
 
     def test_list_non_json_does_not_crash(self):

@@ -192,7 +192,7 @@ def _resolve_target_ex(target, machine=None):
     if rc != 0:
         return target, herdr_error_rc(err, 8)
     try:
-        agents = json.loads(out)["result"]["agents"] if out else []
+        agents = json.loads(out)["result"].get("agents", []) if out else []
     except Exception:
         return target, fail(8, "herdr returned invalid JSON for agent list")
     for a in agents:
@@ -263,13 +263,14 @@ label_scope = label_role  # legacy alias
 
 # ---------------------------------------------------------------- name/clear
 
-def cmd_name(target, name, scope, force, dry_run, machine=None):
+def cmd_name(target, name, role=None, force=False, dry_run=False, machine=None):
     if not validate_name(name):
         _set_error(f"invalid name {name!r}; expected ^[a-z]{{4,6}}$")
         return 2
-    if scope and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,11}", scope):
-        _set_error("invalid scope; expected [a-z0-9][a-z0-9-]{0,11}")
-        return 2
+    nm = _load_module("names", "names.py")
+    if role is not None and role not in nm.ROLES:
+        return fail(2, f"unknown role {role!r}; available roles: " +
+                    ", ".join(sorted(nm.ROLES)))
     pane, resolve_rc = _resolve_target_ex(target, machine)
     if resolve_rc:
         return resolve_rc
@@ -277,7 +278,7 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
     if rc != 0:
         return herdr_error_rc(err, 8)
     try:
-        agents = json.loads(out)["result"]["agents"] if out else []
+        agents = json.loads(out)["result"].get("agents", []) if out else []
     except Exception:
         return fail(8, "herdr returned invalid JSON for agent list")
     for a in agents:
@@ -288,7 +289,7 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
     if rcp != 0:
         return herdr_error_rc(errp, 8)
     try:
-        pane_rows = json.loads(outp)["result"]["panes"] if outp else []
+        pane_rows = json.loads(outp)["result"].get("panes", []) if outp else []
     except Exception:
         return fail(8, "herdr returned invalid JSON for pane list")
     if rcp == 0 and outp:
@@ -308,18 +309,20 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
         except Exception:
             return fail(8, "herdr returned invalid JSON for pane get")
     kept = False
-    if scope is None:
-        existing = label_scope(cur)
+    if role is None:
+        existing = label_role(cur)
         if existing:
-            scope = existing
+            role = existing
             kept = True
-    label = make_label(name, scope)
+    tier = nm.tier_of(role)
+    label = make_label(name, role)
     if dry_run:
         if _JSON_OUTPUT:
             _json_out({"ok": True, "dry_run": True, "pane_id": pane,
-                       "name": name, "scope": scope, "label": label, "kept": kept})
+                       "name": name, "role": role, "tier": tier,
+                       "label": label, "kept": kept})
         else:
-            suffix = f" (scope={scope} (kept))" if kept else ""
+            suffix = f" (role={role} (kept))" if kept else ""
             print(f"would set label {label} and agent name {name} on {pane}{suffix}")
         return 0
     if cur and not HAO_LABEL_RE.match(cur) and not force:
@@ -332,7 +335,8 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
         if _herdr_err_code(err2) == "agent_not_found":
             if _JSON_OUTPUT:
                 _json_out({"ok": True, "pane_id": pane, "name": name,
-                           "scope": scope, "label": label, "kept": kept})
+                           "role": role, "tier": tier, "label": label,
+                           "kept": kept})
             return 0  # shell-only pane: label set, no agent to rename
         return herdr_error_rc(err2, 8)
     rc3, _, err3 = run_herdr(["agent", "rename", pane, name], machine)
@@ -340,7 +344,7 @@ def cmd_name(target, name, scope, force, dry_run, machine=None):
         return herdr_error_rc(err3, 8)
     if _JSON_OUTPUT:
         _json_out({"ok": True, "pane_id": pane, "name": name,
-                   "scope": scope, "label": label, "kept": kept})
+                   "role": role, "tier": tier, "label": label, "kept": kept})
     return 0
 
 
@@ -550,7 +554,7 @@ def _load_module(name, filename):
     return mod
 
 
-def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machine=None,
+def cmd_suggest(task, json_out, live_names=None, label_roles=None, machine=None,
                 custom=None):
     nm = _load_module("names", "names.py")
     NAMES, RESERVED, GRAY = nm.NAMES, nm.RESERVED, nm.GRAY
@@ -560,8 +564,7 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
             return 2
         cands = [custom]
         out = {"group": "custom", "reason": "custom name",
-               "candidates": cands, "scope": scope,
-               "suggested_label": make_label(custom, scope) if scope else None}
+               "candidates": cands}
         if json_out:
             return out
         print(f"custom: {custom}")
@@ -608,8 +611,6 @@ def cmd_suggest(task, scope, json_out, live_names=None, label_roles=None, machin
         "group": best,
         "reason": f"keywords matched {best_score}",
         "candidates": cands[:3],
-        "scope": scope,
-        "suggested_label": make_label(cands[0], scope) if cands and scope else None,
     }
     if json_out:
         return out
@@ -2063,13 +2064,19 @@ def cmd_status(target, text_mode=False):
     agent = (ag or {}).get("agent") or (pane_obj or {}).get("agent")
     agent_status = ag.get("agent_status") if ag is not None else None
     name = (ag or {}).get("name")
+    nm = _load_module("names", "names.py")
+    role = label_role(label)
+    tier = nm.tier_of(role)
+    group = nm.ROLES[role]["group"] if role in nm.ROLES else None
     info = {
         "pane_id": pane,
         "label": label,
         "agent": agent,
         "agent_status": agent_status,
         "name": name,
-        "scope": label_scope(label),
+        "role": role,
+        "tier": tier,
+        "group": group,
         "tasks": _status_tasks(pane),
     }
     if _JSON_OUTPUT and not text_mode:
@@ -2078,7 +2085,7 @@ def cmd_status(target, text_mode=False):
         print(f"pane: {pane}")
         print(f"label: {label or '-'}")
         print(f"agent: {agent or '-'} status: {agent_status or '-'} name: {name or '-'}")
-        print(f"scope: {info['scope'] or '-'}")
+        print(f"role: {role or '-'} tier: {tier or '-'} group: {group or '-'}")
         tasks = info["tasks"]
         print(f"tasks: running={len(tasks['running'])} done={tasks['done']} "
               f"cancelled={tasks['cancelled']}")
@@ -2175,16 +2182,20 @@ def cmd_list(workspace=None, machine=None, json_out=False):
         pane_rows = json.loads(out)["result"]["panes"]
     except Exception:
         return fail(8, "herdr returned invalid JSON for pane list")
+    nm = _load_module("names", "names.py")
     for p in pane_rows:
         m = HAO_LABEL_RE.match(p.get("label") or "")
         if m:
+            role = m.group(2)
             rows.append({"pane_id": p["pane_id"], "label": p.get("label"),
+                         "role": role, "tier": nm.tier_of(role),
                          "agent": p.get("agent"), "cwd": p.get("cwd")})
     if json_out:
         print(json.dumps({"panes": rows}, ensure_ascii=False))
     else:
         for r in rows:
-            print(r["pane_id"], r["label"], r["agent"], r["cwd"])
+            print(r["pane_id"], r["label"], r["role"] or "-",
+                  r["tier"] or "-", r["agent"], r["cwd"])
     return 0
 
 
@@ -2351,7 +2362,7 @@ def build_parser():
     p = argparse.ArgumentParser(
         prog="hao",
         description="hao — tiered agent collaboration CLI",
-        epilog=("Examples: hao suggest \"review PR\"; hao name w2:p9 hawk --scope api; "
+        epilog=("Examples: hao suggest \"review PR\"; hao name w2:p9 hawk --role reviewer; "
                 "hao ask w2:p9 \"review\" --wait; hao stop w2:p9; "
                 "hao status w2:p9 --json. Exit codes: references/protocol.md"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2363,13 +2374,13 @@ def build_parser():
         sp.set_defaults(func=func)
         return sp
 
-    sp = add("name", lambda a: cmd_name(a.target, a.name, a.scope, a.force,
+    sp = add("name", lambda a: cmd_name(a.target, a.name, a.role, a.force,
                                          a.dry_run, a.machine), ["n"],
-             "Rename an agent and set its hao- pane label; keeps existing scope unless overridden.")
+             "Rename an agent and set its hao- pane label; keeps existing role unless overridden.")
     sp.add_argument("target", help="pane id, label, or agent name")
     sp.add_argument("name", help="new agent name matching ^[a-z]{4,6}$")
-    sp.add_argument("--scope", metavar="SCOPE",
-                    help="label scope; omit to keep current scope, empty string to clear")
+    sp.add_argument("--role", metavar="ROLE",
+                    help="role from references/roles.md, carried in the pane label")
     sp.add_argument("--force", action="store_true", help="allow replacing a non-hao label")
     sp.add_argument("--dry-run", action="store_true", help="show the planned label/name only")
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
@@ -2483,12 +2494,11 @@ def build_parser():
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
     sp.add_argument("--json", action="store_true", help="emit one JSON result line")
 
-    sp = add("suggest", lambda a: cmd_suggest(a.task, a.scope, a.json,
-                                               a.live_names, a.label_roles,
-                                               a.machine, a.custom), ["s"],
+    sp = add("suggest", lambda a: cmd_suggest(a.task, a.json, a.live_names,
+                                               a.label_roles, a.machine,
+                                               a.custom), ["s"],
              "Suggest short agent names from a keyword-matched pool.")
     sp.add_argument("task", help="task description used for keyword matching")
-    sp.add_argument("--scope", metavar="SCOPE", help="optional label scope")
     sp.add_argument("--json", action="store_true", help="emit JSON only")
     sp.add_argument("--live-names", nargs="*", metavar="NAME",
                     help="names already live; overrides automatic lookup")

@@ -235,8 +235,11 @@ class TestPhaseAStatus(unittest.TestCase):
                 data = json.loads(out)
                 self.assertEqual(rc, 0)
                 self.assertEqual(set(data), {"pane_id", "label", "agent",
-                                             "agent_status", "name", "scope", "tasks"})
-                self.assertEqual(data["scope"], "ops")
+                                             "agent_status", "name", "role",
+                                             "tier", "group", "tasks"})
+                self.assertEqual(data["role"], "ops")
+                self.assertIsNone(data["tier"])
+                self.assertIsNone(data["group"])
                 self.assertEqual(data["tasks"]["running"][0]["shortid"],
                                  "abcd12345678")
                 self.assertEqual(data["tasks"]["done"], 1)
