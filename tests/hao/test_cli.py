@@ -455,6 +455,8 @@ class TestWriteDegradation(unittest.TestCase):
                 return 0, '{"result":{}}', ""
             if args[:2] == ["agent", "get"]:
                 return 1, "", '{"error":{"code":"agent_not_found"}}'
+            if args[:2] == ["pane", "get"]:
+                return 0, '{"result":{}}', ""
             return self.orig_run(args, machine)
 
         hao.run_herdr = stub
@@ -475,6 +477,8 @@ class TestWriteDegradation(unittest.TestCase):
                 return 0, '{"result":{}}', ""
             if args[:2] == ["agent", "get"]:
                 return 1, "", '{"error":{"code":"agent_not_found"}}'
+            if args[:2] == ["pane", "get"]:
+                return 0, '{"result":{}}', ""
             return self.orig_run(args, machine)
 
         self.lm.Ledger = BoomLedger

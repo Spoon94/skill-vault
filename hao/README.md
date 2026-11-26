@@ -35,7 +35,7 @@ hao/
 | `hao clear <target> [--force] [--dry-run] [--machine M] [--json]` | 清除 hao- label 与 agent name |
 | `hao suggest "<task>" [--custom NAME] [--live-names N...] [--label-roles L...] [--machine M] [--json]` | 词表选名；`--custom` 校验自定义名（保留字/灰词） |
 | `hao restore [--workspace W\|--all] [--adopt\|--no-adopt] [--dry-run] [--pick PANE] [--machine M] [--json]` | 从 label 恢复名字并输出摘要 |
-| `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--text-only] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--text-only` 不给对端任何 hao done 命令；`--wake` 异步唤醒；窄 pane（<40 列）警告并给 `target_cols`；`--json` no-op |
+| `hao ask <target> "<task>" [--wait] [--mode M] [--wake TARGET] [--timeout S] [--strict-ledger] [--text-only] [--max-lines N] [--machine M] [--json]` | 发任务 + 拆分哨兵；`--text-only` 不给对端任何 hao done 命令；`--wake` 异步唤醒；窄 pane（<40 列）警告并给 `target_cols`；`--json` no-op |
 | `hao wait <target> [--token T] [--timeout S] [--mode M] [--no-agent] [--accept-unknown] [--machine M] [--json]` | 等完成（哨兵/台账/agent wait）；`--json` no-op |
 | `hao done [--token T] [--summary TEXT] [--final] [--json]` | 台账 done + 打印哨兵；可读台账但无记录 → exit3 无哨兵；summary 是结果载荷 |
 | `hao cancel <t> [--json]` / `hao abort <t> [--interrupt] [--json]` | cancel 只取消等待、**不停止对方**；working 时提示 `abort --interrupt`（blocked 需授权） |

@@ -535,7 +535,7 @@ def _load_module(name, filename):
         base = os.path.dirname(os.path.abspath(__file__))
     except NameError:
         # hao itself loaded via SourceFileLoader: derive from this code object
-        base = os.path.dirname(os.path.abspath(_load_module.__code__.co_filename))
+        base = os.path.dirname(os.path.abspath(_LOAD_MODULE_SELF))
     try:
         _self = os.path.join(base, "hao")
         if os.path.islink(_self):
@@ -552,6 +552,9 @@ def _load_module(name, filename):
     loader.exec_module(mod)
     sys.modules[name] = mod
     return mod
+
+
+_LOAD_MODULE_SELF = _load_module.__code__.co_filename
 
 
 def cmd_suggest(task, json_out, live_names=None, label_roles=None, machine=None,
@@ -620,39 +623,62 @@ def cmd_suggest(task, json_out, live_names=None, label_roles=None, machine=None,
 
 # ---------------------------------------------------------------- ask/wait/done
 
-def build_prompt(task, token, result_path=None, text_only=False):
+TIER_MAX_LINES = {"top": 15, "mid": 40, "low": None}
+
+
+def _effective_cap(tier, max_lines):
+    if max_lines is None:
+        return TIER_MAX_LINES.get(tier)
+    return None if max_lines == 0 else max_lines
+
+
+def build_prompt(task, token, result_path=None, text_only=False, tier=None, max_lines=None):
     h = token[4:]
     half = len(h) // 2
     shortid = h[:12]
-    lines = [
-        f"[TASK {shortid}]",
-        "--- 任务开始 ---",
-        task,
-        "--- 任务结束 ---",
-        "",
-        "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
-        f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
-    ]
-    if text_only:
-        lines += [
-            "完成顺序：输出完最终答复的全部正文后，在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
-            "不要调用任何命令；只输出最终答复和最后一行哨兵。",
+    cap = _effective_cap(tier, max_lines)
+    head = [f"[TASK {shortid}]", "--- 任务开始 ---", task, "--- 任务结束 ---", ""]
+    if tier == "top":
+        # compact brief: the peer is the most expensive model
+        limit = f"正文不超过 {cap} 行；" if cap else ""
+        lines = head + [
+            "完成规则（协议步骤，不计入任务要求的回复内容）：先给结论，再列必须处理的事项，"
+            f"{limit}最后一行打印 HAO_DONE + 一个空格 + hao- + {h[:half]} + {h[half:]}（两段直接拼接，无分隔符）。",
         ]
+        if not text_only:
+            lines.append(
+                "打印哨兵之后，只有确认命令能直接执行（不会向用户请求审批）时才调用："
+                f"{hao_command()} done --token <完整令牌> --summary \"<结论>\"；"
+                "不确定或需要审批就只打印哨兵，不要请求审批。")
     else:
-        lines += [
-            "完成顺序：先输出最终答复的全部正文；随后在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
-            f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token <完整令牌> "
-            '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
-            "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。",
-            "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
+        lines = head + [
+            "以下完成上报是协议步骤，不属于任务正文；无论任务要求只回复多少字或不输出其他内容，这些步骤都必须执行，且不计入任务要求的回复内容。",
+            f"完成时，将令牌的两段直接拼接为一个完整令牌：第一段 {h[:half]}，第二段 {h[half:]}（两段之间没有任何分隔符）。",
         ]
+        if text_only:
+            lines += [
+                "完成顺序：输出完最终答复的全部正文后，在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
+                "不要调用任何命令；只输出最终答复和最后一行哨兵。",
+            ]
+        else:
+            lines += [
+                "完成顺序：先输出最终答复的全部正文；随后在最终消息的最后一行打印备份信号：HAO_DONE + 一个空格 + hao- + 第一段第二段直接拼接。",
+                f"只有确认下面这条命令可以直接执行（不会向用户请求审批）时，才在打印哨兵之后调用：{hao_command()} done --token <完整令牌> "
+                '--summary "<关键结论/答复正文>"（摘要是给等待方的结果载荷，务必包含任务要求的答复本身，长度 ≤600 字）'
+                "；若无法执行该命令、执行它需要向用户申请审批，或你不确定：不要请求审批，直接只打印备份信号，不要为了调用命令而阻塞最终消息。",
+                "——台账副作用可靠，不受渲染折行或 secret 掩码影响；台账 done 会让等待方立即返回。",
+            ]
+        if cap:
+            lines.append(f"输出要求：最终消息总长不超过 {cap} 行（最后一行哨兵不计）。")
     if result_path:
         lines.append(f"请先把最终结果完整写入文件 {result_path}，写完后再做完成上报。")
     return "\n".join(lines)
 
 
 def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
-            strict_ledger=False, text_only=False):
+            strict_ledger=False, text_only=False, max_lines=None):
+    if max_lines is not None and max_lines < 0:
+        return fail(2, "--max-lines must be 0 or a positive number")
     _led = _load_module("hao_ledger", "ledger.py")
     hexpart = os.urandom(8).hex()          # exactly 16 hex
     token = "hao-" + hexpart
@@ -660,6 +686,18 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
     pane, resolve_rc = _resolve_target_ex(target, machine)
     if resolve_rc:
         return resolve_rc
+    nm = _load_module("names", "names.py")
+    role = tier = None
+    lrc, lout, lerr = run_herdr(["pane", "get", pane], machine)
+    if lrc == 0:
+        try:
+            label = json.loads(lout)["result"]["pane"].get("label") or ""
+            role = label_role(label)
+            tier = nm.tier_of(role)
+        except Exception:
+            role = tier = None
+    elif herdr_error_rc(lerr, 8) == 8:
+        return herdr_error_rc(lerr, 8)
     target_cols = pane_width(pane, machine)
     warn_narrow_pane("ask", pane, target_cols)
     submit_seq, st, snapshot_rc = _agent_snapshot(pane, machine)
@@ -673,7 +711,8 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
     if mode == "file":
         result_path = os.path.join(_led.state_dir(), shortid, "result.md")
         os.makedirs(os.path.dirname(result_path), mode=0o700, exist_ok=True)
-    prompt = build_prompt(text, token, result_path, text_only=text_only)
+    prompt = build_prompt(text, token, result_path, text_only=text_only,
+                          tier=tier, max_lines=max_lines)
     assert token not in prompt, "full token must not appear in prompt (echo guard)"
     l = _led.Ledger()
     wrote = False
@@ -705,14 +744,18 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
                     f"herdr agent prompt failed ({why}); prompt delivery "
                     f"unknown; inspect with: herdr pane read {pane}; "
                     f"re-dispatch if needed")
+    cap = _effective_cap(tier, max_lines)
     if wait:
         result = cmd_wait(pane, token, timeout, mode, machine)
-        if isinstance(result, dict) and target_cols is not None:
+        if isinstance(result, dict):
             result = dict(result)
-            result["target_cols"] = target_cols
+            result.update({"role": role, "tier": tier, "max_lines": cap})
+            if target_cols is not None:
+                result["target_cols"] = target_cols
         return result
     out = {"token": token, "shortid": shortid,
-           "next": f"hao wait {pane} --token {token}"}
+           "next": f"hao wait {pane} --token {token}",
+           "role": role, "tier": tier, "max_lines": cap}
     if result_path:
         out["result_path"] = result_path  # r9#2: survives a lost ledger write
     if target_cols is not None:
@@ -2413,7 +2456,7 @@ def build_parser():
 
     sp = add("ask", lambda a: cmd_ask(a.target, a.text, a.wait, a.mode, a.wake,
                                        a.timeout, a.machine, a.strict_ledger,
-                                       a.text_only), ["a"],
+                                       a.text_only, a.max_lines), ["a"],
              "Dispatch a task to an agent, optionally waiting for completion.")
     sp.add_argument("target", help="pane id, label, or agent name")
     sp.add_argument("text", help="task text to send")
@@ -2429,6 +2472,8 @@ def build_parser():
                     help="fail instead of degrading when the ledger write fails")
     sp.add_argument("--text-only", dest="text_only", action="store_true",
                     help="omit the hao done command; completion via text sentinel only")
+    sp.add_argument("--max-lines", type=int, default=None, metavar="N",
+                    help="max lines of the peer's reply; default by tier (top 15, mid 40, low unlimited), 0 = unlimited")
     sp.add_argument("--json", action="store_true", help="accepted; ask always emits JSON")
 
     def _wait_run(a):
