@@ -1566,7 +1566,7 @@ def build_parser():
     sp.add_argument("--wait", action="store_true", help="wait inline for completion")
     sp.add_argument("--mode", metavar="MODE", default="sentinel",
                     choices=["sentinel", "lifecycle", "file"],
-                    help="completion mode: sentinel, lifecycle, or file")
+                    help="completion mode: sentinel (default), lifecycle, or file (peer writes result.md; reply is returned inline in tail and the file is removed on read)")
     sp.add_argument("--wake", metavar="TARGET", help="same-machine target to wake on completion")
     sp.add_argument("--timeout", type=int, default=1800, metavar="SECONDS",
                     help="wait timeout in seconds; 0 means no timeout")
@@ -1597,7 +1597,7 @@ def build_parser():
                     help="timeout in seconds; 0 means no timeout")
     sp.add_argument("--mode", metavar="MODE", default="sentinel",
                     choices=["sentinel", "lifecycle", "file"],
-                    help="completion mode: sentinel, lifecycle, or file")
+                    help="completion mode: sentinel (default), lifecycle, or file (peer writes result.md; reply is returned inline in tail and the file is removed on read)")
     sp.add_argument("--machine", metavar="MACHINE", help="remote herdr machine profile")
     sp.add_argument("--no-agent", dest="no_agent", action="store_true",
                     help="skip agent status gates for shell panes")
