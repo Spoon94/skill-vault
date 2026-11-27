@@ -444,27 +444,31 @@ def _finish_done(l, sid, ml, tail=None, tail_note=None, last_line=None):
         out["tail_note"] = tail_note
     return out
 
-def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown):
-    """Fast path (sentinel short-poll) then herdr agent wait backstop.
+def _wait_unified(pane, sid, token, timeout, machine, no_agent, accept_unknown,
+                  mode):
+    """Shared sentinel/lifecycle wait loop.
 
-    The backstop is the long-wait safeguard: server-side agent wait short
-    cycles + big-window tail rescan, so a sentinel that scrolls out of the
-    1s wait-output snapshot is still found after the agent settles.
+    mode="sentinel": wait-output fast path, then agent-wait backstop.
+    mode="lifecycle": submit_seq activity gate with sentinel evidence.
+    Completion always needs task-level evidence (sentinel or ledger done).
     """
     _led = _load_module("hao_ledger", "ledger.py")
     global _LAST_PANE_TEXT
     _LAST_PANE_TEXT = None
     l = _led.Ledger()
-    prompt = (_safe_get(l, sid) or {}).get("prompt")
+    rec0 = _safe_get(l, sid) or {}
+    prompt = rec0.get("prompt")
+    submit_seq = rec0.get("submit_seq") or 0
     start = time.time()
     deadline = None if timeout == 0 else start + (timeout or 1800)
     observed_working = False
     last_status = None
-    seen_record = False
+    seen_record = bool(rec0) if mode == "lifecycle" else False
     sentinel_seen = False
     validated_ml = None
     response_warned = False
     last_pane_scan = start
+    saw_activity = False
     while deadline is None or time.time() < deadline:
         rec = _wait_round_rec(l, sid)
         if rec:
@@ -478,8 +482,10 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             return payload
         if kind == "cancelled":
             return 10
-        gate, last_status, _agent = _agent_status_gate(
-            pane, machine, no_agent, accept_unknown)
+        gate, last_status, agent = _agent_status_gate(
+            pane, machine,
+            False if mode == "lifecycle" else no_agent,
+            True if mode == "lifecycle" else accept_unknown)
         if last_status == "working":
             observed_working = True
         if gate is not None:
@@ -489,11 +495,12 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
             if _deadline_passed(deadline):
                 return _wait_timeout(observed_working, last_status, timeout,
                                      seen_record)
-            # Only status gates (3/5/9) get the pre-give-up rescan.
-            last, _e = _sentinel_scan_tail(pane, token, sid, machine)
-            if last:
-                return _finish_sentinel(
-                    l, sid, last, pane, token, machine, prompt=prompt)
+            if mode == "sentinel":
+                # Only status gates (3/5/9) get the pre-give-up rescan.
+                last, _e = _sentinel_scan_tail(pane, token, sid, machine)
+                if last:
+                    return _finish_sentinel(
+                        l, sid, last, pane, token, machine, prompt=prompt)
             if validated_ml is not None:
                 return _finish_sentinel(
                     l, sid, validated_ml, pane, token, machine,
@@ -504,6 +511,69 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
         if _deadline_passed(deadline):
             return _wait_timeout(observed_working, last_status, timeout,
                                  seen_record)
+
+        if mode == "lifecycle":
+            if last_status == "unknown":
+                return 6  # lifecycle does not support unknown agents
+            seq = agent.get("state_change_seq") or 0
+            if seq > submit_seq or last_status == "working":
+                saw_activity = True
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
+            # task-level evidence is checked BEFORE the no-activity exit9
+            # (r5#3): a late sentinel wins over the activity gate
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
+            ml, errc, _stale = _sentinel_check(pane, token, sid, machine)
+            if errc is not None:
+                return errc
+            if ml:
+                sentinel_seen = True
+                validated_ml = ml
+                if _deadline_passed(deadline):
+                    return _wait_timeout(observed_working, last_status,
+                                         timeout, seen_record)
+                conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
+                if conf:
+                    return _finish_sentinel(
+                        l, sid, conf, pane, token, machine, prompt=prompt)
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
+            last, errc2 = _sentinel_scan_tail(pane, token, sid, machine)
+            if errc2 is not None:
+                return errc2
+            if last:
+                sentinel_seen = True
+                validated_ml = last
+                if _deadline_passed(deadline):
+                    return _wait_timeout(observed_working, last_status,
+                                         timeout, seen_record)
+                conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
+                if conf:
+                    return _finish_sentinel(
+                        l, sid, conf, pane, token, machine, prompt=prompt)
+            elif last_status in ("idle", "done"):
+                time.sleep(SETTLED_SCAN_INTERVAL)
+            response_warned = _maybe_warn_unresponsive(
+                pane, time.time() - start, last_status, observed_working,
+                sentinel_seen, response_warned)
+            if not saw_activity and time.time() - start > 5:
+                return 9  # no activity observed for this task
+            if _deadline_passed(deadline):
+                return _wait_timeout(observed_working, last_status, timeout,
+                                     seen_record)
+            rw, _, ew = run_herdr(["agent", "wait", pane,
+                                   "--until", "idle", "--until", "done",
+                                   "--until", "blocked", "--timeout", "8000"],
+                                  machine)
+            if (rw != 0 and _herdr_err_code(ew) != "timeout"
+                    and "timed out" in ew.lower()):
+                return herdr_error_rc(ew, 8)
+            continue
+
         if time.time() - start < FAST_PATH_SECONDS:
             if (last_status == "working"
                     and time.time() - last_pane_scan
@@ -586,6 +656,20 @@ def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown)
     return _wait_timeout(observed_working, last_status, timeout,
                          seen_record)
 
+
+def _wait_sentinel(pane, sid, token, timeout, machine, no_agent, accept_unknown):
+    return _wait_unified(pane, sid, token, timeout, machine, no_agent,
+                         accept_unknown, "sentinel")
+
+
+def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown):
+    return _wait_unified(pane, sid, token, timeout, machine, no_agent,
+                         accept_unknown, "lifecycle")
+
+
+RESPONSE_WARN_S = 15
+
+
 def _maybe_warn_unresponsive(pane, elapsed, status, observed_working,
                              sentinel_seen, warned):
     if (warned or sentinel_seen or observed_working
@@ -599,119 +683,6 @@ def _maybe_warn_unresponsive(pane, elapsed, status, observed_working,
         return True
     return warned
 
-def _wait_lifecycle(pane, sid, token, timeout, machine, no_agent, accept_unknown):
-    """agent-wait backstop loop with submit_seq activity gate.
-    Completion still requires sentinel/ledger done (task-level evidence)."""
-    _led = _load_module("hao_ledger", "ledger.py")
-    global _LAST_PANE_TEXT
-    _LAST_PANE_TEXT = None
-    l = _led.Ledger()
-    rec0 = _safe_get(l, sid) or {}
-    prompt = rec0.get("prompt")
-    submit_seq = rec0.get("submit_seq") or 0
-    start = time.time()
-    deadline = None if timeout == 0 else start + (timeout or 1800)
-    saw_activity = False
-    observed_working = False
-    last_status = None
-    seen_record = bool(rec0)
-    sentinel_seen = False
-    validated_ml = None
-    response_warned = False
-    while deadline is None or time.time() < deadline:
-        rec = _wait_round_rec(l, sid)
-        if rec:
-            seen_record = True
-        elif _wait_consumed(l, sid, seen_record):
-            return 3
-        token = rec.get("token") or token  # ledger holds the full token
-        prompt = rec.get("prompt") or prompt
-        kind, payload = _wait_common_check(rec)
-        if kind == "done":
-            return payload
-        if kind == "cancelled":
-            return 10
-        gate, st, ag = _agent_status_gate(pane, machine, False, True)
-        last_status = st
-        if st == "working":
-            observed_working = True
-        if gate is not None:
-            if gate == 8:
-                return gate
-            if _deadline_passed(deadline):
-                return _wait_timeout(observed_working, last_status, timeout,
-                                     seen_record)
-            if validated_ml is not None:
-                return _finish_sentinel(
-                    l, sid, validated_ml, pane, token, machine,
-                    prompt=prompt)
-            if gate == 5 and not sentinel_seen:
-                _set_blocked_hint(pane)
-            return gate
-        if _deadline_passed(deadline):
-            return _wait_timeout(observed_working, last_status, timeout,
-                                 seen_record)
-        if st == "unknown":
-            return 6  # lifecycle does not support unknown agents
-        seq = ag.get("state_change_seq") or 0
-        if seq > submit_seq or st == "working":
-            saw_activity = True
-        if _deadline_passed(deadline):
-            return _wait_timeout(observed_working, last_status, timeout,
-                                 seen_record)
-        # task-level evidence is checked BEFORE the no-activity exit9 (r5#3):
-        # a late sentinel wins over the activity gate
-        if _deadline_passed(deadline):
-            return _wait_timeout(observed_working, last_status, timeout,
-                                 seen_record)
-        ml, errc, _stale = _sentinel_check(pane, token, sid, machine)
-        if errc is not None:
-            return errc
-        if ml:
-            sentinel_seen = True
-            validated_ml = ml
-            if _deadline_passed(deadline):
-                return _wait_timeout(observed_working, last_status, timeout,
-                                     seen_record)
-            conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
-            if conf:
-                return _finish_sentinel(
-                    l, sid, conf, pane, token, machine, prompt=prompt)
-        if _deadline_passed(deadline):
-            return _wait_timeout(observed_working, last_status, timeout,
-                                 seen_record)
-        last, errc2 = _sentinel_scan_tail(pane, token, sid, machine)
-        if errc2 is not None:
-            return errc2
-        if last:
-            sentinel_seen = True
-            validated_ml = last
-            if _deadline_passed(deadline):
-                return _wait_timeout(observed_working, last_status, timeout,
-                                     seen_record)
-            conf = _confirm_sentinel(pane, token, sid, machine, no_agent)
-            if conf:
-                return _finish_sentinel(
-                    l, sid, conf, pane, token, machine, prompt=prompt)
-        elif st in ("idle", "done"):
-            time.sleep(SETTLED_SCAN_INTERVAL)
-        response_warned = _maybe_warn_unresponsive(
-            pane, time.time() - start, last_status, observed_working,
-            sentinel_seen, response_warned)
-        if not saw_activity and time.time() - start > 5:
-            return 9  # no activity observed for this task
-        if _deadline_passed(deadline):
-            return _wait_timeout(observed_working, last_status, timeout,
-                                 seen_record)
-        rw, _, ew = run_herdr(["agent", "wait", pane,
-                               "--until", "idle", "--until", "done",
-                               "--until", "blocked", "--timeout", "8000"],
-                              machine)
-        if (rw != 0 and _herdr_err_code(ew) != "timeout"
-                and "timed out" in ew.lower()):
-            return herdr_error_rc(ew, 8)
-    return _wait_timeout(observed_working, last_status, timeout,
-                         seen_record)
 
 def _wait_file(pane, sid, token, timeout, machine):
     """File mode: completion = stable non-empty regular result file, or
