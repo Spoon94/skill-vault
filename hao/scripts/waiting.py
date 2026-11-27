@@ -435,18 +435,25 @@ def _finish_sentinel(l, sid, ml, pane, token, machine, prompt=None):
 
 def _finish_done(l, sid, ml, tail=None, tail_note=None, last_line=None):
     had_done = False
-    has_summary = False
+    summary = None
     try:
         rec = l.get(sid)
         had_done = bool(rec and rec.get("status") == "done")
-        has_summary = bool(rec and rec.get("summary"))
+        summary = rec.get("summary") if rec else None
     except Exception:
         pass
+    has_summary = bool(summary)
     try:
         l.write_done(sid, matched_line=ml, wait_consumed=True, create=False)
     except Exception as e:
         _ledger_warn(e)  # r7#1: confirmed completion must still be returned
     out = {"status": "done", "matched_line": ml}
+    if has_summary:
+        # The ledger holds the reply. Return it on the sentinel path too: the
+        # record is consumed right after the wait, so this is the caller's
+        # only chance to get it when the sentinel is seen in the same round
+        # the peer's `hao done --summary` landed.
+        out["summary"] = summary
     if (not had_done or not has_summary) and (tail is not None or tail_note is not None):
         out["tail"] = tail
         out["last_line"] = last_line

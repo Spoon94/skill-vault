@@ -104,6 +104,39 @@ class TestReplyPayload(unittest.TestCase):
         ct.assert_not_called()
         self.assertEqual(out["status"], "done")
         self.assertNotIn("tail", out)
+        self.assertEqual(out["summary"], "ledger answer")
+
+    def test_sentinel_finish_returns_the_ledger_summary(self):
+        # Regression, found by the live suite: when the peer's
+        # `hao done --summary` lands in the same round the sentinel is seen,
+        # the wait finished through the sentinel path without the summary and
+        # then consumed the record, so the caller lost the reply.
+        self.led.write_running(SID, token=TOKEN, target="w2:p9",
+                               prompt="task")
+        line = "HAO_DONE " + TOKEN
+        state = {"landed": False}
+
+        def fake(args, machine=None):
+            a = " ".join(args[:2])
+            if a == "agent get":
+                if not state["landed"]:      # the peer's done lands mid-round
+                    state["landed"] = True
+                    self.led.write_done(SID, summary="slept")
+                return 0, json.dumps({"result": {"agent": {
+                    "agent_status": "done", "state_change_seq": 2}}}), ""
+            if a == "pane wait-output":
+                return 0, json.dumps({"result": {"matched_line": line}}), ""
+            if a == "pane read":
+                return 0, json.dumps({"result": {
+                    "read": {"text": "slept\n" + line}}}), ""
+            return 0, '{"result":{}}', ""
+
+        with mock.patch.object(hao, "run_herdr", side_effect=fake), \
+                mock.patch.object(hao.time, "sleep", lambda s: None):
+            result = hao.cmd_wait("w2:p9", TOKEN, 5)
+        self.assertEqual(result["status"], "done")
+        self.assertEqual(result["summary"], "slept")
+        self.assertFalse(os.path.exists(os.path.join(self.state, SID + ".json")))
 
 
 if __name__ == "__main__":
