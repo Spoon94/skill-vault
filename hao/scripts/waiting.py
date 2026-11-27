@@ -739,12 +739,24 @@ def _wait_file(pane, sid, token, timeout, machine):
         if rp and os.path.isfile(rp):
             sz = os.path.getsize(rp)
             if sz > 0 and sz == last_size:
+                content = safe_read(sid, rp)
                 try:
                     l.write_done(sid, result_path=rp, wait_consumed=True,
                                  create=False)
                 except Exception as e:
                     _ledger_warn(e)  # r7#1: stable file is the evidence
-                return {"status": "done", "result_path": rp}
+                out = {"status": "done", "result_path": rp}
+                if content is not None:
+                    out["tail"] = content
+                    out["result_consumed"] = True
+                    try:
+                        l.consume(sid)
+                    except Exception as e:
+                        _ledger_warn(e)
+                else:
+                    out["tail_note"] = ("result file unreadable; "
+                                        "left in place for hao result")
+                return out
             last_size = sz
         time.sleep(1)
     return 4
