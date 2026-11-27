@@ -17,7 +17,7 @@
   python3 scripts/hao ask w2:p9 "为 <需求> 给出方案、风险与验收标准" --wait --json
   ```
 
-- **产物怎么交给下一步**：`ask --wait` 返回的 `summary`（≤600 字）可直接放进第 2 步的任务文本；报告较长时用 `--mode file`，把 `result_path` 路径交给下一步，或事后用 `hao result <shortid> --file <path>` 读取。
+- **产物怎么交给下一步**：`ask --wait` 返回的 `summary`（≤600 字）可直接放进第 2 步的任务文本；报告较长时用 `--mode file`，返回 JSON 的 `tail` 就是答复内容，结果文件取走即删，无需再读文件；异步场景按 wake 通知取回（记录仍在时 `hao result <shortid>` 也可直接读取并删除）。
 - **失败处理**：被审批卡住 → 交用户放行，或改用 `ask --text-only` 重新派发；超时 → `cancel <shortid>` 只停止等待，要停对方用 `abort <shortid> --interrupt` 或 `stop <pane>`。
 
 ## 2. 拆解
@@ -31,7 +31,7 @@
   python3 scripts/hao ask w2:p10 "把下面的方案拆成可独立执行的任务清单，每项写明目标、验收和负责角色：<方案摘要>" --wait --json
   ```
 
-- **产物怎么交给下一步**：任务清单放进 `summary` 或 file 模式的报告路径；第 3 步按清单逐项派发，每项一个 `ask`。
+- **产物怎么交给下一步**：任务清单放进 `summary` 或 file 模式的 `tail`；第 3 步按清单逐项派发，每项一个 `ask`。
 - **失败处理**：拆解结果不可执行 → 带着具体缺口退回第 1 步；对方长时间 working → 用 `hao status <pane>` 查看，必要时 `stop`。
 
 ## 3. 实施
@@ -50,7 +50,7 @@
   python3 scripts/hao wait w2:p11 --token <shortid> --timeout 600
   ```
 
-- **产物怎么交给下一步**：每项实现的 `summary` 加改动路径/提交号；代码量大时要求写入 file 模式的报告，把路径交给初审。
+- **产物怎么交给下一步**：每项实现的 `summary` 加改动路径/提交号；代码量大时要求写入 file 模式的报告，直接使用返回的 `tail`（文件已删除），把内容交给初审。
 - **失败处理**：超时 → `stop <pane>`（只停当前一轮）或 `abort <shortid> --interrupt`；被审批卡住 → 交用户或 `--text-only`；`low` 档角色给短 `--timeout`，见文末。
 
 ## 4. 初审
