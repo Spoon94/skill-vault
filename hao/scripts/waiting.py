@@ -37,8 +37,8 @@ def _timeout_detail(observed_working, last_status, timeout, seen_record=True,
     else:
         tail = (f"agent_status={state}, never observed working since dispatch "
                 f"— peer may have skipped the completion protocol")
-        if pane:
-            tail += f"; inspect with: herdr pane read {pane}"
+    if pane:
+        tail += f"; inspect with: herdr pane read {pane}"
     return f"timeout after {timeout}s; {tail}"
 
 def _wait_timeout(observed_working, last_status, timeout, seen_record):
