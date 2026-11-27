@@ -22,8 +22,10 @@ SENTINEL_RE = re.compile(
     rf"^\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE:?\s+((?:hao-)?[0-9a-f]{{12,32}})[{_TAIL_CHARS}]*$")
 
 _LEDGER_WARNED = False
+_WAIT_PANE = None
 
-def _timeout_detail(observed_working, last_status, timeout, seen_record=True):
+def _timeout_detail(observed_working, last_status, timeout, seen_record=True,
+                    pane=None):
     if not seen_record:
         return (f"timeout after {timeout}s; no ledger record was ever seen "
                 f"for this task (not dispatched via hao ask, already consumed, "
@@ -35,12 +37,14 @@ def _timeout_detail(observed_working, last_status, timeout, seen_record=True):
     else:
         tail = (f"agent_status={state}, never observed working since dispatch "
                 f"— peer may have skipped the completion protocol")
+        if pane:
+            tail += f"; inspect with: herdr pane read {pane}"
     return f"timeout after {timeout}s; {tail}"
 
 def _wait_timeout(observed_working, last_status, timeout, seen_record):
     global _WAIT_DIAG
     _WAIT_DIAG = _timeout_detail(observed_working, last_status, timeout,
-                                 seen_record=seen_record)
+                                 seen_record=seen_record, pane=_WAIT_PANE)
     return 4
 
 def _ledger_warn(err):
@@ -421,6 +425,10 @@ WORKING_SCAN_INTERVAL = 10
 SETTLED_SCAN_INTERVAL = 2
 
 def _finish_sentinel(l, sid, ml, pane, token, machine, prompt=None):
+    rec = _safe_get(l, sid) or {}
+    if rec.get("summary"):
+        # summary is the higher-priority payload; skip the pane read
+        return _finish_done(l, sid, ml, None, None, None)
     tail, last_line, note = _completion_tail(
         pane, token, sid, machine, prompt=prompt)
     return _finish_done(l, sid, ml, tail, note, last_line)
@@ -455,8 +463,9 @@ def _wait_unified(pane, sid, token, timeout, machine, no_agent, accept_unknown,
     Completion always needs task-level evidence (sentinel or ledger done).
     """
     _led = _load_module("hao_ledger", "ledger.py")
-    global _LAST_PANE_TEXT
+    global _LAST_PANE_TEXT, _WAIT_PANE
     _LAST_PANE_TEXT = None
+    _WAIT_PANE = pane
     l = _led.Ledger()
     rec0 = _safe_get(l, sid) or {}
     prompt = rec0.get("prompt")

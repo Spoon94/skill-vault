@@ -94,6 +94,17 @@ class TestReplyPayload(unittest.TestCase):
                                tail="screen answer")
         self.assertEqual(out["tail"], "screen answer")
 
+    def test_finish_sentinel_skips_tail_when_summary_exists(self):
+        self.led.write_done(SID, summary="ledger answer")
+        with mock.patch.object(
+                hao, "_completion_tail",
+                return_value=("screen answer", "screen answer", None)) as ct:
+            out = hao._finish_sentinel(self.led, SID, "HAO_DONE line",
+                                       "w2:p9", TOKEN, None)
+        ct.assert_not_called()
+        self.assertEqual(out["status"], "done")
+        self.assertNotIn("tail", out)
+
 
 if __name__ == "__main__":
     unittest.main()
