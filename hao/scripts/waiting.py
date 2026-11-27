@@ -427,9 +427,11 @@ def _finish_sentinel(l, sid, ml, pane, token, machine, prompt=None):
 
 def _finish_done(l, sid, ml, tail=None, tail_note=None, last_line=None):
     had_done = False
+    has_summary = False
     try:
         rec = l.get(sid)
         had_done = bool(rec and rec.get("status") == "done")
+        has_summary = bool(rec and rec.get("summary"))
     except Exception:
         pass
     try:
@@ -437,10 +439,10 @@ def _finish_done(l, sid, ml, tail=None, tail_note=None, last_line=None):
     except Exception as e:
         _ledger_warn(e)  # r7#1: confirmed completion must still be returned
     out = {"status": "done", "matched_line": ml}
-    if not had_done and (tail is not None or tail_note is not None):
+    if (not had_done or not has_summary) and (tail is not None or tail_note is not None):
         out["tail"] = tail
         out["last_line"] = last_line
-    if tail_note is not None and not had_done:
+    if tail_note is not None and (not had_done or not has_summary):
         out["tail_note"] = tail_note
     return out
 
@@ -761,6 +763,29 @@ def _wait_file(pane, sid, token, timeout, machine):
         time.sleep(1)
     return 4
 
+def _reply_payload(result, sid):
+    """Payload priority: ledger summary, then result.md, then tail.
+
+    A result file is read into `tail` and marked consumed; the caller then
+    removes the record and the result tree. Returns whether the caller
+    should consume the ledger record."""
+    if result.get("summary"):
+        return True
+    rp = result.get("result_path")
+    if not rp:
+        led = _load_module("hao_ledger", "ledger.py")
+        rp = os.path.join(led.state_dir(), sid, "result.md")
+    if rp and os.path.isfile(rp):
+        content = safe_read(sid, rp)
+        if content is not None:
+            result["tail"] = content
+            result["result_path"] = rp
+            result["result_consumed"] = True
+            return True
+        return False
+    return not result.get("result_path")
+
+
 def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
              no_agent=False, accept_unknown=False):
     pane, resolve_rc = _resolve_target_ex(target, machine)
@@ -791,11 +816,14 @@ def cmd_wait(target, token, timeout, mode="sentinel", machine=None,
                 l.write_done(sid, wait_consumed=True, create=False)
             except Exception as e:
                 _ledger_warn(e)
-            if not result.get("result_path"):
-                try:
-                    l.consume(sid)
-                except Exception as e:
-                    _ledger_warn(e)
+        consume_now = False
+        if isinstance(result, dict):
+            consume_now = _reply_payload(result, sid)
+        if l is not None and consume_now:
+            try:
+                l.consume(sid)
+            except Exception as e:
+                _ledger_warn(e)
     elif result == 10:
         try:
             _led = _load_module("hao_ledger", "ledger.py")
