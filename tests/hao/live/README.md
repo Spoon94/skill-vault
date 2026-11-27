@@ -26,7 +26,7 @@ HERDR_ENV=1 HERDR_WORKSPACE_ID=w2 python3 tests/hao/live/run_live.py \
     --filter lifecycle --kinds pi,claude
 ```
 
-- `--list` works without herdr and prints all 44 scenarios.
+- `--list` works without herdr and prints all 45 scenarios.
 - `--quick` skips the three slow scenarios (long task, six dispatches,
   pane-read frequency): about 5 minutes; the full run takes about 8 minutes.
 - `--filter SUBSTR` runs scenarios whose name contains `SUBSTR`.
@@ -40,7 +40,8 @@ HERDR_ENV=1 HERDR_WORKSPACE_ID=w2 python3 tests/hao/live/run_live.py \
 Naming and roles, tiered briefs, wait/ledger completion, `--text-only`,
 lifecycle dispatch, the pane-read frequency regression, file-mode inline
 results and zero residue, cancel/abort/stop, restore/clear, doctor/read-only
-commands, an unsent input draft, and an optional Claude Code peer.
+commands, an unsent input draft, hyphen-joined sentinel acceptance (a
+model-free shell-pane probe), and an optional Claude Code peer.
 
 Each scenario calls `ctx.settle()` between dispatches. Answers are accepted
 from `summary`, `tail` or `last_line` because a peer may or may not call
@@ -69,6 +70,14 @@ from `summary`, `tail` or `last_line` because a peer may or may not call
 - **A draft in the input box is glued in front of the task**, so its wording
   reaches the model. Use a neutral half-typed line; a label such as
   "UNSENT DRAFT" can make a weak model refuse the task as "not sent".
+- **A model-free probe needs a shell pane.** `ctx.new_instance(kind=None, …)`
+  with `ctx.seed_running(...)` gives a wait a task to watch without any agent
+  (start `hao wait … --no-agent`, then print the sentinel with
+  `herdr pane run`). The shell echoes the typed command — so that echo
+  contains the sentinel text — and its prompt precedes the answer: assert on
+  where the tail ends, not on its whole content. A negative case must
+  actually print the malformed line; that is the only way to exercise the
+  regex on the herdr side, which the unit tests cannot reach.
 - Model latency varies (a routed model once took 109s to its first token):
   judge the wait by its result, not by a tight timing bound.
 - **A fresh Claude Code instance is slow on its first turn** (43–69s to its

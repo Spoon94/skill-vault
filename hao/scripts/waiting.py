@@ -21,6 +21,29 @@ _TAIL_CHARS = r"\s.。!！│`*|┃┆┇┊┄┈─━└┘✓✔"
 SENTINEL_RE = re.compile(
     rf"^\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE:?\s+((?:hao-)?[0-9a-f]{{12,32}})[{_TAIL_CHARS}]*$")
 
+# Fast-path pattern handed to `pane wait-output` (Rust regex on the herdr
+# side: no lookaround, no backreferences). A superset of SENTINEL_RE that
+# also matches the token's two 8-hex halves joined by a hyphen; the client
+# removes that hyphen and matches with SENTINEL_RE again.
+SENTINEL_RE_WIDE = re.compile(
+    rf"^\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE:?\s+"
+    rf"((?:hao-)?[0-9a-f]{{8}}-[0-9a-f]{{8}}|(?:hao-)?[0-9a-f]{{12,32}})"
+    rf"[{_TAIL_CHARS}]*$")
+
+# A peer once printed the two halves joined by a hyphen
+# ("HAO_DONE hao-6d913218-c808bdde"). Hex never contains a hyphen, so
+# removing it is unambiguous and the existing identity checks then apply
+# unchanged: both halves must equal the known token's. Any other separator
+# (space, underscore, dash variants, several parts) is left alone.
+_SPLIT_TOKEN_RE = re.compile(
+    rf"^(\s*(?:[{_PREFIX_CHARS}]|\d+\.|\|)*\s*HAO_DONE:?\s+(?:hao-)?[0-9a-f]{{8}})"
+    rf"-([0-9a-f]{{8}})([{_TAIL_CHARS}]*)$")
+
+
+def _rejoin_split_token(line):
+    """Drop a hyphen joining the token's two 8-hex halves; other lines unchanged."""
+    return _SPLIT_TOKEN_RE.sub(r"\1\2\3", line, count=1)
+
 _LEDGER_WARNED = False
 _WAIT_PANE = None
 
@@ -176,7 +199,7 @@ def _sentinel_check(pane, token, sid, machine):
     stale=True means wait-output matched a sentinel line that belongs to
     another task; the caller should rescan the tail for the current one."""
     rc, out, err = run_herdr(
-        ["pane", "wait-output", pane, "--regex", SENTINEL_RE.pattern, "--timeout", "1000"],
+        ["pane", "wait-output", pane, "--regex", SENTINEL_RE_WIDE.pattern, "--timeout", "1000"],
         machine)
     if rc != 0:
         if _herdr_err_code(err) == "timeout":
@@ -186,7 +209,7 @@ def _sentinel_check(pane, token, sid, machine):
         ml = json.loads(out).get("result", {}).get("matched_line", "") or ""
     except Exception:
         ml = out
-    m = SENTINEL_RE.search(ml)
+    m = SENTINEL_RE.search(_rejoin_split_token(ml))
     if not m:
         return None, None, False
     if _token_matches(m.group(1), token, sid):
@@ -320,7 +343,7 @@ def _tail_from_pane_text(text, token, sid, prompt=None):
     start = None
     for k in range(1, min(len(lines), 8) + 1):
         for line, joined in _join_wrapped_sentinels(lines[-k:]):
-            m = SENTINEL_RE.match(line)
+            m = SENTINEL_RE.match(_rejoin_split_token(line))
             if m and _token_matches(m.group(1), token, sid, joined=joined):
                 start = len(lines) - k
                 break
@@ -328,7 +351,7 @@ def _tail_from_pane_text(text, token, sid, prompt=None):
             break
     if start is None:
         for i in range(len(lines) - 1, -1, -1):
-            m = SENTINEL_RE.match(lines[i])
+            m = SENTINEL_RE.match(_rejoin_split_token(lines[i]))
             if m and _token_matches(m.group(1), token, sid):
                 start = i
                 break
@@ -391,7 +414,7 @@ def _sentinel_scan_tail(pane, token, sid, machine, lines=200):
     _LAST_PANE_TEXT = txt
     last = None
     for line, joined in _join_wrapped_sentinels(txt.splitlines()):
-        m = SENTINEL_RE.match(line)
+        m = SENTINEL_RE.match(_rejoin_split_token(line))
         if m and _token_matches(m.group(1), token, sid, joined=joined):
             last = line
     return last, None

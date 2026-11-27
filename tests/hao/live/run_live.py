@@ -169,6 +169,33 @@ class Ctx:
                         "--lines", str(lines)])
         return p.stdout
 
+    def _ledger_mod(self):
+        path = os.path.join(SKILL_ROOT, "scripts", "ledger.py")
+        loader = importlib.machinery.SourceFileLoader("hao_live_ledger", path)
+        mod = types.ModuleType("hao_live_ledger")
+        loader.exec_module(mod)
+        return mod
+
+    def _with_state(self, fn):
+        saved = os.environ.get("HAO_STATE_DIR")
+        os.environ["HAO_STATE_DIR"] = self.state
+        try:
+            return fn()
+        finally:
+            if saved is None:
+                os.environ.pop("HAO_STATE_DIR", None)
+            else:
+                os.environ["HAO_STATE_DIR"] = saved
+
+    def seed_running(self, sid, token, pane, prompt="probe"):
+        mod = self._ledger_mod()
+        self._with_state(lambda: mod.Ledger().write_running(
+            sid, token=token, target=pane, prompt=prompt))
+
+    def consume_record(self, sid):
+        mod = self._ledger_mod()
+        self._with_state(lambda: mod.Ledger().consume(sid))
+
     def pane_flat(self, lines=400, pane=None):
         """Pane text with whitespace and border glyphs removed.
 
@@ -217,6 +244,9 @@ class Ctx:
         if not pane:
             self.herdr(["tab", "close", tab])
             raise Skip("no pane found in new tab")
+        if kind is None:
+            self.extra_tabs.append(tab)
+            return tab, pane
         cmd = ["agent", "start", self.agent_name(), "--kind", kind,
                "--pane", pane, "--timeout", "60000"]
         if kind == "claude":
@@ -920,6 +950,89 @@ def claude_code_peer_end_to_end(ctx):
         ctx.check("tier top", (a or {}).get("tier") == "top", a)
         ctx.check("answer", ctx.answer(a, "claude-ok"), a)
     finally:
+        ctx.close_tab(tab)
+
+
+@scenario("sentinel_split_by_hyphen_is_accepted", "waiting")
+def sentinel_split_by_hyphen_is_accepted(ctx):
+    tab, pane = ctx.new_instance(kind=None, label="hao-live-shell")
+    sid = "5e1f0a2b3c4d"
+    token = "hao-" + "5e1f0a2b" + "3c4d9a7b"
+    split = "hao-" + "5e1f0a2b" + "-" + "3c4d9a7b"
+    sid2 = "5e1f0a2b3c4e"
+    token2 = "hao-" + "5e1f0a2b" + "3c4e9a7b"
+    wait = None
+    try:
+        ctx.seed_running(sid, token, pane)
+        wait = subprocess.Popen(
+            [sys.executable, HAO, "wait", pane, "--token", token,
+             "--no-agent", "--timeout", "15", "--json"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=ctx.env)
+        time.sleep(2)
+        start = time.time()
+        p = ctx.herdr(["pane", "run", pane,
+                       "printf 'answer\\nHAO_DONE " + split + "\\n'"],
+                      timeout=15)
+        ctx.check("pane run rc 0", p.returncode == 0,
+                  (p.stderr or p.stdout)[:200])
+        out, err = wait.communicate(timeout=20)
+        elapsed_after_print = time.time() - start
+        d = last_json(out) or {}
+        ctx.check("fast path within 8s", elapsed_after_print < 8,
+                  round(elapsed_after_print, 1))
+        ctx.check("wait rc 0", wait.returncode == 0, err)
+        ctx.check("done", d.get("status") == "done", d)
+        ctx.check("raw matched_line",
+                  split in str(d.get("matched_line")), d)
+        # a shell pane also shows its prompt and the command echo before the
+        # answer (and that echo contains the sentinel text), so assert on
+        # where the tail ends: the sentinel line itself is excluded
+        tail_lines = [l for l in str(d.get("tail") or "").splitlines() if l.strip()]
+        ctx.check("tail ends with the answer, sentinel line excluded",
+                  bool(tail_lines) and tail_lines[-1].strip() == "answer",
+                  tail_lines[-1:] or d)
+
+        ctx.consume_record(sid)
+        sid3 = "5e1f0a2b3c4f"
+        token3 = "hao-" + "5e1f0a2b" + "3c4f9a7b"
+
+        def reject(name, sid_n, token_n, line):
+            """Print a malformed sentinel for a seeded task: the wait must
+            not accept it. This exercises the herdr-side regex, which the
+            unit tests cannot."""
+            ctx.seed_running(sid_n, token_n, pane)
+            w = subprocess.Popen(
+                [sys.executable, HAO, "wait", pane, "--token", token_n,
+                 "--no-agent", "--timeout", "8", "--json"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                env=ctx.env)
+            try:
+                time.sleep(2)
+                ctx.herdr(["pane", "run", pane,
+                           "printf 'nope\\nHAO_DONE " + line + "\\n'"],
+                          timeout=15)
+                out_n, _ = w.communicate(timeout=30)
+                d_n = last_json(out_n) or {}
+                ctx.check(name, w.returncode == 4 and d_n.get("status") != "done",
+                          (w.returncode, str(d_n.get("error") or d_n)[:110]))
+            finally:
+                if w.poll() is None:
+                    w.kill()
+                    w.communicate()
+                ctx.consume_record(sid_n)
+
+        reject("wrong second half is rejected", sid2, token2,
+               "hao-5e1f0a2b-3c4dffff")
+        reject("space-separated halves are rejected", sid3, token3,
+               "hao-5e1f0a2b 3c4f9a7b")
+    finally:
+        if wait and wait.poll() is None:
+            wait.kill()
+            wait.communicate()
+        ctx.consume_record(sid)
+        ctx.consume_record(sid2)
+        ctx.consume_record(sid3)
         ctx.close_tab(tab)
 
 
