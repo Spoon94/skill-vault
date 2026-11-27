@@ -153,6 +153,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 cd tests/hao
 python3 -m unittest discover -s . -p 'test_*.py'       # 单元（485 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
+python3 live/run_live.py --list                          # 可选真机场景（需 HERDR_ENV=1 + HERDR_WORKSPACE_ID；--quick 约 3 分钟）
 ```
 
 ## 设计文档
