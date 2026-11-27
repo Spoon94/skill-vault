@@ -985,19 +985,54 @@ def sentinel_split_by_hyphen_is_accepted(ctx):
         ctx.check("done", d.get("status") == "done", d)
         ctx.check("raw matched_line",
                   split in str(d.get("matched_line")), d)
-        ctx.check("tail answer", d.get("tail") == "answer", d)
+        # a shell pane also shows its prompt and the command echo before the
+        # answer (and that echo contains the sentinel text), so assert on
+        # where the tail ends: the sentinel line itself is excluded
+        tail_lines = [l for l in str(d.get("tail") or "").splitlines() if l.strip()]
+        ctx.check("tail ends with the answer, sentinel line excluded",
+                  bool(tail_lines) and tail_lines[-1].strip() == "answer",
+                  tail_lines[-1:] or d)
 
         ctx.consume_record(sid)
-        ctx.seed_running(sid2, token2, pane)
-        rc = ctx.hao(["wait", pane, "--token", token2, "--no-agent",
-                      "--timeout", "8", "--json"], timeout=30).returncode
-        ctx.check("wrong second half times out", rc == 4, rc)
+        sid3 = "5e1f0a2b3c4f"
+        token3 = "hao-" + "5e1f0a2b" + "3c4f9a7b"
+
+        def reject(name, sid_n, token_n, line):
+            """Print a malformed sentinel for a seeded task: the wait must
+            not accept it. This exercises the herdr-side regex, which the
+            unit tests cannot."""
+            ctx.seed_running(sid_n, token_n, pane)
+            w = subprocess.Popen(
+                [sys.executable, HAO, "wait", pane, "--token", token_n,
+                 "--no-agent", "--timeout", "8", "--json"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                env=ctx.env)
+            try:
+                time.sleep(2)
+                ctx.herdr(["pane", "run", pane,
+                           "printf 'nope\\nHAO_DONE " + line + "\\n'"],
+                          timeout=15)
+                out_n, _ = w.communicate(timeout=30)
+                d_n = last_json(out_n) or {}
+                ctx.check(name, w.returncode == 4 and d_n.get("status") != "done",
+                          (w.returncode, str(d_n.get("error") or d_n)[:110]))
+            finally:
+                if w.poll() is None:
+                    w.kill()
+                    w.communicate()
+                ctx.consume_record(sid_n)
+
+        reject("wrong second half is rejected", sid2, token2,
+               "hao-5e1f0a2b-3c4dffff")
+        reject("space-separated halves are rejected", sid3, token3,
+               "hao-5e1f0a2b 3c4f9a7b")
     finally:
         if wait and wait.poll() is None:
             wait.kill()
             wait.communicate()
         ctx.consume_record(sid)
         ctx.consume_record(sid2)
+        ctx.consume_record(sid3)
         ctx.close_tab(tab)
 
 
