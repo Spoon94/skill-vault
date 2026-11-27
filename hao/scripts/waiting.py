@@ -525,9 +525,6 @@ def _wait_unified(pane, sid, token, timeout, machine, no_agent, accept_unknown,
                                      seen_record)
             # task-level evidence is checked BEFORE the no-activity exit9
             # (r5#3): a late sentinel wins over the activity gate
-            if _deadline_passed(deadline):
-                return _wait_timeout(observed_working, last_status, timeout,
-                                     seen_record)
             ml, errc, _stale = _sentinel_check(pane, token, sid, machine)
             if errc is not None:
                 return errc
@@ -782,6 +779,8 @@ def _reply_payload(result, sid):
             result["result_path"] = rp
             result["result_consumed"] = True
             return True
+        result["tail_note"] = ("result file unreadable; "
+                               "left in place for hao result")
         return False
     return not result.get("result_path")
 

@@ -76,6 +76,18 @@ class TestReplyPayload(unittest.TestCase):
                                                      SID + ".json")))
         self.assertFalse(os.path.exists(self.state))
 
+    def test_unreadable_result_file_sets_tail_note_and_keeps_it(self):
+        self._write_result("file answer")
+        result = {"status": "done", "result_path": self.rp}
+        with mock.patch.object(hao, "safe_read", return_value=None):
+            consume = hao._reply_payload(result, SID)
+        self.assertFalse(consume)
+        self.assertEqual(
+            result["tail_note"],
+            "result file unreadable; left in place for hao result")
+        self.assertNotIn("result_consumed", result)
+        self.assertTrue(os.path.exists(self.rp))
+
     def test_finish_done_keeps_tail_for_done_without_summary(self):
         self.led.write_done(SID)
         out = hao._finish_done(self.led, SID, "HAO_DONE line",
