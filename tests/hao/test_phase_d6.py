@@ -148,7 +148,9 @@ class TestD6Reasons(unittest.TestCase):
                     "agent_status": "working"}}}), ""
             return 0, "{}", ""
 
-        with mock.patch.object(hao, "run_herdr", side_effect=stub):
+        with mock.patch.object(hao, "run_herdr", side_effect=stub), \
+                mock.patch.object(hao, "LIFECYCLE_SETTLE_SECONDS", 0.01), \
+                mock.patch.object(hao.time, "sleep", return_value=None):
             rc, _, err = run_cli(["ask", "w2:p9", "x", "--mode", "lifecycle",
                                   "--wait"])
         self.assertEqual(rc, 6)

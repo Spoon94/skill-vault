@@ -50,6 +50,7 @@ HERDR_TIMEOUT_PROMPT = 30
 HERDR_TIMEOUT_WAIT_EXTRA = 5
 
 HERDR_TIMEOUT_HINT = 5
+LIFECYCLE_SETTLE_SECONDS = 10
 
 def _herdr_timeout(args):
     if args[:2] == ["agent", "prompt"]:
@@ -678,6 +679,18 @@ def cmd_ask(target, text, wait, mode, wake, timeout, machine=None,
         return snapshot_rc
     if mode == "lifecycle" and not wait:
         return fail(2, "lifecycle mode requires --wait")
+    if mode == "lifecycle" and st == "working":
+        # A peer that has just finished its previous task stays `working`
+        # for a moment (measured 1.7-2.5s on pi); wait for it to settle
+        # instead of refusing the dispatch.
+        deadline = time.time() + LIFECYCLE_SETTLE_SECONDS
+        while time.time() < deadline:
+            time.sleep(0.5)
+            submit_seq, st, snapshot_rc = _agent_snapshot(pane, machine)
+            if snapshot_rc or st != "working":
+                break
+        if snapshot_rc:
+            return snapshot_rc
     if mode == "lifecycle" and st in ("working", "blocked", "unknown"):
         return fail(6, f"lifecycle mode needs an idle agent; {pane} is {st}")
     result_path = None
