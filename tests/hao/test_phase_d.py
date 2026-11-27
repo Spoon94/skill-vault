@@ -84,6 +84,16 @@ class TestD2Diagnostics(unittest.TestCase):
         self.assertIn("observed working since dispatch", msg)
         self.assertNotIn("never observed", msg)
 
+    def test_never_working_diagnostic_names_pane_to_inspect(self):
+        msg = hao._timeout_detail(False, "idle", 240, pane="w2:p9")
+        self.assertIn("inspect with: herdr pane read w2:p9", msg)
+
+    def test_observed_working_diagnostic_names_pane_to_inspect(self):
+        # peer did work but sent no completion signal: this case also needs
+        # the actionable "inspect the peer's pane" hint, not just never-working
+        msg = hao._timeout_detail(True, "done", 240, pane="w2:p9")
+        self.assertIn("inspect with: herdr pane read w2:p9", msg)
+
 
 class TestD3Heartbeat(unittest.TestCase):
     def test_heartbeat_does_not_create_stub(self):

@@ -195,7 +195,7 @@ class TestZ3Consume(unittest.TestCase):
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)
 
-    def test_file_mode_wait_keeps_record_until_result(self):
+    def test_file_mode_wait_reads_and_removes_result(self):
         with tempfile.TemporaryDirectory() as d:
             state = self._state(d)
             sid = "beef11223344"
@@ -205,19 +205,28 @@ class TestZ3Consume(unittest.TestCase):
                 f.write("body")
             os.environ["HAO_STATE_DIR"] = state
             try:
-                led.Ledger().write_running(sid, target="w2:p9")
-                led.Ledger().write_done(sid, result_path=rp)
-                rc, out, _err = run_cli(
-                    ["wait", "w2:p9", sid, "--mode", "file", "--json"],
-                    {"HAO_STATE_DIR": state})
+                led.Ledger().write_running(sid, target="w2:p9",
+                                           result_path=rp)
+                def stub(args, machine=None):
+                    if args[:2] == ["agent", "get"]:
+                        return 0, json.dumps({"result": {"agent": {
+                            "agent_status": "done"}}}), ""
+                    return 0, '{"result":{}}', ""
+                with mock.patch.object(hao, "run_herdr", side_effect=stub), \
+                        mock.patch.object(hao.time, "sleep", return_value=None):
+                    rc, out, _err = run_cli(
+                        ["wait", "w2:p9", sid, "--mode", "file", "--json"],
+                        {"HAO_STATE_DIR": state})
                 self.assertEqual(rc, 0)
-                self.assertEqual(json.loads(out)["result_path"], rp)
-                self.assertTrue(os.path.exists(os.path.join(state, sid + ".json")))
-                self.assertTrue(os.path.exists(rp))
-                rc, out, _err = run_cli(["result", sid, "--json"],
-                                        {"HAO_STATE_DIR": state})
-                self.assertEqual(rc, 0)
-                self.assertEqual(json.loads(out)["content"], "body")
+                data = json.loads(out)
+                self.assertEqual(data["result_path"], rp)
+                self.assertEqual(data["tail"], "body")
+                self.assertTrue(data["result_consumed"])
+                self.assertFalse(os.path.exists(os.path.join(state, sid + ".json")))
+                self.assertFalse(os.path.exists(rp))
+                rc, _out, _err = run_cli(["result", sid, "--json"],
+                                         {"HAO_STATE_DIR": state})
+                self.assertEqual(rc, 3)
                 self.assertFalse(os.path.exists(state))
             finally:
                 os.environ.pop("HAO_STATE_DIR", None)

@@ -140,6 +140,11 @@ class TestFileWait(unittest.TestCase):
                     r2 = hao._wait_file("w2:pX", sid, "hao-feed1234567890", 6, None)
                     self.assertEqual(r2["status"], "done")
                     self.assertEqual(r2["result_path"], rp)
+                    self.assertEqual(r2["tail"], "result body")
+                    self.assertTrue(r2["result_consumed"])
+                    self.assertFalse(os.path.exists(rp))
+                    self.assertFalse(os.path.exists(
+                        os.path.join(d, "hao", "tasks", sid + ".json")))
                 finally:
                     hao.run_herdr = orig
             finally:
@@ -416,6 +421,9 @@ class TestFileConventionPath(unittest.TestCase):
                     hao.run_herdr = orig
                 self.assertEqual(r["status"], "done")
                 self.assertEqual(r["result_path"], rp)
+                self.assertEqual(r["tail"], "body")
+                self.assertTrue(r["result_consumed"])
+                self.assertFalse(os.path.exists(rp))
             finally:
                 sys.path.pop(0)
 
