@@ -15,7 +15,7 @@
 ```bash
 hao doctor                              # 自检
 hao name w2:p9 hawk --role reviewer     # → agent hawk + label hao-hawk-reviewer；role=reviewer, tier=mid
-hao ask w2:p9 "审查 PR 7" --wait        # JSON 带回 status/role/tier/max_lines
+hao ask w2:p9 "用三句话说明怎样做好代码评审" --wait --timeout 120   # JSON 带回 status/summary/role/tier/max_lines
 ```
 
 长任务用异步 + 唤醒；收到 `[HAO_WAKE] ...` 通知后，按通知里的 `hao wait` 命令取结果：
@@ -32,19 +32,19 @@ hao restore --dry-run
 hao restore
 ```
 
-最小的三档配合（细节见 `references/workflow.md`）：
+最小的三档配合（细节见 `references/workflow.md`；每个任务都自带上限和超时）：
 
 ```bash
 hao name w2:p9 atlas --role architect
-hao ask w2:p9 "为登录限流写方案与验收标准" --wait
+hao ask w2:p9 "为登录限流写方案与验收标准" --wait --timeout 300
 hao name w2:p10 moss --role project-manager
-hao ask w2:p10 "把方案拆成任务清单：<上一步 summary>" --wait
+hao ask w2:p10 "把方案拆成任务清单：<上一步 summary>" --wait --timeout 300
 hao name w2:p11 fern --role developer
-hao ask w2:p11 "实现任务 1" --wait
+hao ask w2:p11 "实现任务 1" --wait --timeout 300
 hao name w2:p12 lens --role reviewer
-hao ask w2:p12 "审查任务 1 的改动，只列阻塞问题" --wait
+hao ask w2:p12 "审查任务 1 的改动，只列阻塞问题" --wait --timeout 300
 hao name w2:p13 moth --role arbiter
-hao ask w2:p13 "只回答通过/不通过；材料：<初审结论>" --wait
+hao ask w2:p13 "只回答通过/不通过；材料：<初审结论>" --wait --timeout 300
 ```
 
 ## 命令面
@@ -112,13 +112,15 @@ hao ask w2:p13 "只回答通过/不通过；材料：<初审结论>" --wait
 
 ## 派活前要知道的几件事
 
+- **任务文本要自包含、有边界，并带上 `--timeout`。** 对端只能看到你发出的这段文字和它自己的工作目录。实测把一句“审查 PR 7”发给工作目录是 `/tmp` 的 pi，它花了几分钟去找是哪个仓库、哪个 PR，最后真的审了一个已合并的 PR，还在仓库里建了 worktree。
 - 对方输入框必须为空；未提交的文字会被一起提交或丢失。
 - 给 `low` 档角色设短的 `--timeout`；对方干完活却不发完成信号时，wait 只在超时返回。
 - 弱模型不一定调用 `hao done`，`summary` 可能为空；这时看 `tail` / `last_line`。
 - 需要审批、或访问不到 hao 的对方用 `ask --text-only`，结果只走文本通道。
 - `ask --wait` 返回时对方可能还在 working 一两秒；紧接着派下一个默认模式任务通常没问题。
+- 对方 pane 窄于 40 列时 `ask` 会警告：文本哨兵可能因折行认不出，台账通道不受影响；能取到布局时返回里带 `target_cols`。
 - `agent_status=unknown` 加 `--accept-unknown`；无 agent 的 shell pane 用 `--no-agent` 或 `--mode file`。
-- 跨机器加 `--machine`；未知 machine exit 7，herdr 不可达 exit 8。
+- 跨机器加 `--machine`：未知 machine exit 7，herdr 不可达 exit 8。这条路径只用桩验证过，没有做过端到端的真机验证。
 - 不要省略 `--timeout` 做长时间轮询。
 
 ## 命名与恢复
@@ -181,7 +183,7 @@ hao/
 cd tests/hao
 python3 -m unittest discover -s . -p 'test_*.py'       # 单元（497 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
-python3 live/run_live.py --list                          # 可选真机场景（需 HERDR_ENV=1 + HERDR_WORKSPACE_ID）
+python3 live/run_live.py --list                          # 可选真机场景（需 HERDR_ENV=1 + HERDR_WORKSPACE_ID；--quick 约 5 分钟，完整约 8 分钟）
 ```
 
 ## 从旧版本升级
