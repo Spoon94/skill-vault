@@ -151,7 +151,7 @@ hao name: name 'forge' already taken by agent on w2:p9 (exit 6)
 
 ```bash
 cd tests/hao
-python3 -m unittest discover -s . -p 'test_*.py'       # 单元（368 个）
+python3 -m unittest discover -s . -p 'test_*.py'       # 单元（485 个）
 python3 integration/test_integration.py                  # 集成冒烟（需 HERDR_ENV=1）
 ```
 
