@@ -67,10 +67,21 @@ def statements(src):
 
 
 def node_lines(node):
-    """Absolute line numbers of every statement in a node (a re-parsed source
-    segment would renumber them from 1, so always walk the node itself)."""
+    """Absolute line numbers of every executable statement in a node.
+
+    Docstrings are excluded: a docstring is a statement in the AST but the
+    compiler turns it into a constant, so it never produces a line event and
+    would be reported as uncovered forever. (A re-parsed source segment would
+    renumber lines from 1, so always walk the node itself.)"""
+    docstrings = set()
+    for n in ast.walk(node):
+        if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            first = n.body[0] if n.body else None
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) \
+                    and isinstance(first.value.value, str):
+                docstrings.add(first.lineno)
     return {n.lineno for n in ast.walk(node)
-            if isinstance(n, ast.stmt) and getattr(n, "lineno", None)}
+            if isinstance(n, ast.stmt) and getattr(n, "lineno", None)} - docstrings
 
 
 def run_suite(hook_dir, out_dir):
