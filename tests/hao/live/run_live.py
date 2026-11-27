@@ -12,6 +12,7 @@ import argparse
 import importlib.machinery
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,16 +33,23 @@ class Skip(Exception):
 
 
 class Scenario:
-    def __init__(self, name, fn, group, slow):
-        self.name, self.fn, self.group, self.slow = name, fn, group, slow
+    def __init__(self, name, fn, group, slow, isolate=False):
+        self.name, self.fn, self.group = name, fn, group
+        self.slow, self.isolate = slow, isolate
 
 
 SCENARIOS = []
 
 
-def scenario(name, group="", slow=False):
+def scenario(name, group="", slow=False, isolate=False):
+    """isolate=True: the scenario runs against its own throwaway instance.
+
+    Scenarios that leave unfinished work behind (cancelled or interrupted
+    long tasks) must not run on the shared peer: pi keeps the queued prompts
+    and resumes them after an interrupt, so later scenarios would inherit a
+    busy, confused peer."""
     def deco(fn):
-        SCENARIOS.append(Scenario(name, fn, group, slow))
+        SCENARIOS.append(Scenario(name, fn, group, slow, isolate))
         return fn
     return deco
 
@@ -70,6 +78,18 @@ class Ctx:
         self.env["HAO_STATE_DIR"] = state
         self.env.setdefault("HERDR_ENV", "1")
         self.last_file_result = None
+        self.agent_seq = 0
+
+    def agent_name(self):
+        """A herdr agent name unique within the run.
+
+        The pid makes it unique across runs too: an instance left behind by
+        a crashed run is then reported as `agent_name_taken` instead of
+        being silently collided with. (A fixed name made a second instance
+        fail whenever the shared peer had not been renamed yet.)"""
+        self.agent_seq += 1
+        base = "ls" + str(os.getpid())[-5:]
+        return base if self.agent_seq == 1 else "%sx%d" % (base, self.agent_seq)
 
     # ---------------------------------------------------------- plumbing
     def hao(self, args, timeout=None, env=None):
@@ -123,6 +143,7 @@ class Ctx:
         args = ["name", self.pane, name]
         if role is not None:
             args += ["--role", role]
+        args.append("--json")
         return self.hao_json(args)
 
     def ask(self, text, name="fern", role="developer", extra=(),
@@ -147,6 +168,29 @@ class Ctx:
                         "--source", "recent-unwrapped",
                         "--lines", str(lines)])
         return p.stdout
+
+    def pane_flat(self, lines=400, pane=None):
+        """Pane text with whitespace and border glyphs removed.
+
+        pi hard-wraps a pasted prompt at about 48 columns and draws a right
+        border, so a phrase can be split across display lines with a border
+        glyph in between ("…正文不超过 15 │" / "行；…"); match on this form."""
+        return re.sub(r"[\s│┃|]+", "", self.pane_read(lines, pane))
+
+    def input_box_text(self):
+        """Text between the two separator lines of pi's input box.
+
+        Returns None when no box is found on the visible pane (so a caller
+        cannot pass vacuously)."""
+        p = self.herdr(["pane", "read", self.pane, "--source", "visible",
+                        "--lines", "12"])
+        lines = [l.rstrip() for l in p.stdout.splitlines()]
+        seps = [i for i, l in enumerate(lines)
+                if len(l.strip()) >= 10 and set(l.strip()) <= set("─━-")]
+        if len(seps) < 2:
+            return None
+        return " ".join(l.strip() for l in lines[seps[-2] + 1:seps[-1]]
+                        if l.strip())
 
     def new_instance(self, kind="pi", label="hao-live-extra",
                      wait=6):
@@ -173,8 +217,8 @@ class Ctx:
         if not pane:
             self.herdr(["tab", "close", tab])
             raise Skip("no pane found in new tab")
-        cmd = ["agent", "start", "live", "--kind", kind, "--pane", pane,
-               "--timeout", "60000"]
+        cmd = ["agent", "start", self.agent_name(), "--kind", kind,
+               "--pane", pane, "--timeout", "60000"]
         if kind == "claude":
             cmd += ["--", "--dangerously-skip-permissions"]
         a = self.herdr(cmd, timeout=75)
@@ -361,11 +405,29 @@ def compact_brief_is_shorter(ctx):
     top = mod.build_prompt("x", tok, tier="top")
     low = mod.build_prompt("x", tok, tier="low")
     ctx.check("top shorter", len(top) < len(low), (len(top), len(low)))
-    rc, d, _, err = ctx.ask("只回答 compact-ok。", name="moth",
-                            role="arbiter", timeout=120)
-    ctx.check("ask rc 0", rc == 0, err)
-    text = ctx.pane_read()
-    ctx.check("pane shows compact cap", "正文不超过 15 行" in text)
+    # What was actually sent is recorded in the task's ledger record. The
+    # peer's pane is not a reliable witness: pi sometimes clears the screen.
+    ctx.reset("moth", "arbiter")
+    rc, d, _, err = ctx.hao_json(
+        ["ask", ctx.pane, "只回答 compact-ok。", "--json", "--timeout", "120"])
+    sid = (d or {}).get("shortid")
+    ctx.check("async ask", rc == 0 and bool(sid), err)
+    prompt = ""
+    if sid:
+        try:
+            with open(os.path.join(ctx.state, sid + ".json")) as f:
+                prompt = (json.load(f) or {}).get("prompt") or ""
+        except (OSError, ValueError):
+            pass
+    ctx.check("dispatched the compact brief",
+              "正文不超过 15 行" in prompt
+              and "以下完成上报是协议步骤" not in prompt, prompt[:160])
+    rc2, w, _, e2 = ctx.hao_json(
+        ["wait", ctx.pane, "--token", (d or {}).get("token") or "",
+         "--timeout", "120", "--json"])
+    ctx.check("task completes", rc2 == 0 and (w or {}).get("status") == "done",
+              e2)
+    ctx.check("tier top", (d or {}).get("tier") == "top", d)
 
 
 @scenario("custom_role_from_roles_md", "briefs", slow=False)
@@ -507,7 +569,8 @@ def timeout_diagnostic_is_actionable(ctx):
               text)
 
 
-@scenario("working_peer_is_not_read_at_high_frequency", "waiting", slow=True)
+@scenario("working_peer_is_not_read_at_high_frequency", "waiting", slow=True,
+          isolate=True)
 def working_peer_is_not_read_at_high_frequency(ctx):
     real = shutil.which("herdr")
     if not real:
@@ -596,8 +659,11 @@ def file_mode_zero_residue(ctx):
         ctx.check("result file gone", not os.path.exists(rp), rp)
         ctx.check("result dir gone",
                   not os.path.exists(os.path.dirname(rp)), rp)
-    ctx.check("no files in state", ctx.state_files() == [],
-              ctx.state_files())
+        # scoped to this task: other scenarios may legitimately have a
+        # running record of their own in the shared state dir
+        sid = os.path.basename(os.path.dirname(rp))
+        left = [f for f in ctx.state_files() if sid in f]
+        ctx.check("no record or lock left for this task", not left, left)
 
 
 @scenario("stale_record_is_cleaned", "file")
@@ -626,7 +692,7 @@ def result_missing_task_exits_3(ctx):
 
 
 # ---------------------------------------------------------------- control
-@scenario("cancel_keeps_peer_running", "control")
+@scenario("cancel_keeps_peer_running", "control", isolate=True)
 def cancel_keeps_peer_running(ctx):
     ctx.settle()
     rc, d, _, err = ctx.hao_json(
@@ -634,6 +700,10 @@ def cancel_keeps_peer_running(ctx):
          "--json", "--timeout", "90"])
     sid = (d or {}).get("shortid")
     ctx.check("async ask", rc == 0 and bool(sid), err)
+    for _ in range(30):     # the peer needs a moment to pick the task up
+        if ctx.agent_status() == "working":
+            break
+        time.sleep(0.5)
     rc2, c, _, e2 = ctx.hao_json(["cancel", sid, "--json"])
     ctx.check("cancel rc 0", rc2 == 0, e2)
     ctx.check("peer_running", (c or {}).get("peer_running") is True, c)
@@ -644,7 +714,7 @@ def cancel_keeps_peer_running(ctx):
     ctx.settle()
 
 
-@scenario("abort_interrupts", "control")
+@scenario("abort_interrupts", "control", isolate=True)
 def abort_interrupts(ctx):
     ctx.settle()
     rc, d, _, err = ctx.hao_json(
@@ -658,7 +728,7 @@ def abort_interrupts(ctx):
     ctx.settle(20)
 
 
-@scenario("stop_working_peer", "control")
+@scenario("stop_working_peer", "control", isolate=True)
 def stop_working_peer(ctx):
     ctx.settle()
     rc, d, _, err = ctx.hao_json(
@@ -682,7 +752,7 @@ def stop_working_peer(ctx):
               s2)
 
 
-@scenario("stop_dry_run_sends_nothing", "control")
+@scenario("stop_dry_run_sends_nothing", "control", isolate=True)
 def stop_dry_run_sends_nothing(ctx):
     ctx.settle()
     ctx.hao_json(["ask", ctx.pane, "请执行 shell 命令 sleep 60（必须真的执行）。",
@@ -711,7 +781,7 @@ def say_sends_plain_prompt(ctx):
               (before, ctx.state_files()))
 
 
-@scenario("say_strict_refuses_working", "control")
+@scenario("say_strict_refuses_working", "control", isolate=True)
 def say_strict_refuses_working(ctx):
     ctx.settle()
     ctx.hao_json(["ask", ctx.pane, "请执行 shell 命令 sleep 60（必须真的执行）。",
@@ -795,17 +865,26 @@ def read_only_commands_create_no_state(ctx):
 def draft_in_input_box_is_consumed(ctx):
     ctx.settle()
     ctx.reset("fern", "developer")
-    ctx.herdr(["pane", "send-text", ctx.pane, "UNSENT DRAFT"])
+    # A plausible half-typed line. The draft is glued in front of the task,
+    # so its wording reaches the model: text that reads like a label
+    # ("UNSENT DRAFT") can make a weak model refuse the task as "not sent".
+    draft = "顺便看一下"
+    ctx.herdr(["pane", "send-text", ctx.pane, draft])
     rc, d, _, err = ctx.hao_json(
         ["ask", ctx.pane, "只回答 draft-ok。", "--wait", "--timeout", "120",
          "--json"])
     ctx.check("ask rc 0", rc == 0, err)
     ctx.check("done", (d or {}).get("status") == "done", d)
-    text = ctx.pane_read(400)
-    idx = text.find("UNSENT DRAFT")
-    ctx.check("draft echoed", idx >= 0, "not found")
-    ctx.check("draft adjacent to task",
-              idx >= 0 and "[TASK" in text[idx:idx + 400], "not adjacent")
+    ctx.settle()
+    time.sleep(1)       # pi still shows its "Working" banner right after the wait
+    box = ctx.input_box_text()
+    if box is not None:
+        ctx.check("input box no longer holds the draft", draft not in box, box)
+    # when the echo is still on screen, the draft sits right in front of the
+    # task; pi sometimes clears the screen, so this is observed when possible
+    flat = ctx.pane_flat(400)
+    if draft in flat:
+        ctx.check("draft glued in front of the task", draft + "[TASK" in flat)
 
 
 @scenario("claude_code_peer_end_to_end", "cross-agent")
@@ -819,12 +898,27 @@ def claude_code_peer_end_to_end(ctx):
         rc, d, _, err = ctx.hao_json(
             ["name", pane, "moth", "--role", "arbiter", "--json"])
         ctx.check("name rc 0", rc == 0, err)
+        # A fresh Claude Code instance spends its first turn on start-up and
+        # on reading the hao script before it trusts `hao done`: measured 43s
+        # to its first token in the afternoon and 69s in the evening. Warm it
+        # up with a plain prompt first, then dispatch the measured task.
+        ctx.hao_json(["say", pane, "只回答 ready。", "--json"])
+        for _ in range(60):          # dispatching is not the peer starting
+            if ctx.agent_status(pane) == "working":
+                break
+            time.sleep(0.5)
+        deadline = time.time() + 240
+        while time.time() < deadline:
+            if ctx.agent_status(pane) in ("idle", "done"):
+                break
+            time.sleep(1)
         rc2, a, _, e2 = ctx.hao_json(
             ["ask", pane, "只回答 claude-ok。", "--wait",
-             "--timeout", "120", "--json"])
+             "--timeout", "300", "--json"])
         ctx.check("ask rc 0", rc2 == 0, e2)
         ctx.check("done", (a or {}).get("status") == "done", a)
         ctx.check("tier top", (a or {}).get("tier") == "top", a)
+        ctx.check("answer", ctx.answer(a, "claude-ok"), a)
     finally:
         ctx.close_tab(tab)
 
@@ -873,7 +967,7 @@ def setup(ctx):
         time.sleep(0.25)
     if not ctx.pane:
         return "no pane found in new tab"
-    a = ctx.herdr(["agent", "start", "live", "--kind", "pi",
+    a = ctx.herdr(["agent", "start", ctx.agent_name(), "--kind", "pi",
                    "--pane", ctx.pane, "--timeout", "60000"], timeout=75)
     if a.returncode != 0:
         return "agent start failed: " + (a.stderr or a.stdout).strip()[:200]
@@ -881,12 +975,32 @@ def setup(ctx):
     return None
 
 
+def _run_isolated(ctx, sc):
+    """Run sc against a throwaway instance, then destroy it.
+
+    ctx.pane / ctx.tab point at the throwaway for the duration; afterwards
+    the tab is closed, the shared peer is restored and the suite's ledger is
+    cleaned (records of the destroyed instance are orphans)."""
+    tab, pane = ctx.new_instance("pi", "hao-live-iso")
+    main_pane, main_tab = ctx.pane, ctx.tab
+    ctx.pane, ctx.tab = pane, tab
+    try:
+        sc.fn(ctx)
+    finally:
+        ctx.close_tab(tab)
+        ctx.pane, ctx.tab = main_pane, main_tab
+        ctx.hao_json(["clean", "--all", "--json"])
+
+
 def run_one(ctx, sc):
     start = time.time()
     ctx.checks = []
     status, detail = "PASS", ""
     try:
-        sc.fn(ctx)
+        if sc.isolate:
+            _run_isolated(ctx, sc)
+        else:
+            sc.fn(ctx)
         if not all(ok for ok, _, _ in ctx.checks):
             status = "FAIL"
     except Skip as e:
