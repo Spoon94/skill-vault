@@ -1,170 +1,170 @@
-[中文](./README.md) | [English](./README.en.md)
+[English](./README.md) | [中文](./README.zh.md)
 
 # skill-vault
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/Spoon94/skill-vault?style=social)](https://github.com/Spoon94/skill-vault)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Spec-blue)](https://agentskills.io/specification)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#贡献)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-> 个人收藏并整理的 AI 编程助手 **Agent Skills** 集合，按来源/主题分类组织，开箱即用。
+> A personally collected and organized collection of **Agent Skills** for AI coding assistants, grouped by source/topic and ready to use out of the box.
 
-每个 skill 都是一个独立目录。目录里有 `SKILL.md` 与它用到的资源（脚本、模板、参考文档）。每个 skill 都遵循 [Agent Skills 规范](https://agentskills.io/specification)。Claude Code、Codex CLI、Copilot CLI、Gemini CLI、OpenCode 等任何兼容 skills 的 AI 编程助手都能加载和调用它。
+Each skill is a self-contained directory. The directory holds `SKILL.md` and the resources it uses (scripts, templates, reference docs). Every skill follows the [Agent Skills specification](https://agentskills.io/specification). Any AI coding assistant that is compatible with skills — Claude Code, Codex CLI, Copilot CLI, Gemini CLI, OpenCode, and others — can load and invoke it.
 
-## 快速开始
+## Quick start
 
 ```bash
 git clone https://github.com/Spoon94/skill-vault.git
-cp -r skill-vault/git-commit ~/.claude/skills/     # 以 Claude Code + git-commit 为例
+cp -r skill-vault/git-commit ~/.claude/skills/     # Claude Code + git-commit as an example
 ```
 
-**完整安装步骤见 [INSTALL.md](./INSTALL.md)**（含各平台目录、软链方式、批量安装、嵌套路径）。
+**See [INSTALL.md](./INSTALL.md) for the complete installation steps** (per-platform directories, symlinking, bulk installation, nested paths).
 
-## 技能全景
+## Skill overview
 
-![技能全景](docs/images/skill-map.svg)
+![Skill overview](docs/images/skill-map.svg)
 
-核心三条线：**讲解编排**（eli5 · show-me 让人懂）→ **渲染产出**（7 个 diagram-\* 画图）→ **打磨交付**（falsify 验伪 · clarify 精确 · deslop-bi 自然）。其余工具技能归入检索、流程、记忆、操作四类，见下方索引。
+Three core lines: **explaining and orchestration** (eli5 · show-me, to make people understand) → **rendering output** (7 diagram-\* skills for drawing) → **polishing delivery** (falsify for falsification · clarify for precision · deslop-bi for naturalness). The remaining tool skills fall into four categories — retrieval, workflow, memory, and operations — see the index below.
 
-## 组合使用
+## Combining skills
 
-![组合流程](docs/images/skill-pipeline.svg)
+![Combination workflow](docs/images/skill-pipeline.svg)
 
-流水线：**编排**（show-me / eli5 选讲解形式）→ **渲染**（diagram-\* 按需补图）→ **质量**（falsify 验伪）→ **语言**（clarify / deslop-bi 定风格）。独立工具技能（gh、tavily、tmux 等）按需穿插到任意环节。
+Pipeline: **orchestration** (show-me / eli5 choose the explanation format) → **rendering** (diagram-\* adds diagrams as needed) → **quality** (falsify for falsification) → **language** (clarify / deslop-bi set the style). Standalone tool skills (gh, tavily, tmux, etc.) are woven into any stage as needed.
 
-**关键点**：
+**Key points**:
 
-- `show-me` 自带内联 Mermaid 与聚焦 HTML。自带图够用时，你不要再叠 `diagram-*`。只有要 UML/云架构/DOT 边路由/成品文件时，你才升级到对应 `diagram-*`。
-- `eli5` 的产物不要再过 `clarify`。eli5 要生动，clarify 要平实，两者方向冲突。`clarify` 与 `deslop-bi` 互斥：前者压平人味，后者恢复人味。
-- `falsify` 的对象是论断/讲解/计划，不是纯渲染产物。`diagram-*` 只是按描述画图，没有可证伪的论断。
+- `show-me` comes with inline Mermaid and focused HTML. When its built-in diagrams are enough, do not stack `diagram-*` on top. Only upgrade to the matching `diagram-*` when you need UML / cloud architecture / DOT edge routing / finished files.
+- Do not run the output of `eli5` through `clarify`. eli5 wants to be vivid, clarify wants to be plain; the two pull in opposite directions. `clarify` and `deslop-bi` are mutually exclusive: the former flattens the human touch, the latter restores it.
+- `falsify` targets claims / explanations / plans, not pure rendering output. `diagram-*` only draws from a description and makes no falsifiable claims.
 
-## 技能索引（64 个 · 按场景）
+## Skill index (64 · by scenario)
 
-### 讲解与绘图（核心 14 个）
+### Explaining and drawing (14 core skills)
 
-| 技能 | 用途 |
+| Skill | Purpose |
 |------|------|
-| [eli5](./eli5) | 给完全不懂的人：HTML 大图少字 |
-| [show-me](./show-me) | 给技术人：编排图 + 短文讲清话题 |
-| [diagram-mermaid](./diagram/diagram-mermaid) | 嵌入基础图（流程/时序/状态/ER 等 11 种） |
-| [diagram-plantuml](./diagram/diagram-plantuml) | 专业图：UML/云架构/网络/安全/BPMN（图标库 9500+） |
-| [diagram-graphviz](./diagram/diagram-graphviz) | 依赖树/调用图/包层级，细粒度边路由 |
-| [diagram-html](./diagram/diagram-html) | 可分享的 HTML 成品图/一页讲解，双主题 + 一键导出 |
-| [diagram-image](./diagram/diagram-image) | 产 SVG / PNG / 离线 HTML / GIF 动图，命令行适合 CI/批处理 |
-| [diagram-infocard](./diagram/diagram-infocard) | 单主题信息卡片，杂志级排版 |
-| [diagram-infographic](./diagram/diagram-infographic) | KPI 看板/时间线/SWOT/漏斗/对比 |
-| [falsify](./falsify) | 验伪：给产物强制加反例 + 失效机制 + 边界 |
-| [clarify](./clarify) | 精确交付：中英均按 ASD-STE100 受控语言重写 |
-| [deslop-bi](./deslop-bi) | 自然交付：去 AI 味，恢复人味 |
-| [obsidian/defuddle](./obsidian/defuddle) | 从网页提取干净 Markdown，省 token |
-| [obsidian/knap](./obsidian/knap) | 用模板 + 结构化数据批渲染 Markdown 笔记 |
+| [eli5](./eli5) | For people who know nothing about it: HTML with big diagrams and few words |
+| [show-me](./show-me) | For technical people: orchestrated diagrams + short text that explains a topic |
+| [diagram-mermaid](./diagram/diagram-mermaid) | Embed basic diagrams (flow / sequence / state / ER, 11 kinds in total) |
+| [diagram-plantuml](./diagram/diagram-plantuml) | Professional diagrams: UML / cloud architecture / network / security / BPMN (icon library of 9500+) |
+| [diagram-graphviz](./diagram/diagram-graphviz) | Dependency trees / call graphs / package hierarchy, fine-grained edge routing |
+| [diagram-html](./diagram/diagram-html) | Shareable HTML finished diagrams / one-page explainers, dual themes + one-click export |
+| [diagram-image](./diagram/diagram-image) | Produces SVG / PNG / offline HTML / GIF animations; the command line suits CI / batch processing |
+| [diagram-infocard](./diagram/diagram-infocard) | Single-topic info cards with magazine-quality layout |
+| [diagram-infographic](./diagram/diagram-infographic) | KPI dashboards / timelines / SWOT / funnels / comparisons |
+| [falsify](./falsify) | Falsification: force a counterexample + failure mechanism + boundaries into an artifact |
+| [clarify](./clarify) | Precise delivery: rewrites both Chinese and English under the ASD-STE100 controlled language |
+| [deslop-bi](./deslop-bi) | Natural delivery: removes the AI flavor and restores the human touch |
+| [obsidian/defuddle](./obsidian/defuddle) | Extracts clean Markdown from web pages, saves tokens |
+| [obsidian/knap](./obsidian/knap) | Batch-renders Markdown notes from templates + structured data |
 
-### 开发流程（19 个）
+### Development workflow (19)
 
-| 技能 | 用途 |
+| Skill | Purpose |
 |------|------|
-| [superpowers/brainstorming](./superpowers/brainstorming) | 动手前：设计探索与需求澄清 |
-| [superpowers/writing-plans](./superpowers/writing-plans) | 有规格后：写多步实施计划 |
-| [superpowers/executing-plans](./superpowers/executing-plans) | 执行实施计划 |
-| [superpowers/subagent-driven-development](./superpowers/subagent-driven-development) | 用子代理并行执行独立任务 |
-| [superpowers/dispatching-parallel-agents](./superpowers/dispatching-parallel-agents) | 分发 2+ 个独立任务给并行代理 |
-| [superpowers/test-driven-development](./superpowers/test-driven-development) | 写实现前：先写测试 |
-| [superpowers/systematic-debugging](./superpowers/systematic-debugging) | 遇 bug/测试失败：系统化调试 |
-| [superpowers/verification-before-completion](./superpowers/verification-before-completion) | 声称完工前：先验证 |
-| [superpowers/requesting-code-review](./superpowers/requesting-code-review) | 合并前：请求代码审查 |
-| [superpowers/receiving-code-review](./superpowers/receiving-code-review) | 收到审查意见后：先评估再改 |
-| [superpowers/finishing-a-development-branch](./superpowers/finishing-a-development-branch) | 实现完成：收尾开发分支 |
-| [superpowers/using-git-worktrees](./superpowers/using-git-worktrees) | 要隔离工作区时：用 git worktree |
-| [superpowers/using-superpowers](./superpowers/using-superpowers) | 会话开始：如何发现和使用 skills |
-| [superpowers/writing-skills](./superpowers/writing-skills) | 新建/编辑/校验 skill |
-| [superpowers/diagnosing-superpowers](./superpowers/diagnosing-superpowers) | 复盘出问题的 superpowers 会话，生成 bug report |
-| [git-commit](./git-commit) | 规范提交信息（Conventional Commits） |
-| [worktrunk](./worktrunk) | Worktrunk（`wt`）worktree 管理、hooks、配置 |
-| [hunk-review](./hunk-review) | 与 Hunk 交互式 diff 审阅会话协作 |
-| [anthropics/skills/skill-creator](./anthropics/skills/skill-creator) | 创建/改进 skill，度量 skill 性能 |
+| [superpowers/brainstorming](./superpowers/brainstorming) | Before starting out: design exploration and requirements clarification |
+| [superpowers/writing-plans](./superpowers/writing-plans) | Once there is a spec: write multi-step implementation plans |
+| [superpowers/executing-plans](./superpowers/executing-plans) | Execute implementation plans |
+| [superpowers/subagent-driven-development](./superpowers/subagent-driven-development) | Run independent tasks in parallel with subagents |
+| [superpowers/dispatching-parallel-agents](./superpowers/dispatching-parallel-agents) | Dispatch 2+ independent tasks to parallel agents |
+| [superpowers/test-driven-development](./superpowers/test-driven-development) | Before writing the implementation: write the tests first |
+| [superpowers/systematic-debugging](./superpowers/systematic-debugging) | On a bug / test failure: systematic debugging |
+| [superpowers/verification-before-completion](./superpowers/verification-before-completion) | Before claiming completion: verify first |
+| [superpowers/requesting-code-review](./superpowers/requesting-code-review) | Before merging: request a code review |
+| [superpowers/receiving-code-review](./superpowers/receiving-code-review) | After receiving review comments: evaluate first, then change |
+| [superpowers/finishing-a-development-branch](./superpowers/finishing-a-development-branch) | Implementation done: finish up the development branch |
+| [superpowers/using-git-worktrees](./superpowers/using-git-worktrees) | When you need an isolated working tree: use git worktree |
+| [superpowers/using-superpowers](./superpowers/using-superpowers) | At the start of a session: how to discover and use skills |
+| [superpowers/writing-skills](./superpowers/writing-skills) | Create / edit / validate skills |
+| [superpowers/diagnosing-superpowers](./superpowers/diagnosing-superpowers) | Review a superpowers session that went wrong and generate a bug report |
+| [git-commit](./git-commit) | Standardized commit messages (Conventional Commits) |
+| [worktrunk](./worktrunk) | Worktrunk (`wt`) worktree management, hooks, configuration |
+| [hunk-review](./hunk-review) | Work with Hunk's interactive diff review sessions |
+| [anthropics/skills/skill-creator](./anthropics/skills/skill-creator) | Create / improve skills, measure skill performance |
 
-### 检索与信息（5 个）
+### Retrieval and information (5)
 
-| 技能 | 用途 |
+| Skill | Purpose |
 |------|------|
-| [semble](./semble) | 代码语义检索，替代 grep+read，省 ~98% token |
-| [tavily](./tavily) | 网页搜索/提取/爬取/研究，带引用 |
-| [gh](./gh) | GitHub CLI 调用模式：结构化输出、分页、`gh api` 兜底 |
-| [obsidian/obsidian-cli](./obsidian/obsidian-cli) | 通过 Obsidian CLI 读/建/搜 vault |
-| [agentsview-cli](./agentsview-cli) | 本地 AI 会话历史：同步/搜索/成本报告 |
+| [semble](./semble) | Semantic code retrieval, replaces grep+read, saves ~98% tokens |
+| [tavily](./tavily) | Web search / extraction / crawling / research, with citations |
+| [gh](./gh) | GitHub CLI invocation patterns: structured output, pagination, `gh api` as the fallback |
+| [obsidian/obsidian-cli](./obsidian/obsidian-cli) | Read / create / search vaults through the Obsidian CLI |
+| [agentsview-cli](./agentsview-cli) | Local AI session history: sync / search / cost reports |
 
-### 笔记与记忆（6 个）
+### Notes and memory (6)
 
-| 技能 | 用途 |
+| Skill | Purpose |
 |------|------|
-| [engram-mem](./engram-mem) | 跨会话持久记忆（本地 SQLite，工作与生活通用） |
-| [obsidian/obsidian-markdown](./obsidian/obsidian-markdown) | Obsidian Markdown：wikilinks/嵌入/callouts/properties |
-| [obsidian/obsidian-bases](./obsidian/obsidian-bases) | Obsidian Bases（`.base`）：视图/过滤器/公式/汇总 |
-| [obsidian/json-canvas](./obsidian/json-canvas) | JSON Canvas（`.canvas`）：节点/连线/分组 |
-| [anthropics/skills/doc-coauthoring](./anthropics/skills/doc-coauthoring) | 结构化协同写作 |
-| [anthropics/skills/internal-comms](./anthropics/skills/internal-comms) | 写各类内部沟通（周报/公告/FAQ） |
+| [engram-mem](./engram-mem) | Persistent memory across sessions (local SQLite, for both work and life) |
+| [obsidian/obsidian-markdown](./obsidian/obsidian-markdown) | Obsidian Markdown: wikilinks / embeds / callouts / properties |
+| [obsidian/obsidian-bases](./obsidian/obsidian-bases) | Obsidian Bases (`.base`): views / filters / formulas / summaries |
+| [obsidian/json-canvas](./obsidian/json-canvas) | JSON Canvas (`.canvas`): nodes / edges / groups |
+| [anthropics/skills/doc-coauthoring](./anthropics/skills/doc-coauthoring) | Structured co-writing |
+| [anthropics/skills/internal-comms](./anthropics/skills/internal-comms) | Write all kinds of internal communications (weekly reports / announcements / FAQ) |
 
-### 操作与集成（7 个）
+### Operations and integrations (7)
 
-| 技能 | 用途 |
+| Skill | Purpose |
 |------|------|
-| [tmux](./tmux) | 脚本化驱动 tmux：后台会话/send-keys/capture-pane |
-| [herdr](./herdr) | Herdr CLI 控制终端多路复用器，协调 agent |
-| [hao](./hao) | hao：分档多 agent 协作——角色目录、按档位派活、命名/持久化、任务级等待 |
-| [opencli](./opencli) | 把网站/Electron 应用/外部 CLI 变成统一操作面 |
-| [mcp2cli](./mcp2cli) | 把 MCP/OpenAPI/GraphQL 变成 CLI |
-| [anthropics/skills/mcp-builder](./anthropics/skills/mcp-builder) | 构建高质量 MCP 服务器 |
-| [anthropics/skills/claude-api](./anthropics/skills/claude-api) | 构建/调试/优化 Claude API 与 Anthropic SDK 应用 |
+| [tmux](./tmux) | Drive tmux from scripts: background sessions / send-keys / capture-pane |
+| [herdr](./herdr) | Herdr CLI for controlling the terminal multiplexer and coordinating agents |
+| [hao](./hao) | hao: tiered multi-agent collaboration — role catalog, dispatch by tier, naming / persistence, task-level waiting |
+| [opencli](./opencli) | Turns websites / Electron apps / external CLIs into a unified operating surface |
+| [mcp2cli](./mcp2cli) | Turns MCP / OpenAPI / GraphQL into CLIs |
+| [anthropics/skills/mcp-builder](./anthropics/skills/mcp-builder) | Build high-quality MCP servers |
+| [anthropics/skills/claude-api](./anthropics/skills/claude-api) | Build / debug / optimize Claude API and Anthropic SDK applications |
 
-### 文档与设计（12 个）
+### Documents and design (12)
 
-| 技能 | 用途 |
+| Skill | Purpose |
 |------|------|
-| [anthropics/skills/docx](./anthropics/skills/docx) | Word 文档创建/编辑 |
-| [anthropics/skills/pdf](./anthropics/skills/pdf) | PDF 处理 |
-| [anthropics/skills/pptx](./anthropics/skills/pptx) | PowerPoint 创建/编辑 |
-| [anthropics/skills/xlsx](./anthropics/skills/xlsx) | Excel 表格创建/编辑 |
-| [anthropics/skills/frontend-design](./anthropics/skills/frontend-design) | 前端视觉设计指引 |
-| [anthropics/skills/web-artifacts-builder](./anthropics/skills/web-artifacts-builder) | 构建多组件 claude.ai HTML artifact |
-| [anthropics/skills/webapp-testing](./anthropics/skills/webapp-testing) | 用 Playwright 测试本地 Web 应用 |
-| [anthropics/skills/algorithmic-art](./anthropics/skills/algorithmic-art) | p5.js 算法艺术（种子随机） |
-| [anthropics/skills/canvas-design](./anthropics/skills/canvas-design) | PNG/PDF 视觉艺术设计 |
-| [anthropics/skills/brand-guidelines](./anthropics/skills/brand-guidelines) | 应用 Anthropic 官方品牌色与字体 |
-| [anthropics/skills/theme-factory](./anthropics/skills/theme-factory) | 给 artifact（幻灯片/文档/网页）套主题 |
-| [anthropics/skills/slack-gif-creator](./anthropics/skills/slack-gif-creator) | 制作适配 Slack 的动图 GIF |
+| [anthropics/skills/docx](./anthropics/skills/docx) | Word document creation / editing |
+| [anthropics/skills/pdf](./anthropics/skills/pdf) | PDF processing |
+| [anthropics/skills/pptx](./anthropics/skills/pptx) | PowerPoint creation / editing |
+| [anthropics/skills/xlsx](./anthropics/skills/xlsx) | Excel spreadsheet creation / editing |
+| [anthropics/skills/frontend-design](./anthropics/skills/frontend-design) | Frontend visual design guidelines |
+| [anthropics/skills/web-artifacts-builder](./anthropics/skills/web-artifacts-builder) | Build multi-component claude.ai HTML artifacts |
+| [anthropics/skills/webapp-testing](./anthropics/skills/webapp-testing) | Test local web apps with Playwright |
+| [anthropics/skills/algorithmic-art](./anthropics/skills/algorithmic-art) | p5.js algorithmic art (seeded randomness) |
+| [anthropics/skills/canvas-design](./anthropics/skills/canvas-design) | PNG / PDF visual art design |
+| [anthropics/skills/brand-guidelines](./anthropics/skills/brand-guidelines) | Apply Anthropic's official brand colors and fonts |
+| [anthropics/skills/theme-factory](./anthropics/skills/theme-factory) | Apply themes to artifacts (slides / documents / web pages) |
+| [anthropics/skills/slack-gif-creator](./anthropics/skills/slack-gif-creator) | Create animated GIFs that fit Slack |
 
-> `anthropics/template`（脚手架模板）未列入索引 —— 它是新建 skill 的起点，不是可用技能。
+> `anthropics/template` (a scaffold template) is not listed in the index — it is the starting point for a new skill, not a usable skill.
 
-## 安装方式
+## Installation
 
-**agent 读 [INSTALL.md](./INSTALL.md)** —— 里面有按平台分步的安装指令。
-人只需知道：把 skill 目录拷到平台的 skills 目录，或用 `npx skills add <repo-url>` 批量装。
+**Agents read [INSTALL.md](./INSTALL.md)** — it contains step-by-step installation instructions per platform.
+Humans only need to know: copy the skill directory into the platform's skills directory, or use `npx skills add <repo-url>` to install in bulk.
 
-## 与上游项目的差异
+## Differences from the upstream projects
 
-为保证开箱可用，本仓库对 vendored 内容维护以下本地不变式。任何上游同步都必须保住它们：
+To keep everything usable out of the box, this repository maintains the following local invariants for vendored content. Any upstream sync must preserve them:
 
-| # | 不变式 | 原因 | 影响范围 |
+| # | Invariant | Reason | Scope |
 |---|--------|------|----------|
-| I1 | `description` ≤ 1024 字符，超长时存裁剪版 | pi harness 硬限制，超出报 `description exceeds 1024 characters` | `diagram/diagram-{html,mermaid,plantuml}`（上游 1219/1159/1452 字符，本地为合规裁剪版） |
-| I2 | `description` 含 `:` / 引号等 YAML 特殊字符时必须加引号 | 否则 YAML 解析报 `Nested mappings are not allowed in compact mappings` | `semble/SKILL.md`（上游未加引号，本地加了） |
-| I3 | ~~引用仓库内相对路径扁平化~~ **已由上游修复** | 上游 2026-10 起改用扁平路径，本地无需再打补丁 | —（原 `superpowers/brainstorming/SKILL.md`） |
-| I4 | opencli 结构不同：上游 `OpenCLI/skills/` 下 5 个子技能（opencli-usage / opencli-browser / opencli-adapter-author / opencli-autofix / smart-search）合并为单个 `opencli/SKILL.md` + `opencli/references/` | 统一入口，按任务类型路由，避免 5 个 skill 全部进上下文 | `opencli/` 全目录：去掉子技能 frontmatter，`references/` 路径前缀重写为本地布局（`adapter/`、`search/`） |
-| I5 | opencli 的 strategy 术语有两套（references 的上游文档层大写术语 vs 运行时的小写 tag），`SKILL.md` 需维护映射表 | 上游文档与自家 CLI 输出脱节；本地需要让 agent 能把 references 术语和 `list -f json` 实际输出对上 | `opencli/SKILL.md`「术语对照」表 |
-| I6 | `diagram/` 家族跨两个上游集合：`arch-diagram/diagram/` 的 4 个 `diagram-*` + `arch-diagram/skills/`（即 markdown-viewer/skills）的 3 个改名为 `diagram-*` 的目录（`diagram-graphviz` / `diagram-infocard` / `diagram-infographic`，上游裸名 graphviz / infocard / infographic） | 同属绘图技能集中放置便于路由与发现 | `diagram/diagram-{graphviz,infocard,infographic}/` |
-| I7 | diagram 家族统一用 `diagram-*` 前缀命名，与上游 `markdown-viewer/skills` 的裸名（graphviz/infocard/infographic）不同 | 家族内命名一致性优先于上游保真；便于按名字定位 | `diagram/diagram-{graphviz,infocard,infographic}/`；下次同步这 3 个时需重做改名 + 改 `name` 字段补丁 |
-| I8 | `worktrunk/reference/claude-code.md` 中关于 `wt-switch-create` 的描述保留上游原文，但加了「本仓库未收录」标注 | 该 skill 已删除（用户不需要），上游文本仍提及它；标注避免 agent 误以为可用 | `worktrunk/reference/claude-code.md` |
-| I9 | `diagram-{graphviz,infocard,infographic}` 冻结在 markdown-viewer/skills 合并前的版本 | 上游 2026-10 已把这 3 个（及同仓库其他子技能）合并为单个 `documd-visuals`，原目录删除且新包要求 Node 18+ 与 Chrome；本地保留无需构建的旧版 | `diagram/diagram-{graphviz,infocard,infographic}/`；下次同步跳过这 3 个 |
+| I1 | `description` ≤ 1024 characters; when it is too long, store a trimmed version | Hard limit of the pi harness; anything longer fails with `description exceeds 1024 characters` | `diagram/diagram-{html,mermaid,plantuml}` (1219/1159/1452 characters upstream; the local copies are trimmed for compliance) |
+| I2 | A `description` that contains `:` / quotes or other YAML special characters must be quoted | Otherwise YAML parsing fails with `Nested mappings are not allowed in compact mappings` | `semble/SKILL.md` (not quoted upstream, quoted locally) |
+| I3 | ~~Flattening of relative paths referenced inside the repository~~ **fixed upstream** | Upstream switched to flat paths in 2026-10, so no local patch is needed any more | — (formerly `superpowers/brainstorming/SKILL.md`) |
+| I4 | opencli has a different structure: the 5 sub-skills under upstream `OpenCLI/skills/` (opencli-usage / opencli-browser / opencli-adapter-author / opencli-autofix / smart-search) are merged into a single `opencli/SKILL.md` + `opencli/references/` | One unified entry point that routes by task type, so that 5 skills do not all end up in the context | The whole `opencli/` directory: sub-skill frontmatter removed, and the `references/` path prefixes rewritten to the local layout (`adapter/`, `search/`) |
+| I5 | opencli's strategy terminology comes in two sets (the capitalized terms of the upstream documentation layer in references vs the lowercase tags at runtime), and `SKILL.md` has to maintain a mapping table | The upstream docs are out of step with their own CLI output; locally, an agent must be able to match the terminology in references to the actual output of `list -f json` | The「术语对照」(terminology mapping) table in `opencli/SKILL.md` |
+| I6 | The `diagram/` family spans two upstream collections: 4 `diagram-*` from `arch-diagram/diagram/` + 3 directories renamed to `diagram-*` from `arch-diagram/skills/` (i.e. markdown-viewer/skills) (`diagram-graphviz` / `diagram-infocard` / `diagram-infographic`; bare names upstream: graphviz / infocard / infographic) | They are all diagram skills, so keeping them in one place eases routing and discovery | `diagram/diagram-{graphviz,infocard,infographic}/` |
+| I7 | The diagram family is uniformly named with the `diagram-*` prefix, unlike the bare names (graphviz/infocard/infographic) upstream in `markdown-viewer/skills` | Naming consistency within the family takes priority over upstream fidelity; it also makes them easier to locate by name | `diagram/diagram-{graphviz,infocard,infographic}/`; the next time these 3 are synced, the rename + `name` field patch has to be redone |
+| I8 | In `worktrunk/reference/claude-code.md` the description of `wt-switch-create` keeps the upstream wording but carries a「本仓库未收录」(not included in this repository) note | The skill was deleted (the user does not need it) while the upstream text still mentions it; the note keeps an agent from assuming it is available | `worktrunk/reference/claude-code.md` |
+| I9 | `diagram-{graphviz,infocard,infographic}` are frozen at the version from before the markdown-viewer/skills merge | In 2026-10 upstream merged these 3 (and the other sub-skills in the same repository) into a single `documd-visuals`; the original directories were deleted and the new package requires Node 18+ and Chrome; locally the old version that needs no build is kept | `diagram/diagram-{graphviz,infocard,infographic}/`; skip these 3 on the next sync |
 
-除上述不变式外，其余内容与各上游项目保持一致。
+Apart from the invariants above, the remaining content is kept identical to the respective upstream projects.
 
-## 贡献
+## Contributing
 
-欢迎 PR 和 Issue：
+PRs and issues are welcome:
 
-- 新增 skill：请放在对应分类目录下。在本 README 表格中追加一行。
-- 修复/改进现有 skill：建议先在 Issue 中讨论，再提 PR。
-- 提交规范：遵循 [Conventional Commits](./git-commit)。
+- Adding a skill: put it under the matching category directory, and append a row to the table in this README.
+- Fixing / improving an existing skill: discuss it in an Issue first, then open a PR.
+- Commit conventions: follow [Conventional Commits](./git-commit).
 
 ## License
 

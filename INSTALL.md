@@ -1,61 +1,60 @@
-[中文](./INSTALL.md) | [English](./INSTALL.en.md)
+[English](./INSTALL.md) | [中文](./INSTALL.zh.md)
 
-# 安装 skill（给 agent 的指令）
+# Installing skills (instructions for agents)
 
-本文件面向 **agent**。人在 README 看简介；agent 按本文件把 skill 装到目标平台。
+This file is for **agents**. Humans get the overview from the README; agents follow this file to install skills on the target platform.
 
-## 关键规则
+## Key rules
 
-1. **先确认目标平台**。用户没指定时，问一次，或用当前环境判断（见下表）。
-2. **只装需要的 skill**，不要全量拷贝。用户指定名字时，只装那些。
-3. **保留目录完整性**。每个 skill 是一个目录，目录里有 `SKILL.md` 和它用到的资源。
-   拷贝时整个目录一起拷，不要只拷 `SKILL.md`。
-4. **装完验证**。确认软链或目录存在，且 `SKILL.md` 可读。
+1. **Confirm the target platform first.** When the user has not specified it, ask once, or infer it from the current environment (see the table below).
+2. **Install only the skills that are needed**; do not copy everything. When the user names specific skills, install only those.
+3. **Keep directories intact.** Each skill is a directory that holds `SKILL.md` and the resources it uses.
+   Copy the directory as a whole; never copy just `SKILL.md`.
+4. **Verify after installing.** Confirm that the symlink or directory exists and that `SKILL.md` is readable.
 
-## 平台与安装目录
+## Platforms and install directories
 
-| 平台 | 安装目录 | 判断依据 |
+| Platform | Install directory | How to detect |
 |------|----------|----------|
-| Claude Code | `~/.claude/skills/` | 环境有 `claude` 命令 |
-| Codex CLI | `~/.codex/skills/` | 环境有 `codex` 命令 |
-| Copilot CLI | `~/.agents/skills/` | 环境有 `copilot` 命令 |
-| OpenCode | `~/.opencode/skills/` | 环境有 `opencode` 命令 |
-| Gemini CLI | 支持 `SKILL.md`；`~/.gemini/skills/` 或项目内 `.gemini/skills/` | 环境有 `gemini` 命令 |
+| Claude Code | `~/.claude/skills/` | A `claude` command exists in the environment |
+| Codex CLI | `~/.codex/skills/` | A `codex` command exists in the environment |
+| Copilot CLI | `~/.agents/skills/` | A `copilot` command exists in the environment |
+| OpenCode | `~/.opencode/skills/` | An `opencode` command exists in the environment |
+| Gemini CLI | Supports `SKILL.md`; `~/.gemini/skills/` or `.gemini/skills/` inside a project | A `gemini` command exists in the environment |
 
-## 方式一：拷贝单个 skill（通用）
+## Option 1: copy a single skill (general)
 
 ```bash
-# 1. 取仓库（已克隆则跳过）
+# 1. Get the repository (skip if already cloned)
 git clone https://github.com/Spoon94/skill-vault.git
 cd skill-vault
 
-# 2. 拷贝目标 skill 到平台目录（以 Claude Code + git-commit 为例）
+# 2. Copy the target skill to the platform directory (Claude Code + git-commit as an example)
 mkdir -p ~/.claude/skills
 cp -r git-commit ~/.claude/skills/
 ```
 
-## 方式二：软链（推荐，便于随仓库更新）
+## Option 2: symlink (recommended, so the skill follows repository updates)
 
 ```bash
-# 仓库留在原处，软链到平台目录
+# Leave the repository where it is and symlink it into the platform directory
 ln -sfn "$PWD/git-commit" ~/.claude/skills/git-commit
 ```
 
-软链的好处：`git pull` 后 skill 自动是最新版。若目标平台不支持软链，用方式一。
+The benefit of a symlink: after `git pull` the skill is automatically up to date. If the target platform does not support symlinks, use option 1.
 
-## 方式三：批量安装
+## Option 3: bulk installation
 
 ```bash
-# 官方 skills CLI 从远程仓库装
+# The official skills CLI installs from a remote repository
 npx skills add https://github.com/Spoon94/skill-vault
 ```
 
-## 装哪些 skill
+## Which skills to install
 
-用户只说「装 XX」时，按名字装。用户说「有什么」或让你挑时，读 `README.md` 的
-「技能索引」——那里按场景列了全部技能与各自用途。
+When the user only says "install XX", install by name. When the user asks "what is there" or lets you choose, read the "Skill index" in `README.md` — it lists all the skills by scenario together with what each one is for.
 
-**嵌套路径注意**：部分 skill 在分类目录下，拷贝时用完整相对路径：
+**Nested paths**: some skills live under category directories; use the full relative path when copying:
 
 ```bash
 cp -r superpowers/brainstorming        ~/.claude/skills/
@@ -64,18 +63,18 @@ cp -r obsidian/obsidian-markdown       ~/.claude/skills/
 cp -r diagram/diagram-mermaid          ~/.claude/skills/
 ```
 
-顶层 skill（`git-commit`、`gh`、`tavily`、`eli5`、`clarify` 等）直接用目录名。
+Top-level skills (`git-commit`, `gh`, `tavily`, `eli5`, `clarify`, etc.) use the directory name directly.
 
-## 验证安装
+## Verify the installation
 
 ```bash
-# 目录存在，且 SKILL.md 可读
+# The directory exists and SKILL.md is readable
 ls ~/.claude/skills/<name>/SKILL.md
 ```
 
-Claude Code 里新开会话，skill 按 `description` 自动触发，或用 `/<name>` 显式调用。
+In Claude Code, start a new session: skills trigger automatically by their `description`, or are invoked explicitly with `/<name>`.
 
-## 注意
+## Notes
 
-- `anthropics/template` 是脚手架模板，不是可用技能，不要装。
-- 本仓库无插件市场元数据（不是 `.claude-plugin` 包）。分发方式是**拷贝目录**。
+- `anthropics/template` is a scaffold template, not a usable skill; do not install it.
+- This repository has no plugin-marketplace metadata (it is not a `.claude-plugin` package). It is distributed by **copying directories**.
