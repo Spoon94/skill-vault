@@ -1,3 +1,5 @@
+[中文](./INSTALL.md) | [English](./INSTALL.en.md)
+
 # 安装 skill（给 agent 的指令）
 
 本文件面向 **agent**。人在 README 看简介；agent 按本文件把 skill 装到目标平台。
